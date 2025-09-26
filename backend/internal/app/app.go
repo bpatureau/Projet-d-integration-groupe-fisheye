@@ -13,10 +13,11 @@ import (
 )
 
 type Application struct {
-	Logger      *utils.Logger
-	AuthHandler *api.AuthHandler
-	Middleware  *middleware.Middleware
-	DB          *sql.DB
+	Logger       *utils.Logger
+	AuthHandler  *api.AuthHandler
+	VisitHandler *api.VisitHandler
+	Middleware   *middleware.Middleware
+	DB           *sql.DB
 }
 
 func NewApplication() (*Application, error) {
@@ -46,16 +47,19 @@ func NewApplication() (*Application, error) {
 
 	userStore := store.NewPostgresUserStore(db)
 	tokenStore := store.NewPostgresTokenStore(db)
+	visitStore := store.NewPostgresVisitStore(db)
 
 	authHandler := api.NewAuthHandler(userStore, tokenStore, logger)
+	visitHandler := api.NewVisitHandler(visitStore, logger)
 
 	middlewareHandler := middleware.NewMiddleware(userStore, logger)
 
 	return &Application{
-		Logger:      logger,
-		AuthHandler: authHandler,
-		Middleware:  middlewareHandler,
-		DB:          db,
+		Logger:       logger,
+		AuthHandler:  authHandler,
+		VisitHandler: visitHandler,
+		Middleware:   middlewareHandler,
+		DB:           db,
 	}, nil
 }
 

@@ -24,16 +24,26 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 	router.Group(func(r chi.Router) {
 		r.Use(app.Middleware.RequireAuth)
 		r.Get("/auth/me", app.AuthHandler.HandleMe)
+
+		// Routes des visites
+		r.Get("/visits", app.VisitHandler.HandleListVisits)
+		r.Get("/visits/recent", app.VisitHandler.HandleGetRecentVisits)
+		r.Get("/visits/unresponded", app.VisitHandler.HandleGetUnrespondedVisits)
+		r.Get("/visits/{id}", app.VisitHandler.HandleGetVisit)
+		r.Patch("/visits/{id}/status", app.VisitHandler.HandleUpdateVisitStatus)
+		r.Post("/visits/{id}/respond", app.VisitHandler.HandleRespondToVisit)
 	})
 
 	// Admin uniquement
 	router.Group(func(r chi.Router) {
 		r.Use(app.Middleware.RequireAdmin)
+		r.Get("/visits/stats", app.VisitHandler.HandleGetStatistics)
 	})
 
 	// Raspberry Pi uniquement
 	router.Group(func(r chi.Router) {
 		r.Use(app.Middleware.RequireDevice)
+		r.Post("/visits", app.VisitHandler.HandleCreateVisit)
 	})
 
 	return router
