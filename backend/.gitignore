@@ -1,2 +1,5 @@
 /database
 ./database
+*.log
+.env*
+!.env.example
