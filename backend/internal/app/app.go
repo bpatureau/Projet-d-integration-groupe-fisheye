@@ -3,15 +3,20 @@ package app
 import (
 	"database/sql"
 	"fmt"
+	"net/http"
 
+	"fisheye/internal/api"
+	"fisheye/internal/middleware"
 	"fisheye/internal/store"
 	"fisheye/internal/utils"
 	"fisheye/migrations"
 )
 
 type Application struct {
-	Logger *utils.Logger
-	DB     *sql.DB
+	Logger      *utils.Logger
+	AuthHandler *api.AuthHandler
+	Middleware  *middleware.Middleware
+	DB          *sql.DB
 }
 
 func NewApplication() (*Application, error) {
@@ -39,9 +44,18 @@ func NewApplication() (*Application, error) {
 	logger.SetDB(db)
 	logger.Info("app", "Application initialized successfully")
 
+	userStore := store.NewPostgresUserStore(db)
+	tokenStore := store.NewPostgresTokenStore(db)
+
+	authHandler := api.NewAuthHandler(userStore, tokenStore, logger)
+
+	middlewareHandler := middleware.NewMiddleware(userStore, logger)
+
 	return &Application{
-		Logger: logger,
-		DB:     db,
+		Logger:      logger,
+		AuthHandler: authHandler,
+		Middleware:  middlewareHandler,
+		DB:          db,
 	}, nil
 }
 
@@ -55,4 +69,8 @@ func (app *Application) Close() error {
 		return app.Logger.Close()
 	}
 	return nil
+}
+
+func (app *Application) HealthCheck(w http.ResponseWriter, r *http.Request) {
+	utils.WriteSuccess(w, http.StatusOK, map[string]string{"status": "ok"})
 }

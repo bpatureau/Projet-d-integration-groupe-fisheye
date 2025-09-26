@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"fisheye/internal/app"
+	"fisheye/internal/routes"
 )
 
 func main() {
@@ -18,8 +19,10 @@ func main() {
 	}
 	defer application.Close()
 
+	router := routes.SetupRoutes(application)
 	server := &http.Server{
 		Addr:         ":8080",
+		Handler:      router,
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
