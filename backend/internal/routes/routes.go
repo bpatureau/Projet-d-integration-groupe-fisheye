@@ -12,8 +12,6 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 
 	// Middleware global
 	router.Use(middleware.Recoverer)
-	router.Use(app.Middleware.AuthenticateUser)
-	router.Use(app.Middleware.LogRequest)
 
 	// Routes publiques
 	router.Get("/health", app.HealthCheck)
@@ -23,7 +21,10 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 
 	// Authentifié uniquement
 	router.Group(func(r chi.Router) {
+		r.Use(app.Middleware.AuthenticateUser)
+		r.Use(app.Middleware.LogRequest)
 		r.Use(app.Middleware.RequireAuth)
+
 		r.Get("/auth/me", app.AuthHandler.HandleMe)
 		r.Post("/auth/logout", app.AuthHandler.HandleLogout)
 		r.Post("/auth/change-password", app.AuthHandler.HandleChangePassword)
@@ -40,13 +41,19 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 
 	// Admin uniquement
 	router.Group(func(r chi.Router) {
+		r.Use(app.Middleware.AuthenticateUser)
+		r.Use(app.Middleware.LogRequest)
 		r.Use(app.Middleware.RequireAdmin)
+
 		r.Get("/visits/stats", app.VisitHandler.HandleGetStatistics)
 	})
 
 	// Raspberry Pi uniquement
 	router.Group(func(r chi.Router) {
+		r.Use(app.Middleware.AuthenticateUser)
+		r.Use(app.Middleware.LogRequest)
 		r.Use(app.Middleware.RequireDevice)
+
 		r.Post("/visits", app.VisitHandler.HandleCreateVisit)
 	})
 

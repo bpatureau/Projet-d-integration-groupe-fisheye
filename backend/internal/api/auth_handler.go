@@ -162,6 +162,7 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !passwordsMatch {
+		h.logger.Warning("auth", "Invalid login attempt for user: "+req.Username)
 		utils.WriteUnauthorized(w, "Invalid credentials")
 		return
 	}
