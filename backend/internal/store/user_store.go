@@ -59,10 +59,6 @@ func (u *User) IsAdmin() bool {
 	return u.Role == "admin"
 }
 
-func (u *User) IsDevice() bool {
-	return u.Role == "device"
-}
-
 type PostgresUserStore struct {
 	db *sql.DB
 }

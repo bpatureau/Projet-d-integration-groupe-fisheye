@@ -166,14 +166,7 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var tokenDuration time.Duration
-	if user.IsDevice() {
-		tokenDuration = 30 * 24 * time.Hour // 30 jours pour les devices
-	} else {
-		tokenDuration = 24 * time.Hour // 24h pour les utilisateurs normaux
-	}
-
-	token, err := h.tokenStore.CreateNewToken(user.ID, tokenDuration, tokens.ScopeAuth)
+	token, err := h.tokenStore.CreateNewToken(user.ID, 24*time.Hour, tokens.ScopeAuth)
 	if err != nil {
 		h.logger.Error("auth", "Failed to create token", err)
 		utils.WriteInternalError(w)
@@ -294,15 +287,7 @@ func (h *AuthHandler) HandleRefreshToken(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Créer un nouveau token
-	var tokenDuration time.Duration
-	if user.IsDevice() {
-		tokenDuration = 30 * 24 * time.Hour // 30 jours pour les devices
-	} else {
-		tokenDuration = 24 * time.Hour // 24h pour les utilisateurs
-	}
-
-	newToken, err := h.tokenStore.CreateNewToken(user.ID, tokenDuration, tokens.ScopeAuth)
+	newToken, err := h.tokenStore.CreateNewToken(user.ID, 24*time.Hour, tokens.ScopeAuth)
 	if err != nil {
 		h.logger.Error("auth", "Failed to create new token", err)
 		utils.WriteInternalError(w)

@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"net/http"
+	"os"
 	"strings"
 
 	"fisheye/internal/store"
@@ -11,26 +12,33 @@ import (
 )
 
 type Middleware struct {
-	UserStore store.UserStore
-	Logger    *utils.Logger
+	UserStore    store.UserStore
+	Logger       *utils.Logger
+	DeviceAPIKey string
 }
 
 func NewMiddleware(userStore store.UserStore, logger *utils.Logger) *Middleware {
 	return &Middleware{
-		UserStore: userStore,
-		Logger:    logger,
+		UserStore:    userStore,
+		Logger:       logger,
+		DeviceAPIKey: os.Getenv("DEVICE_API_KEY"),
 	}
 }
 
 type contextKey string
 
 const (
-	UserContextKey   = contextKey("user")
-	DeviceContextKey = contextKey("device")
+	UserContextKey = contextKey("user")
+	IsDeviceKey    = contextKey("is_device")
 )
 
 func SetUser(r *http.Request, user *store.User) *http.Request {
 	ctx := context.WithValue(r.Context(), UserContextKey, user)
+	return r.WithContext(ctx)
+}
+
+func SetDevice(r *http.Request, isDevice bool) *http.Request {
+	ctx := context.WithValue(r.Context(), IsDeviceKey, isDevice)
 	return r.WithContext(ctx)
 }
 
@@ -42,6 +50,11 @@ func GetUser(r *http.Request) *store.User {
 	return user
 }
 
+func IsDevice(r *http.Request) bool {
+	isDevice, ok := r.Context().Value(IsDeviceKey).(bool)
+	return ok && isDevice
+}
+
 func (m *Middleware) AuthenticateUser(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Vary", "Authorization")
@@ -49,13 +62,41 @@ func (m *Middleware) AuthenticateUser(next http.Handler) http.Handler {
 
 		if authHeader == "" {
 			r = SetUser(r, store.AnonymousUser)
+			r = SetDevice(r, false)
 			next.ServeHTTP(w, r)
 			return
 		}
 
 		headerParts := strings.Split(authHeader, " ")
-		if len(headerParts) != 2 || headerParts[0] != "Bearer" {
+		if len(headerParts) != 2 {
 			m.Logger.Warning("middleware", "Invalid authorization header format")
+			utils.WriteUnauthorized(w, "Invalid authorization header")
+			return
+		}
+
+		// Vérifier si c'est une clé API device
+		if headerParts[0] == "ApiKey" {
+			if m.DeviceAPIKey == "" {
+				m.Logger.Error("middleware", "DEVICE_API_KEY not configured", nil)
+				utils.WriteInternalError(w)
+				return
+			}
+
+			if headerParts[1] == m.DeviceAPIKey {
+				// C'est le device authentifié
+				r = SetUser(r, store.AnonymousUser) // Pas d'utilisateur spécifique
+				r = SetDevice(r, true)
+				next.ServeHTTP(w, r)
+				return
+			} else {
+				utils.WriteUnauthorized(w, "Invalid API key")
+				return
+			}
+		}
+
+		// Sinon, c'est un token Bearer classique
+		if headerParts[0] != "Bearer" {
+			m.Logger.Warning("middleware", "Invalid authorization type")
 			utils.WriteUnauthorized(w, "Invalid authorization header")
 			return
 		}
@@ -74,6 +115,7 @@ func (m *Middleware) AuthenticateUser(next http.Handler) http.Handler {
 		}
 
 		r = SetUser(r, user)
+		r = SetDevice(r, false)
 		next.ServeHTTP(w, r)
 	})
 }
@@ -81,7 +123,7 @@ func (m *Middleware) AuthenticateUser(next http.Handler) http.Handler {
 func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := GetUser(r)
-		if user.IsAnonymous() {
+		if user.IsAnonymous() && !IsDevice(r) {
 			utils.WriteUnauthorized(w, "Authentication required")
 			return
 		}
@@ -106,25 +148,17 @@ func (m *Middleware) RequireAdmin(next http.Handler) http.Handler {
 
 func (m *Middleware) RequireDevice(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if IsDevice(r) {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		user := GetUser(r)
-		if user.IsAnonymous() {
-			utils.WriteUnauthorized(w, "Authentication required")
+		if !user.IsAnonymous() && user.IsAdmin() {
+			next.ServeHTTP(w, r)
 			return
 		}
-		if !user.IsDevice() && !user.IsAdmin() {
-			utils.WriteForbidden(w, "Device access required")
-			return
-		}
-		next.ServeHTTP(w, r)
+
+		utils.WriteForbidden(w, "Device or admin access required")
 	})
-}
-
-type responseWriter struct {
-	http.ResponseWriter
-	statusCode int
-}
-
-func (rw *responseWriter) WriteHeader(code int) {
-	rw.statusCode = code
-	rw.ResponseWriter.WriteHeader(code)
 }
