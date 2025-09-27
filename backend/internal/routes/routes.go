@@ -19,11 +19,15 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 	router.Get("/health", app.HealthCheck)
 	router.Post("/auth/register", app.AuthHandler.HandleRegister)
 	router.Post("/auth/login", app.AuthHandler.HandleLogin)
+	router.Post("/auth/refresh", app.AuthHandler.HandleRefreshToken)
 
 	// Authentifié uniquement
 	router.Group(func(r chi.Router) {
 		r.Use(app.Middleware.RequireAuth)
 		r.Get("/auth/me", app.AuthHandler.HandleMe)
+		r.Post("/auth/logout", app.AuthHandler.HandleLogout)
+		r.Post("/auth/change-password", app.AuthHandler.HandleChangePassword)
+		r.Delete("/auth/account", app.AuthHandler.HandleDeleteAccount)
 
 		// Routes des visites
 		r.Get("/visits", app.VisitHandler.HandleListVisits)

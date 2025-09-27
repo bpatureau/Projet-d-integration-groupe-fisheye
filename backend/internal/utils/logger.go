@@ -29,6 +29,10 @@ func (l *Logger) SetDB(db *sql.DB) {
 	l.db = db
 }
 
+func (l *Logger) Debug(component, message string) {
+	l.log("debug", component, message)
+}
+
 func (l *Logger) Info(component, message string) {
 	l.log("info", component, message)
 }

@@ -10,12 +10,12 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-type password struct {
+type Password struct {
 	plaintText *string
 	hash       []byte
 }
 
-func (p *password) Set(plaintextPassword string) error {
+func (p *Password) Set(plaintextPassword string) error {
 	hash, err := bcrypt.GenerateFromPassword([]byte(plaintextPassword), 12)
 	if err != nil {
 		return err
@@ -26,7 +26,7 @@ func (p *password) Set(plaintextPassword string) error {
 	return nil
 }
 
-func (p *password) Matches(plaintextPassword string) (bool, error) {
+func (p *Password) Matches(plaintextPassword string) (bool, error) {
 	err := bcrypt.CompareHashAndPassword(p.hash, []byte(plaintextPassword))
 	if err != nil {
 		switch {
@@ -43,7 +43,7 @@ type User struct {
 	ID           uuid.UUID `json:"id"`
 	Username     string    `json:"username"`
 	Email        string    `json:"email"`
-	PasswordHash password  `json:"-"`
+	PasswordHash Password  `json:"-"`
 	Role         string    `json:"role"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
@@ -72,7 +72,7 @@ type UserStore interface {
 	GetUserByUsername(username string) (*User, error)
 	GetUserByID(id uuid.UUID) (*User, error)
 	UpdateUser(*User) error
-	UpdatePassword(id uuid.UUID, passwordHash password) error
+	UpdatePassword(id uuid.UUID, passwordHash Password) error
 	DeleteUser(id uuid.UUID) error
 	GetUserToken(scope, tokenPlainText string) (*User, error)
 	CountUsers() (int, error)
@@ -106,7 +106,7 @@ func (s *PostgresUserStore) CreateUser(user *User) error {
 }
 
 func (s *PostgresUserStore) GetUserByUsername(username string) (*User, error) {
-	user := &User{PasswordHash: password{}}
+	user := &User{PasswordHash: Password{}}
 
 	query := `
   SELECT id, username, email, password_hash, role, created_at, updated_at
@@ -132,7 +132,7 @@ func (s *PostgresUserStore) GetUserByUsername(username string) (*User, error) {
 }
 
 func (s *PostgresUserStore) GetUserByID(id uuid.UUID) (*User, error) {
-	user := &User{PasswordHash: password{}}
+	user := &User{PasswordHash: Password{}}
 
 	query := `
 		SELECT id, username, email, password_hash, role, created_at, updated_at
@@ -170,7 +170,7 @@ func (s *PostgresUserStore) UpdateUser(user *User) error {
 	return err
 }
 
-func (s *PostgresUserStore) UpdatePassword(id uuid.UUID, passwordHash password) error {
+func (s *PostgresUserStore) UpdatePassword(id uuid.UUID, passwordHash Password) error {
 	query := `
 		UPDATE users
 		SET password_hash = $1, updated_at = CURRENT_TIMESTAMP
@@ -197,7 +197,7 @@ func (s *PostgresUserStore) GetUserToken(scope, plaintextPassword string) (*User
   WHERE t.hash = $1 AND t.scope = $2 and t.expiry > $3
   `
 
-	user := &User{PasswordHash: password{}}
+	user := &User{PasswordHash: Password{}}
 
 	err := s.db.QueryRow(query, tokenHash[:], scope, time.Now()).Scan(
 		&user.ID,

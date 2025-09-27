@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"os"
 	"strings"
@@ -9,6 +10,17 @@ import (
 	"fisheye/internal/store"
 	"fisheye/internal/tokens"
 	"fisheye/internal/utils"
+
+	"github.com/joho/godotenv"
+)
+
+type contextKey string
+
+const (
+	UserContextKey = contextKey("user")
+	IsDeviceKey    = contextKey("is_device")
+	AuthTypeBearer = "Bearer"
+	AuthTypeApiKey = "ApiKey"
 )
 
 type Middleware struct {
@@ -18,19 +30,21 @@ type Middleware struct {
 }
 
 func NewMiddleware(userStore store.UserStore, logger *utils.Logger) *Middleware {
+	godotenv.Load()
+
+	deviceAPIKey := os.Getenv("DEVICE_API_KEY")
+	if deviceAPIKey == "" {
+		logger.Warning("middleware", "DEVICE_API_KEY not configured - device authentication disabled")
+	} else {
+		logger.Info("middleware", "Device API authentication enabled")
+	}
+
 	return &Middleware{
 		UserStore:    userStore,
 		Logger:       logger,
-		DeviceAPIKey: os.Getenv("DEVICE_API_KEY"),
+		DeviceAPIKey: deviceAPIKey,
 	}
 }
-
-type contextKey string
-
-const (
-	UserContextKey = contextKey("user")
-	IsDeviceKey    = contextKey("is_device")
-)
 
 func SetUser(r *http.Request, user *store.User) *http.Request {
 	ctx := context.WithValue(r.Context(), UserContextKey, user)
@@ -55,93 +69,142 @@ func IsDevice(r *http.Request) bool {
 	return ok && isDevice
 }
 
+func (m *Middleware) parseAuthHeader(authHeader string) (authType, authValue string, err error) {
+	if authHeader == "" {
+		return "", "", nil
+	}
+
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 {
+		return "", "", errors.New("invalid authorization header format")
+	}
+
+	return parts[0], parts[1], nil
+}
+
+func (m *Middleware) authenticateWithApiKey(apiKey string) (bool, error) {
+	if m.DeviceAPIKey == "" {
+		return false, errors.New("device API key not configured")
+	}
+
+	if apiKey != m.DeviceAPIKey {
+		return false, errors.New("invalid API key")
+	}
+
+	return true, nil
+}
+
+func (m *Middleware) authenticateWithToken(token string) (*store.User, error) {
+	user, err := m.UserStore.GetUserToken(tokens.ScopeAuth, token)
+	if err != nil {
+		return nil, err
+	}
+
+	if user == nil {
+		return nil, errors.New("invalid or expired token")
+	}
+
+	return user, nil
+}
+
 func (m *Middleware) AuthenticateUser(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Vary", "Authorization")
-		authHeader := r.Header.Get("Authorization")
 
-		if authHeader == "" {
+		authType, authValue, err := m.parseAuthHeader(r.Header.Get("Authorization"))
+		if err != nil {
+			m.Logger.Warning("middleware", err.Error())
+			utils.WriteUnauthorized(w, err.Error())
+			return
+		}
+
+		if authType == "" {
 			r = SetUser(r, store.AnonymousUser)
 			r = SetDevice(r, false)
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		headerParts := strings.Split(authHeader, " ")
-		if len(headerParts) != 2 {
-			m.Logger.Warning("middleware", "Invalid authorization header format")
-			utils.WriteUnauthorized(w, "Invalid authorization header")
-			return
+		switch authType {
+		case AuthTypeApiKey:
+			m.handleApiKeyAuth(w, r, authValue, next)
+		case AuthTypeBearer:
+			m.handleBearerAuth(w, r, authValue, next)
+		default:
+			m.Logger.Warning("middleware", "Unknown auth type: "+authType)
+			utils.WriteUnauthorized(w, "invalid authorization type")
 		}
-
-		// Vérifier si c'est une clé API device
-		if headerParts[0] == "ApiKey" {
-			if m.DeviceAPIKey == "" {
-				m.Logger.Error("middleware", "DEVICE_API_KEY not configured", nil)
-				utils.WriteInternalError(w)
-				return
-			}
-
-			if headerParts[1] == m.DeviceAPIKey {
-				// C'est le device authentifié
-				r = SetUser(r, store.AnonymousUser) // Pas d'utilisateur spécifique
-				r = SetDevice(r, true)
-				next.ServeHTTP(w, r)
-				return
-			} else {
-				utils.WriteUnauthorized(w, "Invalid API key")
-				return
-			}
-		}
-
-		// Sinon, c'est un token Bearer classique
-		if headerParts[0] != "Bearer" {
-			m.Logger.Warning("middleware", "Invalid authorization type")
-			utils.WriteUnauthorized(w, "Invalid authorization header")
-			return
-		}
-
-		token := headerParts[1]
-		user, err := m.UserStore.GetUserToken(tokens.ScopeAuth, token)
-		if err != nil {
-			m.Logger.Error("middleware", "Failed to validate user token", err)
-			utils.WriteUnauthorized(w, "Invalid token")
-			return
-		}
-
-		if user == nil {
-			utils.WriteUnauthorized(w, "Token expired or invalid")
-			return
-		}
-
-		r = SetUser(r, user)
-		r = SetDevice(r, false)
-		next.ServeHTTP(w, r)
 	})
+}
+
+func (m *Middleware) handleApiKeyAuth(w http.ResponseWriter, r *http.Request, apiKey string, next http.Handler) {
+	isValid, err := m.authenticateWithApiKey(apiKey)
+
+	if err != nil {
+		if err.Error() == "device API key not configured" {
+			m.Logger.Error("middleware", err.Error(), nil)
+			utils.WriteInternalError(w)
+		} else {
+			m.Logger.Warning("middleware", "Invalid API key attempt")
+			utils.WriteUnauthorized(w, err.Error())
+		}
+		return
+	}
+
+	if isValid {
+		m.Logger.Debug("middleware", "Device authenticated successfully")
+		r = SetUser(r, store.AnonymousUser)
+		r = SetDevice(r, true)
+		next.ServeHTTP(w, r)
+	}
+}
+
+func (m *Middleware) handleBearerAuth(w http.ResponseWriter, r *http.Request, token string, next http.Handler) {
+	user, err := m.authenticateWithToken(token)
+
+	if err != nil {
+		m.Logger.Warning("middleware", "Token validation failed: "+err.Error())
+		utils.WriteUnauthorized(w, "invalid or expired token")
+		return
+	}
+
+	m.Logger.Debug("middleware", "User authenticated: "+user.Username)
+	r = SetUser(r, user)
+	r = SetDevice(r, false)
+	next.ServeHTTP(w, r)
 }
 
 func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := GetUser(r)
-		if user.IsAnonymous() && !IsDevice(r) {
-			utils.WriteUnauthorized(w, "Authentication required")
+		isDevice := IsDevice(r)
+
+		if !user.IsAnonymous() || isDevice {
+			next.ServeHTTP(w, r)
 			return
 		}
-		next.ServeHTTP(w, r)
+
+		m.Logger.Warning("middleware", "Unauthorized access attempt to protected route")
+		utils.WriteUnauthorized(w, "authentication required")
 	})
 }
 
 func (m *Middleware) RequireAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := GetUser(r)
+
 		if user.IsAnonymous() {
-			utils.WriteUnauthorized(w, "Authentication required")
+			m.Logger.Warning("middleware", "Anonymous user tried to access admin route")
+			utils.WriteUnauthorized(w, "authentication required")
 			return
 		}
+
 		if !user.IsAdmin() {
-			utils.WriteForbidden(w, "Admin access required")
+			m.Logger.Warning("middleware", "Non-admin user tried to access admin route: "+user.Username)
+			utils.WriteForbidden(w, "admin access required")
 			return
 		}
+
 		next.ServeHTTP(w, r)
 	})
 }
@@ -155,10 +218,31 @@ func (m *Middleware) RequireDevice(next http.Handler) http.Handler {
 
 		user := GetUser(r)
 		if !user.IsAnonymous() && user.IsAdmin() {
+			m.Logger.Debug("middleware", "Admin accessing device route: "+user.Username)
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		utils.WriteForbidden(w, "Device or admin access required")
+		m.Logger.Warning("middleware", "Unauthorized access to device route")
+		utils.WriteForbidden(w, "device or admin access required")
+	})
+}
+
+func (m *Middleware) LogRequest(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := GetUser(r)
+		isDevice := IsDevice(r)
+
+		var authInfo string
+		if isDevice {
+			authInfo = "device"
+		} else if !user.IsAnonymous() {
+			authInfo = "user:" + user.Username
+		} else {
+			authInfo = "anonymous"
+		}
+
+		m.Logger.Info("request", r.Method+" "+r.URL.Path+" ["+authInfo+"]")
+		next.ServeHTTP(w, r)
 	})
 }
