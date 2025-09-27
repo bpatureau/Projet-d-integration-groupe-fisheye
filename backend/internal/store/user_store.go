@@ -74,14 +74,25 @@ func NewPostgresUserStore(db *sql.DB) *PostgresUserStore {
 type UserStore interface {
 	CreateUser(*User) error
 	GetUserByUsername(username string) (*User, error)
+	GetUserByID(id uuid.UUID) (*User, error)
 	UpdateUser(*User) error
+	UpdatePassword(id uuid.UUID, passwordHash password) error
+	DeleteUser(id uuid.UUID) error
 	GetUserToken(scope, tokenPlainText string) (*User, error)
 	CountUsers() (int, error)
+	CountAdmins() (int, error)
 }
 
 func (s *PostgresUserStore) CountUsers() (int, error) {
 	var count int
 	query := `SELECT COUNT(*) FROM users`
+	err := s.db.QueryRow(query).Scan(&count)
+	return count, err
+}
+
+func (s *PostgresUserStore) CountAdmins() (int, error) {
+	var count int
+	query := `SELECT COUNT(*) FROM users WHERE role = 'admin'`
 	err := s.db.QueryRow(query).Scan(&count)
 	return count, err
 }
@@ -124,6 +135,32 @@ func (s *PostgresUserStore) GetUserByUsername(username string) (*User, error) {
 	return user, err
 }
 
+func (s *PostgresUserStore) GetUserByID(id uuid.UUID) (*User, error) {
+	user := &User{PasswordHash: password{}}
+
+	query := `
+		SELECT id, username, email, password_hash, role, created_at, updated_at
+		FROM users
+		WHERE id = $1
+	`
+
+	err := s.db.QueryRow(query, id).Scan(
+		&user.ID,
+		&user.Username,
+		&user.Email,
+		&user.PasswordHash.hash,
+		&user.Role,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+
+	return user, err
+}
+
 func (s *PostgresUserStore) UpdateUser(user *User) error {
 	query := `
   UPDATE users
@@ -134,6 +171,23 @@ func (s *PostgresUserStore) UpdateUser(user *User) error {
 
 	err := s.db.QueryRow(query, user.Username, user.Email, user.Role, user.ID).
 		Scan(&user.UpdatedAt)
+	return err
+}
+
+func (s *PostgresUserStore) UpdatePassword(id uuid.UUID, passwordHash password) error {
+	query := `
+		UPDATE users
+		SET password_hash = $1, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $2
+	`
+
+	_, err := s.db.Exec(query, passwordHash.hash, id)
+	return err
+}
+
+func (s *PostgresUserStore) DeleteUser(id uuid.UUID) error {
+	query := `DELETE FROM users WHERE id = $1`
+	_, err := s.db.Exec(query, id)
 	return err
 }
 
