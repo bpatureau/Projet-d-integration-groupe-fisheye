@@ -146,10 +146,7 @@ func (m *Middleware) handleApiKeyAuth(w http.ResponseWriter, r *http.Request, ap
 			utils.WriteInternalError(w)
 		} else {
 			m.Logger.Warning("middleware", "Invalid API key attempt")
-			r = SetUser(r, store.AnonymousUser)
-			r = SetDevice(r, false)
-			next.ServeHTTP(w, r)
-			return
+			utils.WriteUnauthorized(w, err.Error())
 		}
 		return
 	}
@@ -167,9 +164,7 @@ func (m *Middleware) handleBearerAuth(w http.ResponseWriter, r *http.Request, to
 
 	if err != nil {
 		m.Logger.Warning("middleware", "Token validation failed: "+err.Error())
-		r = SetUser(r, store.AnonymousUser)
-		r = SetDevice(r, false)
-		next.ServeHTTP(w, r)
+		utils.WriteUnauthorized(w, "invalid or expired token")
 		return
 	}
 
