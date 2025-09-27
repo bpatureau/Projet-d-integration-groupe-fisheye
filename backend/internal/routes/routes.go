@@ -45,6 +45,15 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 		r.Use(app.Middleware.LogRequest)
 		r.Use(app.Middleware.RequireAdmin)
 
+		// Gestion des utilisateurs
+		r.Get("/users", app.UserHandler.HandleListUsers)
+		r.Get("/users/{id}", app.UserHandler.HandleGetUser)
+		r.Post("/users", app.UserHandler.HandleCreateUser)
+		r.Patch("/users/{id}", app.UserHandler.HandleUpdateUser)
+		r.Delete("/users/{id}", app.UserHandler.HandleDeleteUser)
+		r.Post("/users/{id}/reset-password", app.UserHandler.HandleResetUserPassword)
+
+		// Statistiques des visites
 		r.Get("/visits/stats", app.VisitHandler.HandleGetStatistics)
 	})
 

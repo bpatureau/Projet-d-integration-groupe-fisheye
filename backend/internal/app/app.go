@@ -15,6 +15,7 @@ import (
 type Application struct {
 	Logger       *utils.Logger
 	AuthHandler  *api.AuthHandler
+	UserHandler  *api.UserHandler
 	VisitHandler *api.VisitHandler
 	Middleware   *middleware.Middleware
 	DB           *sql.DB
@@ -50,6 +51,7 @@ func NewApplication() (*Application, error) {
 	visitStore := store.NewPostgresVisitStore(db)
 
 	authHandler := api.NewAuthHandler(userStore, tokenStore, logger)
+	userHandler := api.NewUserHandler(userStore, tokenStore, logger)
 	visitHandler := api.NewVisitHandler(visitStore, logger)
 
 	middlewareHandler := middleware.NewMiddleware(userStore, logger)
@@ -57,6 +59,7 @@ func NewApplication() (*Application, error) {
 	return &Application{
 		Logger:       logger,
 		AuthHandler:  authHandler,
+		UserHandler:  userHandler,
 		VisitHandler: visitHandler,
 		Middleware:   middlewareHandler,
 		DB:           db,

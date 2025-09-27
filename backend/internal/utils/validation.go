@@ -86,3 +86,16 @@ func ValidateVisitStatus(status string) error {
 	}
 	return nil
 }
+
+func ValidateRole(role string) error {
+	validRoles := map[string]bool{
+		"admin": true,
+		"user":  true,
+	}
+
+	if !validRoles[role] {
+		return errors.New("invalid role: must be 'admin' or 'user'")
+	}
+
+	return nil
+}

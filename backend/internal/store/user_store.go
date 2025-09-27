@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -77,6 +78,7 @@ type UserStore interface {
 	GetUserToken(scope, tokenPlainText string) (*User, error)
 	CountUsers() (int, error)
 	CountAdmins() (int, error)
+	ListUsers(limit, offset int, search, role string) ([]*User, int, error)
 }
 
 func (s *PostgresUserStore) CountUsers() (int, error) {
@@ -214,4 +216,73 @@ func (s *PostgresUserStore) GetUserToken(scope, plaintextPassword string) (*User
 	}
 
 	return user, err
+}
+
+func (s *PostgresUserStore) ListUsers(limit, offset int, search, role string) ([]*User, int, error) {
+	countQuery := `SELECT COUNT(*) FROM users WHERE 1=1`
+	query := `
+		SELECT id, username, email, password_hash, role, created_at, updated_at
+		FROM users
+		WHERE 1=1
+	`
+
+	args := []interface{}{}
+	countArgs := []interface{}{}
+	argPosition := 1
+
+	if search != "" {
+		searchCondition := ` AND (username ILIKE $` + strconv.Itoa(argPosition) +
+			` OR email ILIKE $` + strconv.Itoa(argPosition) + `)`
+		query += searchCondition
+		countQuery += searchCondition
+		searchParam := "%" + search + "%"
+		args = append(args, searchParam)
+		countArgs = append(countArgs, searchParam)
+		argPosition++
+	}
+
+	if role != "" {
+		roleCondition := ` AND role = $` + strconv.Itoa(argPosition)
+		query += roleCondition
+		countQuery += roleCondition
+		args = append(args, role)
+		countArgs = append(countArgs, role)
+		argPosition++
+	}
+
+	var total int
+	err := s.db.QueryRow(countQuery, countArgs...).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	query += ` ORDER BY created_at DESC LIMIT $` + strconv.Itoa(argPosition) +
+		` OFFSET $` + strconv.Itoa(argPosition+1)
+	args = append(args, limit, offset)
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	users := []*User{}
+	for rows.Next() {
+		user := &User{PasswordHash: Password{}}
+		err := rows.Scan(
+			&user.ID,
+			&user.Username,
+			&user.Email,
+			&user.PasswordHash.hash,
+			&user.Role,
+			&user.CreatedAt,
+			&user.UpdatedAt,
+		)
+		if err != nil {
+			return nil, 0, err
+		}
+		users = append(users, user)
+	}
+
+	return users, total, nil
 }
