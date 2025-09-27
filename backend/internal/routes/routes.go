@@ -11,9 +11,9 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 	router := chi.NewRouter()
 
 	// Middleware global
-	router.Use(middleware.Logger)
 	router.Use(middleware.Recoverer)
 	router.Use(app.Middleware.AuthenticateUser)
+	router.Use(app.Middleware.LogRequest)
 
 	// Routes publiques
 	router.Get("/health", app.HealthCheck)

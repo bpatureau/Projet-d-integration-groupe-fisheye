@@ -30,7 +30,9 @@ func (l *Logger) SetDB(db *sql.DB) {
 }
 
 func (l *Logger) Debug(component, message string) {
-	l.log("debug", component, message)
+	if os.Getenv("DEBUG") == "true" {
+		l.log("debug", component, message)
+	}
 }
 
 func (l *Logger) Info(component, message string) {
