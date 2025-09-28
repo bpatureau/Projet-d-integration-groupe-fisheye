@@ -9,23 +9,20 @@ import (
 	"github.com/google/uuid"
 )
 
-const (
-	ScopeAuth = "authentication"
-)
-
 type Token struct {
 	Plaintext string    `json:"token"`
 	Hash      []byte    `json:"-"`
 	UserID    uuid.UUID `json:"-"`
 	Expiry    time.Time `json:"expiry"`
-	Scope     string    `json:"-"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
-func GenerateToken(userID uuid.UUID, ttl time.Duration, scope string) (*Token, error) {
+const DefaultTTL = 7 * 24 * time.Hour
+
+func GenerateToken(userID uuid.UUID, ttl time.Duration) (*Token, error) {
 	token := &Token{
 		UserID: userID,
 		Expiry: time.Now().Add(ttl),
-		Scope:  scope,
 	}
 
 	emptyBytes := make([]byte, 32)

@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"database/sql"
+	"fisheye/internal/store"
 	"fmt"
 	"log"
 	"os"
@@ -9,7 +9,7 @@ import (
 
 type Logger struct {
 	fileLogger *log.Logger
-	db         *sql.DB
+	logStore   store.LogStore
 	file       *os.File
 }
 
@@ -25,8 +25,8 @@ func NewFileLogger(logFilePath string) (*Logger, error) {
 	}, nil
 }
 
-func (l *Logger) SetDB(db *sql.DB) {
-	l.db = db
+func (l *Logger) SetLogStore(logStore store.LogStore) {
+	l.logStore = logStore
 }
 
 func (l *Logger) Debug(component, message string) {
@@ -55,14 +55,10 @@ func (l *Logger) log(level, component, message string) {
 	logMsg := fmt.Sprintf("[%s] %s: %s", level, component, message)
 	l.fileLogger.Println(logMsg)
 
-	// Logger en DB si disponible
-	if l.db != nil {
-		_, err := l.db.Exec(`
-			INSERT INTO system_logs (level, message, component) 
-			VALUES ($1, $2, $3)`,
-			level, message, component)
-		if err != nil {
-			// Fallback: log l'erreur DB dans le fichier uniquement
+	// Enregistrer en BD si disponible
+	if l.logStore != nil {
+		if err := l.logStore.CreateLog(level, message, component); err != nil {
+			// fallback : fichier uniquement
 			l.fileLogger.Printf("[error] logger: failed to insert log into database: %v", err)
 		}
 	}

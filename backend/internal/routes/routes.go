@@ -12,58 +12,88 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 
 	// Middleware global
 	router.Use(middleware.Recoverer)
+	router.Use(middleware.RequestID)
+	router.Use(middleware.RealIP)
 
-	// Routes publiques
-	router.Get("/health", app.HealthCheck)
-	router.Post("/auth/register", app.AuthHandler.HandleRegister)
-	router.Post("/auth/login", app.AuthHandler.HandleLogin)
-	router.Post("/auth/refresh", app.AuthHandler.HandleRefreshToken)
+	router.Route("/api", func(r chi.Router) {
+		r.Get("/health", app.HealthCheck)
 
-	// Authentifié uniquement
-	router.Group(func(r chi.Router) {
-		r.Use(app.Middleware.AuthenticateUser)
-		r.Use(app.Middleware.LogRequest)
-		r.Use(app.Middleware.RequireAuth)
+		r.Route("/auth", func(r chi.Router) {
+			r.Post("/register", app.AuthHandler.HandleRegister)
+			r.Post("/login", app.AuthHandler.HandleLogin)
+		})
 
-		r.Get("/auth/me", app.AuthHandler.HandleMe)
-		r.Post("/auth/logout", app.AuthHandler.HandleLogout)
-		r.Post("/auth/change-password", app.AuthHandler.HandleChangePassword)
-		r.Delete("/auth/account", app.AuthHandler.HandleDeleteAccount)
+		r.Route("/profile", func(r chi.Router) {
+			r.Use(app.Middleware.AuthenticateUser)
+			r.Use(app.Middleware.LogRequest)
+			r.Use(app.Middleware.RequireAuth)
 
-		// Routes des visites
-		r.Get("/visits", app.VisitHandler.HandleListVisits)
-		r.Get("/visits/recent", app.VisitHandler.HandleGetRecentVisits)
-		r.Get("/visits/unresponded", app.VisitHandler.HandleGetUnrespondedVisits)
-		r.Get("/visits/{id}", app.VisitHandler.HandleGetVisit)
-		r.Patch("/visits/{id}/status", app.VisitHandler.HandleUpdateVisitStatus)
-		r.Post("/visits/{id}/respond", app.VisitHandler.HandleRespondToVisit)
-	})
+			r.Get("/", app.ProfileHandler.HandleGetProfile)
+			r.Put("/", app.ProfileHandler.HandleUpdateProfile)
+			r.Post("/change-password", app.ProfileHandler.HandleChangePassword)
+			r.Delete("/", app.ProfileHandler.HandleDeleteAccount)
+			r.Post("/logout", app.ProfileHandler.HandleLogout)
+		})
 
-	// Admin uniquement
-	router.Group(func(r chi.Router) {
-		r.Use(app.Middleware.AuthenticateUser)
-		r.Use(app.Middleware.LogRequest)
-		r.Use(app.Middleware.RequireAdmin)
+		r.Route("/visits", func(r chi.Router) {
+			r.Use(app.Middleware.AuthenticateUser)
+			r.Use(app.Middleware.LogRequest)
 
-		// Gestion des utilisateurs
-		r.Get("/users", app.UserHandler.HandleListUsers)
-		r.Get("/users/{id}", app.UserHandler.HandleGetUser)
-		r.Post("/users", app.UserHandler.HandleCreateUser)
-		r.Patch("/users/{id}", app.UserHandler.HandleUpdateUser)
-		r.Delete("/users/{id}", app.UserHandler.HandleDeleteUser)
-		r.Post("/users/{id}/reset-password", app.UserHandler.HandleResetUserPassword)
+			r.Group(func(r chi.Router) {
+				r.Use(app.Middleware.RequireDevice)
+				r.Post("/", app.VisitHandler.HandleCreateVisit)
+			})
 
-		// Statistiques des visites
-		r.Get("/visits/stats", app.VisitHandler.HandleGetStatistics)
-	})
+			r.Group(func(r chi.Router) {
+				r.Use(app.Middleware.RequireAuth)
+				r.Get("/", app.VisitHandler.HandleListVisits)
+				r.Get("/stats", app.VisitHandler.HandleGetStatistics)
+				r.Get("/voice-messages", app.VoiceMessageHandler.ListVoiceMessages)
+				r.Get("/{id}", app.VisitHandler.HandleGetVisit)
+				r.Patch("/{id}/status", app.VisitHandler.HandleUpdateVisitStatus)
+				r.Post("/{id}/respond", app.VisitHandler.HandleRespondToVisit)
 
-	// Raspberry Pi uniquement
-	router.Group(func(r chi.Router) {
-		r.Use(app.Middleware.AuthenticateUser)
-		r.Use(app.Middleware.LogRequest)
-		r.Use(app.Middleware.RequireDevice)
+				r.Route("/{id}/voice-messages", func(r chi.Router) {
+					r.Get("/", app.VoiceMessageHandler.ListByVisit)
+					r.Post("/", app.VoiceMessageHandler.Upload)
+					r.Get("/{messageId}", app.VoiceMessageHandler.Download)
+					r.Patch("/{messageId}/listen", app.VoiceMessageHandler.MarkAsListened)
+					r.Delete("/{messageId}", app.VoiceMessageHandler.DeleteVoiceMessage)
+				})
+			})
+		})
 
-		r.Post("/visits", app.VisitHandler.HandleCreateVisit)
+		r.Route("/admin", func(r chi.Router) {
+			r.Use(app.Middleware.AuthenticateUser)
+			r.Use(app.Middleware.LogRequest)
+			r.Use(app.Middleware.RequireAdmin)
+
+			r.Route("/users", func(r chi.Router) {
+				r.Get("/", app.AdminHandler.HandleListUsers)
+				r.Post("/", app.AdminHandler.HandleCreateUser)
+				r.Get("/{id}", app.AdminHandler.HandleGetUser)
+				r.Put("/{id}", app.AdminHandler.HandleUpdateUser)
+				r.Delete("/{id}", app.AdminHandler.HandleDeleteUser)
+				r.Post("/{id}/reset-password", app.AdminHandler.HandleResetUserPassword)
+			})
+
+			r.Route("/settings", func(r chi.Router) {
+				r.Get("/", app.SettingsHandler.HandleGetSettings)
+				r.Put("/", app.SettingsHandler.HandleUpdateSettings)
+				r.Post("/toggle-dnd", app.SettingsHandler.HandleToggleDND)
+				r.Put("/schedule", app.SettingsHandler.HandleUpdateSchedule)
+				r.Put("/motd", app.SettingsHandler.HandleUpdateMOTD)
+			})
+
+			r.Route("/stats", func(r chi.Router) {
+				r.Get("/visits", app.AdminHandler.HandleGetVisitStatistics)
+			})
+
+			r.Route("/logs", func(r chi.Router) {
+				r.Get("/", app.AdminHandler.HandleListSystemLogs)
+				r.Delete("/", app.AdminHandler.HandleClearLogs)
+			})
+		})
 	})
 
 	return router

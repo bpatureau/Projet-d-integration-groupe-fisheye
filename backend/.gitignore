@@ -1,5 +1,6 @@
 /database
 /tmp
+/uploads
 *.log
 .env*
 !.env.example

@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 
-	"fisheye/internal/middleware"
 	"fisheye/internal/store"
 	"fisheye/internal/utils"
 
@@ -106,7 +106,27 @@ func (h *VisitHandler) HandleListVisits(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	visits, total, err := h.visitStore.ListVisits(limit, offset)
+	// Filtres
+	status := r.URL.Query().Get("status")
+	visitType := r.URL.Query().Get("type")
+
+	var startDate, endDate *time.Time
+
+	if startDateStr := r.URL.Query().Get("start_date"); startDateStr != "" {
+		if sd, err := time.Parse("2006-01-02", startDateStr); err == nil {
+			startDate = &sd
+		}
+	}
+
+	if endDateStr := r.URL.Query().Get("end_date"); endDateStr != "" {
+		if ed, err := time.Parse("2006-01-02", endDateStr); err == nil {
+			// Set to end of day
+			endOfDay := ed.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+			endDate = &endOfDay
+		}
+	}
+
+	visits, total, err := h.visitStore.ListVisits(limit, offset, status, visitType, startDate, endDate)
 	if err != nil {
 		h.logger.Error("visits", "Failed to list visits", err)
 		utils.WriteInternalError(w)
@@ -199,44 +219,7 @@ func (h *VisitHandler) HandleRespondToVisit(w http.ResponseWriter, r *http.Reque
 	utils.WriteSuccess(w, http.StatusOK, map[string]string{"message": "Visit marked as responded"})
 }
 
-func (h *VisitHandler) HandleGetRecentVisits(w http.ResponseWriter, r *http.Request) {
-	limitStr := r.URL.Query().Get("limit")
-	limit := 10 // Par défaut
-
-	if limitStr != "" {
-		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 50 {
-			limit = l
-		}
-	}
-
-	visits, err := h.visitStore.GetRecentVisits(limit)
-	if err != nil {
-		h.logger.Error("visits", "Failed to get recent visits", err)
-		utils.WriteInternalError(w)
-		return
-	}
-
-	utils.WriteSuccess(w, http.StatusOK, visits)
-}
-
-func (h *VisitHandler) HandleGetUnrespondedVisits(w http.ResponseWriter, r *http.Request) {
-	visits, err := h.visitStore.GetUnrespondedVisits()
-	if err != nil {
-		h.logger.Error("visits", "Failed to get unresponded visits", err)
-		utils.WriteInternalError(w)
-		return
-	}
-
-	utils.WriteSuccess(w, http.StatusOK, visits)
-}
-
 func (h *VisitHandler) HandleGetStatistics(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r)
-	if !user.IsAdmin() {
-		utils.WriteForbidden(w, "Admin access required")
-		return
-	}
-
 	stats, err := h.visitStore.GetVisitStatistics()
 	if err != nil {
 		h.logger.Error("visits", "Failed to get visit statistics", err)

@@ -13,12 +13,15 @@ import (
 )
 
 type Application struct {
-	Logger       *utils.Logger
-	AuthHandler  *api.AuthHandler
-	UserHandler  *api.UserHandler
-	VisitHandler *api.VisitHandler
-	Middleware   *middleware.Middleware
-	DB           *sql.DB
+	Logger              *utils.Logger
+	AdminHandler        *api.AdminHandler
+	AuthHandler         *api.AuthHandler
+	ProfileHandler      *api.ProfileHandler
+	SettingsHandler     *api.SettingsHandler
+	VisitHandler        *api.VisitHandler
+	VoiceMessageHandler *api.VoiceMessageHandler
+	Middleware          *middleware.Middleware
+	DB                  *sql.DB
 }
 
 func NewApplication() (*Application, error) {
@@ -43,26 +46,35 @@ func NewApplication() (*Application, error) {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	logger.SetDB(db)
+	logStore := store.NewPostgresLogStore(db)
+	logger.SetLogStore(logStore)
 	logger.Info("app", "Application initialized successfully")
 
-	userStore := store.NewPostgresUserStore(db)
+	settingsStore := store.NewPostgresSettingsStore(db)
 	tokenStore := store.NewPostgresTokenStore(db)
+	userStore := store.NewPostgresUserStore(db)
 	visitStore := store.NewPostgresVisitStore(db)
+	voiceMessageStore := store.NewPostgresVoiceMessageStore(db)
 
+	adminHandler := api.NewAdminHandler(userStore, tokenStore, visitStore, logStore, logger)
 	authHandler := api.NewAuthHandler(userStore, tokenStore, logger)
-	userHandler := api.NewUserHandler(userStore, tokenStore, logger)
+	profileHandler := api.NewProfileHandler(userStore, tokenStore, logger)
+	settingsHandler := api.NewSettingsHandler(settingsStore, logger)
 	visitHandler := api.NewVisitHandler(visitStore, logger)
+	voiceMessageHandler := api.NewVoiceMessageHandler(voiceMessageStore, logger)
 
-	middlewareHandler := middleware.NewMiddleware(userStore, logger)
+	middlewareHandler := middleware.NewMiddleware(userStore, tokenStore, logger)
 
 	return &Application{
-		Logger:       logger,
-		AuthHandler:  authHandler,
-		UserHandler:  userHandler,
-		VisitHandler: visitHandler,
-		Middleware:   middlewareHandler,
-		DB:           db,
+		Logger:              logger,
+		AdminHandler:        adminHandler,
+		AuthHandler:         authHandler,
+		ProfileHandler:      profileHandler,
+		SettingsHandler:     settingsHandler,
+		VisitHandler:        visitHandler,
+		VoiceMessageHandler: voiceMessageHandler,
+		Middleware:          middlewareHandler,
+		DB:                  db,
 	}, nil
 }
 
