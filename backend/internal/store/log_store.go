@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -18,9 +19,9 @@ type LogEntry struct {
 }
 
 type LogStore interface {
-	CreateLog(level, message, component string) error
-	ListLogs(limit, offset int, level, component string, startDate, endDate *time.Time) ([]*LogEntry, int, error)
-	DeleteOldLogs(olderThanDays int) (int64, error)
+	Create(ctx context.Context, level, message, component string) error
+	List(ctx context.Context, limit, offset int, level, component string, startDate, endDate *time.Time) ([]*LogEntry, int, error)
+	DeleteOld(ctx context.Context, olderThanDays int) (int64, error)
 }
 
 type PostgresLogStore struct {
@@ -31,17 +32,17 @@ func NewPostgresLogStore(db *sql.DB) *PostgresLogStore {
 	return &PostgresLogStore{db: db}
 }
 
-func (s *PostgresLogStore) CreateLog(level, message, component string) error {
+func (s *PostgresLogStore) Create(ctx context.Context, level, message, component string) error {
 	query := `
 		INSERT INTO system_logs (level, message, component)
 		VALUES ($1, $2, $3)
 	`
 
-	_, err := s.db.Exec(query, level, message, component)
+	_, err := s.db.ExecContext(ctx, query, level, message, component)
 	return err
 }
 
-func (s *PostgresLogStore) ListLogs(limit, offset int, level, component string, startDate, endDate *time.Time) ([]*LogEntry, int, error) {
+func (s *PostgresLogStore) List(ctx context.Context, limit, offset int, level, component string, startDate, endDate *time.Time) ([]*LogEntry, int, error) {
 	whereConditions := []string{"1=1"}
 	args := []any{}
 	argPosition := 1
@@ -72,14 +73,15 @@ func (s *PostgresLogStore) ListLogs(limit, offset int, level, component string, 
 
 	whereClause := strings.Join(whereConditions, " AND ")
 
+	// Count total
 	var total int
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM system_logs WHERE %s", whereClause)
-	if err := s.db.QueryRow(countQuery, args...).Scan(&total); err != nil {
+	if err := s.db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	finalArgs := append(args, limit, offset)
-
+	// Get logs
+	args = append(args, limit, offset)
 	query := fmt.Sprintf(`
 		SELECT id, level, message, component, created_at
 		FROM system_logs
@@ -88,7 +90,7 @@ func (s *PostgresLogStore) ListLogs(limit, offset int, level, component string, 
 		LIMIT $%d OFFSET $%d
 	`, whereClause, argPosition, argPosition+1)
 
-	rows, err := s.db.Query(query, finalArgs...)
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -110,14 +112,10 @@ func (s *PostgresLogStore) ListLogs(limit, offset int, level, component string, 
 		logs = append(logs, log)
 	}
 
-	if err = rows.Err(); err != nil {
-		return nil, 0, err
-	}
-
-	return logs, total, nil
+	return logs, total, rows.Err()
 }
 
-func (s *PostgresLogStore) DeleteOldLogs(olderThanDays int) (int64, error) {
+func (s *PostgresLogStore) DeleteOld(ctx context.Context, olderThanDays int) (int64, error) {
 	cutoffDate := time.Now().AddDate(0, 0, -olderThanDays)
 
 	query := `
@@ -125,7 +123,7 @@ func (s *PostgresLogStore) DeleteOldLogs(olderThanDays int) (int64, error) {
 		WHERE created_at < $1
 	`
 
-	result, err := s.db.Exec(query, cutoffDate)
+	result, err := s.db.ExecContext(ctx, query, cutoffDate)
 	if err != nil {
 		return 0, err
 	}

@@ -2,96 +2,102 @@ package routes
 
 import (
 	"fisheye/internal/app"
+	"fisheye/internal/middleware"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	chiMiddleware "github.com/go-chi/chi/v5/middleware"
+	"golang.org/x/time/rate"
 )
 
 func SetupRoutes(app *app.Application) *chi.Mux {
 	router := chi.NewRouter()
 
-	// Middleware global
-	router.Use(middleware.Recoverer)
-	router.Use(middleware.RequestID)
-	router.Use(middleware.RealIP)
+	// Global middleware
+	router.Use(chiMiddleware.Recoverer)
+	router.Use(chiMiddleware.RequestID)
+	router.Use(chiMiddleware.RealIP)
+	router.Use(chiMiddleware.Logger)
+
+	// Rate limiter for auth endpoints (10 requests per minute)
+	authLimiter := middleware.NewRateLimiter(rate.Limit(10.0/60.0), 5, app.Logger)
 
 	router.Route("/api", func(r chi.Router) {
-		r.Get("/health", app.HealthCheck)
+		// Health check
+		r.Get("/health", app.HealthHandler.HandleHealth)
 
+		// Authentication
 		r.Route("/auth", func(r chi.Router) {
-			r.Post("/register", app.AuthHandler.HandleRegister)
-			r.Post("/login", app.AuthHandler.HandleLogin)
+			r.Use(authLimiter.StrictLimit)
+			r.Post("/login", app.AuthHandler.Login)
 		})
 
-		r.Route("/profile", func(r chi.Router) {
+		// Device endpoints (doorbell only)
+		r.Route("/device", func(r chi.Router) {
+			r.Use(app.Middleware.AuthenticateUser)
+			r.Use(app.Middleware.LogRequest)
+			r.Use(app.Middleware.RequireDevice)
+
+			r.Post("/ring", app.DeviceHandler.Ring)
+			r.Post("/visits/{id}/message", app.DeviceHandler.AddMessage)
+			r.Post("/visits/{id}/answer", app.DeviceHandler.AnswerVisit)
+			r.Get("/settings", app.DeviceHandler.GetSettings)
+		})
+
+		// User endpoints (authenticated users)
+		r.Group(func(r chi.Router) {
 			r.Use(app.Middleware.AuthenticateUser)
 			r.Use(app.Middleware.LogRequest)
 			r.Use(app.Middleware.RequireAuth)
 
-			r.Get("/", app.ProfileHandler.HandleGetProfile)
-			r.Put("/", app.ProfileHandler.HandleUpdateProfile)
-			r.Post("/change-password", app.ProfileHandler.HandleChangePassword)
-			r.Delete("/", app.ProfileHandler.HandleDeleteAccount)
-			r.Post("/logout", app.ProfileHandler.HandleLogout)
-		})
+			// Auth
+			r.Post("/auth/logout", app.AuthHandler.Logout)
 
-		r.Route("/visits", func(r chi.Router) {
-			r.Use(app.Middleware.AuthenticateUser)
-			r.Use(app.Middleware.LogRequest)
-
-			r.Group(func(r chi.Router) {
-				r.Use(app.Middleware.RequireDevice)
-				r.Post("/", app.VisitHandler.HandleCreateVisit)
+			// Profile management
+			r.Route("/profile", func(r chi.Router) {
+				r.Get("/", app.ProfileHandler.Get)
+				r.Put("/", app.ProfileHandler.Update)
+				r.Post("/password", app.ProfileHandler.ChangePassword)
 			})
 
-			r.Group(func(r chi.Router) {
-				r.Use(app.Middleware.RequireAuth)
-				r.Get("/", app.VisitHandler.HandleListVisits)
-				r.Get("/stats", app.VisitHandler.HandleGetStatistics)
-				r.Get("/voice-messages", app.VoiceMessageHandler.ListVoiceMessages)
-				r.Get("/{id}", app.VisitHandler.HandleGetVisit)
-				r.Patch("/{id}/status", app.VisitHandler.HandleUpdateVisitStatus)
-				r.Post("/{id}/respond", app.VisitHandler.HandleRespondToVisit)
+			// Visits
+			r.Route("/visits", func(r chi.Router) {
+				r.Get("/", app.VisitHandler.List)
+				r.Get("/stats", app.VisitHandler.GetStats)
+				r.Get("/{id}", app.VisitHandler.GetByID)
+				r.Patch("/{id}", app.VisitHandler.Update)
+				r.Get("/{id}/message", app.VisitHandler.DownloadMessage)
 
-				r.Route("/{id}/voice-messages", func(r chi.Router) {
-					r.Get("/", app.VoiceMessageHandler.ListByVisit)
-					r.Post("/", app.VoiceMessageHandler.Upload)
-					r.Get("/{messageId}", app.VoiceMessageHandler.Download)
-					r.Patch("/{messageId}/listen", app.VoiceMessageHandler.MarkAsListened)
-					r.Delete("/{messageId}", app.VoiceMessageHandler.DeleteVoiceMessage)
-				})
+				// Admin only
+				r.With(app.Middleware.RequireAdmin).Delete("/{id}", app.VisitHandler.Delete)
+			})
+
+			// Settings (read for all, write for admin)
+			r.Route("/settings", func(r chi.Router) {
+				r.Get("/", app.SettingsHandler.Get)
+				r.With(app.Middleware.RequireAdmin).Put("/", app.SettingsHandler.Update)
 			})
 		})
 
+		// Admin endpoints
 		r.Route("/admin", func(r chi.Router) {
 			r.Use(app.Middleware.AuthenticateUser)
 			r.Use(app.Middleware.LogRequest)
 			r.Use(app.Middleware.RequireAdmin)
 
+			// User management
 			r.Route("/users", func(r chi.Router) {
-				r.Get("/", app.AdminHandler.HandleListUsers)
-				r.Post("/", app.AdminHandler.HandleCreateUser)
-				r.Get("/{id}", app.AdminHandler.HandleGetUser)
-				r.Put("/{id}", app.AdminHandler.HandleUpdateUser)
-				r.Delete("/{id}", app.AdminHandler.HandleDeleteUser)
-				r.Post("/{id}/reset-password", app.AdminHandler.HandleResetUserPassword)
+				r.Get("/", app.AdminHandler.ListUsers)
+				r.Post("/", app.AdminHandler.CreateUser)
+				r.Get("/{id}", app.AdminHandler.GetUser)
+				r.Put("/{id}", app.AdminHandler.UpdateUser)
+				r.Delete("/{id}", app.AdminHandler.DeleteUser)
+				r.Post("/{id}/password", app.AdminHandler.ResetPassword)
 			})
 
-			r.Route("/settings", func(r chi.Router) {
-				r.Get("/", app.SettingsHandler.HandleGetSettings)
-				r.Put("/", app.SettingsHandler.HandleUpdateSettings)
-				r.Post("/toggle-dnd", app.SettingsHandler.HandleToggleDND)
-				r.Put("/schedule", app.SettingsHandler.HandleUpdateSchedule)
-				r.Put("/motd", app.SettingsHandler.HandleUpdateMOTD)
-			})
-
-			r.Route("/stats", func(r chi.Router) {
-				r.Get("/visits", app.AdminHandler.HandleGetVisitStatistics)
-			})
-
+			// System logs
 			r.Route("/logs", func(r chi.Router) {
-				r.Get("/", app.AdminHandler.HandleListSystemLogs)
-				r.Delete("/", app.AdminHandler.HandleClearLogs)
+				r.Get("/", app.AdminHandler.ListLogs)
+				r.Delete("/", app.AdminHandler.ClearOldLogs)
 			})
 		})
 	})

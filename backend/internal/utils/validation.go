@@ -2,100 +2,56 @@ package utils
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 )
 
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 
-type ValidationError struct {
-	Field   string `json:"field"`
-	Message string `json:"message"`
-}
-
-type ValidationErrors []ValidationError
-
-func (v ValidationErrors) Error() string {
-	var msgs []string
-	for _, err := range v {
-		msgs = append(msgs, err.Field+": "+err.Message)
-	}
-	return strings.Join(msgs, ", ")
+func NewValidationError(message string) error {
+	return errors.New(message)
 }
 
 func ValidateEmail(email string) error {
 	if email == "" {
-		return errors.New("email is required")
+		return NewValidationError("email is required")
 	}
 	if !emailRegex.MatchString(email) {
-		return errors.New("invalid email format")
+		return NewValidationError("invalid email format")
 	}
 	return nil
 }
 
 func ValidateUsername(username string) error {
 	if username == "" {
-		return errors.New("username is required")
+		return NewValidationError("username is required")
 	}
 	if len(username) < 3 {
-		return errors.New("username must be at least 3 characters")
+		return NewValidationError("username must be at least 3 characters")
 	}
 	if len(username) > 50 {
-		return errors.New("username cannot exceed 50 characters")
+		return NewValidationError("username cannot exceed 50 characters")
 	}
 	return nil
 }
 
 func ValidatePassword(password string) error {
 	if password == "" {
-		return errors.New("password is required")
+		return NewValidationError("password is required")
 	}
 	if len(password) < 8 {
-		return errors.New("password must be at least 8 characters")
+		return NewValidationError("password must be at least 8 characters")
+	}
+	if len(password) > 128 {
+		return NewValidationError("password cannot exceed 128 characters")
 	}
 	return nil
 }
 
 func ValidateRequired(value, fieldName string) error {
 	if strings.TrimSpace(value) == "" {
-		return errors.New(fieldName + " is required")
+		return NewValidationError(fmt.Sprintf("%s is required", fieldName))
 	}
-	return nil
-}
-
-func ValidateVisitType(visitType string) error {
-	validTypes := map[string]bool{
-		"doorbell":      true,
-		"voice_message": true,
-		"knock":         true,
-	}
-	if !validTypes[visitType] {
-		return errors.New("invalid visit type")
-	}
-	return nil
-}
-
-func ValidateVisitStatus(status string) error {
-	validStatuses := map[string]bool{
-		"answered":   true,
-		"unanswered": true,
-		"ignored":    true,
-	}
-	if !validStatuses[status] {
-		return errors.New("invalid visit status")
-	}
-	return nil
-}
-
-func ValidateRole(role string) error {
-	validRoles := map[string]bool{
-		"admin": true,
-		"user":  true,
-	}
-
-	if !validRoles[role] {
-		return errors.New("invalid role: must be 'admin' or 'user'")
-	}
-
 	return nil
 }

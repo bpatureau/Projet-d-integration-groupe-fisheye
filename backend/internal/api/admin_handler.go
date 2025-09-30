@@ -17,23 +17,23 @@ import (
 type AdminHandler struct {
 	userStore  store.UserStore
 	tokenStore store.TokenStore
-	visitStore store.VisitStore
 	logStore   store.LogStore
 	logger     *utils.Logger
 }
 
-func NewAdminHandler(userStore store.UserStore, tokenStore store.TokenStore, visitStore store.VisitStore, logStore store.LogStore, logger *utils.Logger) *AdminHandler {
+func NewAdminHandler(userStore store.UserStore, tokenStore store.TokenStore, logStore store.LogStore, logger *utils.Logger) *AdminHandler {
 	return &AdminHandler{
 		userStore:  userStore,
 		tokenStore: tokenStore,
-		visitStore: visitStore,
 		logStore:   logStore,
 		logger:     logger,
 	}
 }
 
-func (h *AdminHandler) HandleListUsers(w http.ResponseWriter, r *http.Request) {
-	// Pagination et filtres
+// GET /api/admin/users
+func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
 	search := r.URL.Query().Get("search")
@@ -43,16 +43,24 @@ func (h *AdminHandler) HandleListUsers(w http.ResponseWriter, r *http.Request) {
 		limit = 20
 	}
 
-	users, total, err := h.userStore.ListUsers(limit, offset, search, role)
+	users, total, err := h.userStore.List(ctx, limit, offset, search, role)
 	if err != nil {
 		h.logger.Error("admin", "Failed to list users", err)
 		utils.WriteInternalError(w)
 		return
 	}
 
-	userResponses := make([]*utils.UserResponse, len(users))
+	// Convert to response format
+	userResponses := make([]map[string]any, len(users))
 	for i, user := range users {
-		userResponses[i] = mapUserToResponse(user)
+		userResponses[i] = map[string]any{
+			"id":         user.ID.String(),
+			"username":   user.Username,
+			"email":      user.Email,
+			"role":       user.Role,
+			"created_at": user.CreatedAt,
+			"updated_at": user.UpdatedAt,
+		}
 	}
 
 	utils.WriteSuccessWithMeta(w, http.StatusOK, userResponses, utils.PaginationMeta{
@@ -62,29 +70,9 @@ func (h *AdminHandler) HandleListUsers(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *AdminHandler) HandleGetUser(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(chi.URLParam(r, "id"))
-	if err != nil {
-		utils.WriteValidationError(w, "Invalid user ID")
-		return
-	}
-
-	user, err := h.userStore.GetUserByID(id)
-	if err != nil {
-		h.logger.Error("admin", "Failed to get user", err)
-		utils.WriteInternalError(w)
-		return
-	}
-
-	if user == nil {
-		utils.WriteNotFound(w, "User not found")
-		return
-	}
-
-	utils.WriteSuccess(w, http.StatusOK, mapUserToResponse(user))
-}
-
-func (h *AdminHandler) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
+// POST /api/admin/users
+func (h *AdminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	admin := middleware.GetUser(r)
 
 	var req struct {
@@ -99,7 +87,7 @@ func (h *AdminHandler) HandleCreateUser(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Validations
+	// Validate
 	if err := utils.ValidateUsername(req.Username); err != nil {
 		utils.WriteValidationError(w, err.Error())
 		return
@@ -115,23 +103,22 @@ func (h *AdminHandler) HandleCreateUser(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := utils.ValidateRole(req.Role); err != nil {
-		utils.WriteValidationError(w, err.Error())
+	if req.Role != "admin" && req.Role != "user" {
+		utils.WriteValidationError(w, "Invalid role")
 		return
 	}
 
-	// Vérifier l'unicité
-	if exists, _ := h.userStore.UsernameExists(req.Username); exists {
+	// Check uniqueness
+	if exists, _ := h.userStore.UsernameExists(ctx, req.Username); exists {
 		utils.WriteValidationError(w, "Username already taken")
 		return
 	}
 
-	if exists, _ := h.userStore.EmailExists(req.Email); exists {
+	if exists, _ := h.userStore.EmailExists(ctx, req.Email); exists {
 		utils.WriteValidationError(w, "Email already registered")
 		return
 	}
 
-	// Créer l'utilisateur
 	user := &store.User{
 		Username: req.Username,
 		Email:    req.Email,
@@ -144,17 +131,63 @@ func (h *AdminHandler) HandleCreateUser(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := h.userStore.CreateUser(user); err != nil {
+	if err := h.userStore.Create(ctx, user); err != nil {
 		h.logger.Error("admin", "Failed to create user", err)
 		utils.WriteInternalError(w)
 		return
 	}
 
 	h.logger.Info("admin", "User created by admin "+admin.Username+": "+user.Username)
-	utils.WriteSuccess(w, http.StatusCreated, mapUserToResponse(user))
+
+	response := map[string]any{
+		"id":         user.ID.String(),
+		"username":   user.Username,
+		"email":      user.Email,
+		"role":       user.Role,
+		"created_at": user.CreatedAt,
+		"updated_at": user.UpdatedAt,
+	}
+
+	utils.WriteSuccess(w, http.StatusCreated, response)
 }
 
-func (h *AdminHandler) HandleUpdateUser(w http.ResponseWriter, r *http.Request) {
+// GET /api/admin/users/:id
+func (h *AdminHandler) GetUser(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		utils.WriteValidationError(w, "Invalid user ID")
+		return
+	}
+
+	user, err := h.userStore.GetByID(ctx, id)
+	if err != nil {
+		h.logger.Error("admin", "Failed to get user", err)
+		utils.WriteInternalError(w)
+		return
+	}
+
+	if user == nil {
+		utils.WriteNotFound(w, "User not found")
+		return
+	}
+
+	response := map[string]any{
+		"id":         user.ID.String(),
+		"username":   user.Username,
+		"email":      user.Email,
+		"role":       user.Role,
+		"created_at": user.CreatedAt,
+		"updated_at": user.UpdatedAt,
+	}
+
+	utils.WriteSuccess(w, http.StatusOK, response)
+}
+
+// PUT /api/admin/users/:id
+func (h *AdminHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	admin := middleware.GetUser(r)
 
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -174,7 +207,7 @@ func (h *AdminHandler) HandleUpdateUser(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	user, err := h.userStore.GetUserByID(id)
+	user, err := h.userStore.GetByID(ctx, id)
 	if err != nil {
 		h.logger.Error("admin", "Failed to get user", err)
 		utils.WriteInternalError(w)
@@ -194,7 +227,7 @@ func (h *AdminHandler) HandleUpdateUser(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		if *req.Username != user.Username {
-			if exists, _ := h.userStore.UsernameExists(*req.Username); exists {
+			if exists, _ := h.userStore.UsernameExists(ctx, *req.Username); exists {
 				utils.WriteValidationError(w, "Username already taken")
 				return
 			}
@@ -209,7 +242,7 @@ func (h *AdminHandler) HandleUpdateUser(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		if *req.Email != user.Email {
-			if exists, _ := h.userStore.EmailExists(*req.Email); exists {
+			if exists, _ := h.userStore.EmailExists(ctx, *req.Email); exists {
 				utils.WriteValidationError(w, "Email already registered")
 				return
 			}
@@ -219,14 +252,14 @@ func (h *AdminHandler) HandleUpdateUser(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if req.Role != nil {
-		if err := utils.ValidateRole(*req.Role); err != nil {
-			utils.WriteValidationError(w, err.Error())
+		if *req.Role != "admin" && *req.Role != "user" {
+			utils.WriteValidationError(w, "Invalid role")
 			return
 		}
 
-		// Vérifier qu'on ne supprime pas le dernier admin
+		// Check not removing last admin
 		if user.Role == "admin" && *req.Role != "admin" {
-			if count, _ := h.userStore.CountAdmins(); count <= 1 {
+			if count, _ := h.userStore.CountAdmins(ctx); count <= 1 {
 				utils.WriteValidationError(w, "Cannot remove admin role from the last admin")
 				return
 			}
@@ -241,17 +274,29 @@ func (h *AdminHandler) HandleUpdateUser(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := h.userStore.UpdateUser(user); err != nil {
+	if err := h.userStore.Update(ctx, user); err != nil {
 		h.logger.Error("admin", "Failed to update user", err)
 		utils.WriteInternalError(w)
 		return
 	}
 
 	h.logger.Info("admin", "User updated by admin "+admin.Username+": "+user.Username)
-	utils.WriteSuccess(w, http.StatusOK, mapUserToResponse(user))
+
+	response := map[string]any{
+		"id":         user.ID.String(),
+		"username":   user.Username,
+		"email":      user.Email,
+		"role":       user.Role,
+		"created_at": user.CreatedAt,
+		"updated_at": user.UpdatedAt,
+	}
+
+	utils.WriteSuccess(w, http.StatusOK, response)
 }
 
-func (h *AdminHandler) HandleDeleteUser(w http.ResponseWriter, r *http.Request) {
+// DELETE /api/admin/users/:id
+func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	admin := middleware.GetUser(r)
 
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -265,7 +310,7 @@ func (h *AdminHandler) HandleDeleteUser(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	user, err := h.userStore.GetUserByID(id)
+	user, err := h.userStore.GetByID(ctx, id)
 	if err != nil {
 		h.logger.Error("admin", "Failed to get user", err)
 		utils.WriteInternalError(w)
@@ -277,15 +322,19 @@ func (h *AdminHandler) HandleDeleteUser(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Vérifier qu'on ne supprime pas le dernier admin
+	// Check not deleting last admin
 	if user.Role == "admin" {
-		if count, _ := h.userStore.CountAdmins(); count <= 1 {
+		if count, _ := h.userStore.CountAdmins(ctx); count <= 1 {
 			utils.WriteValidationError(w, "Cannot delete the last admin")
 			return
 		}
 	}
 
-	if err := h.userStore.DeleteUser(id); err != nil {
+	// Delete tokens first
+	h.tokenStore.DeleteAllForUser(ctx, id, nil)
+
+	// Delete user
+	if err := h.userStore.Delete(ctx, id); err != nil {
 		h.logger.Error("admin", "Failed to delete user", err)
 		utils.WriteInternalError(w)
 		return
@@ -297,7 +346,9 @@ func (h *AdminHandler) HandleDeleteUser(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
-func (h *AdminHandler) HandleResetUserPassword(w http.ResponseWriter, r *http.Request) {
+// POST /api/admin/users/:id/password
+func (h *AdminHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	admin := middleware.GetUser(r)
 
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -320,7 +371,7 @@ func (h *AdminHandler) HandleResetUserPassword(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	user, err := h.userStore.GetUserByID(id)
+	user, err := h.userStore.GetByID(ctx, id)
 	if err != nil {
 		h.logger.Error("admin", "Failed to get user", err)
 		utils.WriteInternalError(w)
@@ -332,23 +383,21 @@ func (h *AdminHandler) HandleResetUserPassword(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	var passwordHash store.Password
+	passwordHash := store.Password{}
 	if err := passwordHash.Set(req.NewPassword); err != nil {
 		h.logger.Error("admin", "Failed to hash password", err)
 		utils.WriteInternalError(w)
 		return
 	}
 
-	if err := h.userStore.UpdateUserPassword(id, passwordHash); err != nil {
+	if err := h.userStore.UpdatePassword(ctx, id, passwordHash); err != nil {
 		h.logger.Error("admin", "Failed to update password", err)
 		utils.WriteInternalError(w)
 		return
 	}
 
-	// Invalider tous les tokens de l'utilisateur
-	if err := h.tokenStore.DeleteAllTokensForUser(id, nil); err != nil {
-		h.logger.Warning("admin", "Failed to invalidate user tokens")
-	}
+	// Invalidate all user tokens
+	h.tokenStore.DeleteAllForUser(ctx, id, nil)
 
 	h.logger.Info("admin", "Password reset by admin "+admin.Username+" for user: "+user.Username)
 	utils.WriteSuccess(w, http.StatusOK, map[string]string{
@@ -356,18 +405,10 @@ func (h *AdminHandler) HandleResetUserPassword(w http.ResponseWriter, r *http.Re
 	})
 }
 
-func (h *AdminHandler) HandleGetVisitStatistics(w http.ResponseWriter, r *http.Request) {
-	stats, err := h.visitStore.GetVisitStatistics()
-	if err != nil {
-		h.logger.Error("admin", "Failed to get visit statistics", err)
-		utils.WriteInternalError(w)
-		return
-	}
+// GET /api/admin/logs
+func (h *AdminHandler) ListLogs(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 
-	utils.WriteSuccess(w, http.StatusOK, stats)
-}
-
-func (h *AdminHandler) HandleListSystemLogs(w http.ResponseWriter, r *http.Request) {
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
 	level := r.URL.Query().Get("level")
@@ -392,7 +433,7 @@ func (h *AdminHandler) HandleListSystemLogs(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	logs, total, err := h.logStore.ListLogs(limit, offset, level, component, startDate, endDate)
+	logs, total, err := h.logStore.List(ctx, limit, offset, level, component, startDate, endDate)
 	if err != nil {
 		h.logger.Error("admin", "Failed to get system logs", err)
 		utils.WriteInternalError(w)
@@ -406,7 +447,9 @@ func (h *AdminHandler) HandleListSystemLogs(w http.ResponseWriter, r *http.Reque
 	})
 }
 
-func (h *AdminHandler) HandleClearLogs(w http.ResponseWriter, r *http.Request) {
+// DELETE /api/admin/logs
+func (h *AdminHandler) ClearOldLogs(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	admin := middleware.GetUser(r)
 
 	var req struct {
@@ -423,7 +466,7 @@ func (h *AdminHandler) HandleClearLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	count, err := h.logStore.DeleteOldLogs(req.OlderThanDays)
+	count, err := h.logStore.DeleteOld(ctx, req.OlderThanDays)
 	if err != nil {
 		h.logger.Error("admin", "Failed to clear logs", err)
 		utils.WriteInternalError(w)
@@ -431,7 +474,7 @@ func (h *AdminHandler) HandleClearLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logger.Info("admin", "Logs cleared by admin "+admin.Username)
-	utils.WriteSuccess(w, http.StatusOK, map[string]interface{}{
+	utils.WriteSuccess(w, http.StatusOK, map[string]any{
 		"message":       "Logs cleared successfully",
 		"deleted_count": count,
 	})

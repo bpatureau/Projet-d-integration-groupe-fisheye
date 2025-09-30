@@ -3,7 +3,6 @@ package utils
 import (
 	"encoding/json"
 	"net/http"
-	"time"
 )
 
 type APIResponse struct {
@@ -11,15 +10,6 @@ type APIResponse struct {
 	Data    any       `json:"data,omitempty"`
 	Error   *APIError `json:"error,omitempty"`
 	Meta    any       `json:"meta,omitempty"`
-}
-
-type UserResponse struct {
-	ID        string    `json:"id"`
-	Username  string    `json:"username"`
-	Email     string    `json:"email"`
-	Role      string    `json:"role"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type APIError struct {
@@ -76,6 +66,10 @@ func WriteForbidden(w http.ResponseWriter, message string) {
 
 func WriteNotFound(w http.ResponseWriter, message string) {
 	WriteError(w, http.StatusNotFound, "NOT_FOUND", message)
+}
+
+func WriteRateLimitExceeded(w http.ResponseWriter, message string) {
+	WriteError(w, http.StatusTooManyRequests, "RATE_LIMIT", message)
 }
 
 func WriteResponse(w http.ResponseWriter, status int, response APIResponse) {

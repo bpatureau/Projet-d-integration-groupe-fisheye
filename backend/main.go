@@ -2,53 +2,84 @@ package main
 
 import (
 	"context"
+	"fisheye/internal/app"
+	"fisheye/internal/routes"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
-
-	"fisheye/internal/app"
-	"fisheye/internal/routes"
 )
+
+const addr = ":8080"
 
 func main() {
 	application, err := app.NewApplication()
 	if err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "Failed to initialize application: %v\n", err)
+		os.Exit(1)
 	}
-	defer application.Close()
-
-	router := routes.SetupRoutes(application)
-	server := &http.Server{
-		Addr:         ":8080",
-		Handler:      router,
-		IdleTimeout:  time.Minute,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 30 * time.Second,
-	}
-
-	// Graceful shutdown
-	go func() {
-		application.Logger.Info("server", "Starting server on :8080")
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			application.Logger.Error("server", "Server failed to start", err)
-			os.Exit(1)
+	defer func() {
+		if err := application.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error during shutdown: %v\n", err)
 		}
 	}()
 
-	// Attendre signal d'arrêt
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	if err := runServer(application); err != nil {
+		application.Logger.Error("main", "Server error", err)
+		os.Exit(1)
+	}
+}
 
-	application.Logger.Info("server", "Shutting down server")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+func runServer(application *app.Application) error {
+	router := routes.SetupRoutes(application)
 
-	if err := server.Shutdown(ctx); err != nil {
-		application.Logger.Error("server", "Server forced to shutdown", err)
+	server := &http.Server{
+		Addr:           addr,
+		Handler:        router,
+		IdleTimeout:    time.Minute,
+		ReadTimeout:    10 * time.Second,
+		WriteTimeout:   30 * time.Second,
+		MaxHeaderBytes: 1 << 20, // 1 MB
 	}
 
-	application.Logger.Info("server", "Server stopped")
+	serverErrors := make(chan error, 1)
+
+	go func() {
+		application.Logger.Info("server", fmt.Sprintf("Starting server on %s", addr))
+		fmt.Printf("\n🚀 Server starting on http://localhost%s\n", addr)
+		fmt.Printf("📝 Default admin credentials: admin / admin\n\n")
+		serverErrors <- server.ListenAndServe()
+	}()
+
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
+
+	select {
+	case err := <-serverErrors:
+		if err != nil && err != http.ErrServerClosed {
+			return fmt.Errorf("server error: %w", err)
+		}
+
+	case sig := <-shutdown:
+		application.Logger.Info("server", fmt.Sprintf("Received signal: %v", sig))
+		fmt.Printf("\n⚠️  Shutdown signal received: %v\n", sig)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		application.Logger.Info("server", "Starting graceful shutdown")
+		if err := server.Shutdown(ctx); err != nil {
+			application.Logger.Error("server", "Graceful shutdown failed, forcing shutdown", err)
+			if err := server.Close(); err != nil {
+				return fmt.Errorf("forced shutdown failed: %w", err)
+			}
+		}
+
+		application.Logger.Info("server", "Server stopped successfully")
+		fmt.Println("✅ Server stopped successfully")
+	}
+
+	return nil
 }

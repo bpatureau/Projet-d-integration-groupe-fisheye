@@ -21,18 +21,20 @@ const DefaultTTL = 7 * 24 * time.Hour
 
 func GenerateToken(userID uuid.UUID, ttl time.Duration) (*Token, error) {
 	token := &Token{
-		UserID: userID,
-		Expiry: time.Now().Add(ttl),
+		UserID:    userID,
+		Expiry:    time.Now().Add(ttl),
+		CreatedAt: time.Now(),
 	}
 
-	emptyBytes := make([]byte, 32)
-	_, err := rand.Read(emptyBytes)
+	randomBytes := make([]byte, 32)
+	_, err := rand.Read(randomBytes)
 	if err != nil {
 		return nil, err
 	}
 
-	token.Plaintext = base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(emptyBytes)
+	token.Plaintext = base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(randomBytes)
 	hash := sha256.Sum256([]byte(token.Plaintext))
 	token.Hash = hash[:]
+
 	return token, nil
 }

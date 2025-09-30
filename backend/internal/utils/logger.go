@@ -1,16 +1,19 @@
 package utils
 
 import (
+	"context"
 	"fisheye/internal/store"
 	"fmt"
 	"log"
 	"os"
+	"time"
 )
 
 type Logger struct {
 	fileLogger *log.Logger
 	logStore   store.LogStore
 	file       *os.File
+	debugMode  bool
 }
 
 func NewFileLogger(logFilePath string) (*Logger, error) {
@@ -19,9 +22,12 @@ func NewFileLogger(logFilePath string) (*Logger, error) {
 		return nil, fmt.Errorf("failed to open log file: %w", err)
 	}
 
+	debugMode := os.Getenv("DEBUG") == "true"
+
 	return &Logger{
 		fileLogger: log.New(file, "", log.Ldate|log.Ltime|log.Lshortfile),
 		file:       file,
+		debugMode:  debugMode,
 	}, nil
 }
 
@@ -30,7 +36,7 @@ func (l *Logger) SetLogStore(logStore store.LogStore) {
 }
 
 func (l *Logger) Debug(component, message string) {
-	if os.Getenv("DEBUG") == "true" {
+	if l.debugMode {
 		l.log("debug", component, message)
 	}
 }
@@ -55,10 +61,12 @@ func (l *Logger) log(level, component, message string) {
 	logMsg := fmt.Sprintf("[%s] %s: %s", level, component, message)
 	l.fileLogger.Println(logMsg)
 
-	// Enregistrer en BD si disponible
+	// Store in database if available
 	if l.logStore != nil {
-		if err := l.logStore.CreateLog(level, message, component); err != nil {
-			// fallback : fichier uniquement
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		if err := l.logStore.Create(ctx, level, message, component); err != nil {
 			l.fileLogger.Printf("[error] logger: failed to insert log into database: %v", err)
 		}
 	}

@@ -2,9 +2,11 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"fisheye/internal/store"
 	"fisheye/internal/tokens"
@@ -32,7 +34,9 @@ func NewMiddleware(userStore store.UserStore, tokenStore store.TokenStore, logge
 
 	deviceAPIKey := os.Getenv("DEVICE_API_KEY")
 	if deviceAPIKey == "" {
-		logger.Warning("middleware", "DEVICE_API_KEY not configured")
+		logger.Error("middleware", "CRITICAL: DEVICE_API_KEY not configured! Device authentication will fail.", nil)
+	} else {
+		logger.Info("middleware", "Device API key configured successfully")
 	}
 
 	return &Middleware{
@@ -98,7 +102,9 @@ func (m *Middleware) AuthenticateUser(next http.Handler) http.Handler {
 }
 
 func (m *Middleware) authenticateWithToken(w http.ResponseWriter, r *http.Request, token string, next http.Handler) {
-	user, err := m.UserStore.GetUserByToken(token)
+	ctx := r.Context()
+
+	user, err := m.UserStore.GetByToken(ctx, token)
 	if err != nil {
 		m.Logger.Warning("middleware", "Token validation error: "+err.Error())
 		utils.WriteUnauthorized(w, "Invalid or expired token")
@@ -110,7 +116,12 @@ func (m *Middleware) authenticateWithToken(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	go m.TokenStore.ExtendTokenExpiry(token, tokens.DefaultTTL)
+	// Extend token expiry asynchronously
+	go func() {
+		extCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		m.TokenStore.ExtendExpiry(extCtx, token, tokens.DefaultTTL)
+	}()
 
 	m.Logger.Debug("middleware", "User authenticated: "+user.Username)
 	r = SetUser(r, user)
@@ -121,17 +132,17 @@ func (m *Middleware) authenticateWithToken(w http.ResponseWriter, r *http.Reques
 func (m *Middleware) authenticateWithApiKey(w http.ResponseWriter, r *http.Request, apiKey string, next http.Handler) {
 	if m.DeviceAPIKey == "" {
 		m.Logger.Error("middleware", "Device API key not configured", nil)
-		utils.WriteInternalError(w)
+		utils.WriteError(w, http.StatusServiceUnavailable, "DEVICE_NOT_CONFIGURED", "Device authentication is not configured")
 		return
 	}
 
 	if apiKey != m.DeviceAPIKey {
-		m.Logger.Warning("middleware", "Invalid API key attempt")
+		m.Logger.Warning("middleware", "Invalid API key attempt from: "+r.RemoteAddr)
 		utils.WriteUnauthorized(w, "Invalid API key")
 		return
 	}
 
-	m.Logger.Debug("middleware", "Device authenticated")
+	m.Logger.Debug("middleware", "Device authenticated from: "+r.RemoteAddr)
 	r = SetUser(r, store.AnonymousUser)
 	r = SetDevice(r, true)
 	next.ServeHTTP(w, r)
@@ -143,7 +154,7 @@ func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 		isDevice := IsDevice(r)
 
 		if user.IsAnonymous() && !isDevice {
-			m.Logger.Warning("middleware", "Unauthorized access attempt")
+			m.Logger.Warning("middleware", "Unauthorized access attempt to protected route")
 			utils.WriteUnauthorized(w, "Authentication required")
 			return
 		}
@@ -163,7 +174,7 @@ func (m *Middleware) RequireAdmin(next http.Handler) http.Handler {
 		}
 
 		if !user.IsAdmin() {
-			m.Logger.Warning("middleware", "Non-admin access attempt: "+user.Username)
+			m.Logger.Warning("middleware", "Non-admin access attempt by: "+user.Username)
 			utils.WriteForbidden(w, "Admin access required")
 			return
 		}
@@ -181,13 +192,13 @@ func (m *Middleware) RequireDevice(next http.Handler) http.Handler {
 
 		user := GetUser(r)
 		if !user.IsAnonymous() && user.IsAdmin() {
-			m.Logger.Debug("middleware", "Admin accessing device route: "+user.Username)
+			m.Logger.Info("middleware", "Admin accessing device route: "+user.Username)
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		m.Logger.Warning("middleware", "Unauthorized device route access")
-		utils.WriteForbidden(w, "Device or admin access required")
+		m.Logger.Warning("middleware", "Unauthorized device route access from: "+r.RemoteAddr)
+		utils.WriteForbidden(w, "Device authentication required")
 	})
 }
 
@@ -198,14 +209,19 @@ func (m *Middleware) LogRequest(next http.Handler) http.Handler {
 
 		var authInfo string
 		if isDevice {
-			authInfo = "device"
+			authInfo = "device:" + r.RemoteAddr
 		} else if !user.IsAnonymous() {
 			authInfo = "user:" + user.Username
 		} else {
 			authInfo = "anonymous"
 		}
 
-		m.Logger.Info("request", r.Method+" "+r.URL.Path+" ["+authInfo+"]")
+		m.Logger.Info("request", fmt.Sprintf("%s %s [%s] from %s",
+			r.Method,
+			r.URL.Path,
+			authInfo,
+			r.RemoteAddr))
+
 		next.ServeHTTP(w, r)
 	})
 }

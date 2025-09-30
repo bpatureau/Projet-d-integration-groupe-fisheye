@@ -6,7 +6,11 @@ CREATE TABLE IF NOT EXISTS system_logs (
   message TEXT NOT NULL,
   component VARCHAR(50),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-)
+);
+
+CREATE INDEX idx_system_logs_created_at ON system_logs(created_at DESC);
+CREATE INDEX idx_system_logs_level ON system_logs(level);
+CREATE INDEX idx_system_logs_component ON system_logs(component);
 -- +goose StatementEnd
 
 -- +goose Down

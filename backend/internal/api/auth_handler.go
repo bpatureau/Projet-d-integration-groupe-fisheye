@@ -23,111 +23,38 @@ func NewAuthHandler(userStore store.UserStore, tokenStore store.TokenStore, logg
 	}
 }
 
-type RegisterRequest struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
 type LoginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
 type AuthResponse struct {
-	User  *utils.UserResponse `json:"user"`
-	Token *tokens.Token       `json:"token"`
+	User  *UserResponse `json:"user"`
+	Token *tokens.Token `json:"token"`
 }
 
-type RefreshTokenRequest struct {
-	Token string `json:"token"`
+type UserResponse struct {
+	ID       string `json:"id"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Role     string `json:"role"`
 }
 
-func (h *AuthHandler) HandleRegister(w http.ResponseWriter, r *http.Request) {
-	var req RegisterRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.WriteValidationError(w, "Invalid request payload")
-		return
-	}
+func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 
-	// Validation
-	if err := utils.ValidateUsername(req.Username); err != nil {
-		utils.WriteValidationError(w, err.Error())
-		return
-	}
-
-	if err := utils.ValidateEmail(req.Email); err != nil {
-		utils.WriteValidationError(w, err.Error())
-		return
-	}
-
-	if err := utils.ValidatePassword(req.Password); err != nil {
-		utils.WriteValidationError(w, err.Error())
-		return
-	}
-
-	// Vérifier l'unicité
-	if exists, _ := h.userStore.UsernameExists(req.Username); exists {
-		utils.WriteValidationError(w, "Username already taken")
-		return
-	}
-
-	if exists, _ := h.userStore.EmailExists(req.Email); exists {
-		utils.WriteValidationError(w, "Email already registered")
-		return
-	}
-
-	// Créer l'utilisateur
-	user := &store.User{
-		Username: req.Username,
-		Email:    req.Email,
-		Role:     "user",
-	}
-
-	// Premier utilisateur devient admin
-	if count, _ := h.userStore.CountUsers(); count == 0 {
-		user.Role = "admin"
-		h.logger.Info("auth", "Creating first admin user")
-	}
-
-	if err := user.PasswordHash.Set(req.Password); err != nil {
-		h.logger.Error("auth", "Failed to hash password", err)
-		utils.WriteInternalError(w)
-		return
-	}
-
-	if err := h.userStore.CreateUser(user); err != nil {
-		h.logger.Error("auth", "Failed to create user", err)
-		utils.WriteInternalError(w)
-		return
-	}
-
-	token, err := h.tokenStore.CreateNewToken(user.ID, tokens.DefaultTTL)
-	if err != nil {
-		h.logger.Error("auth", "Failed to create token", err)
-		utils.WriteInternalError(w)
-		return
-	}
-
-	h.logger.Info("auth", "User registered: "+user.Username)
-
-	response := &AuthResponse{
-		User:  mapUserToResponse(user),
-		Token: token,
-	}
-
-	utils.WriteSuccess(w, http.StatusCreated, response)
-}
-
-func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.WriteValidationError(w, "Invalid request payload")
 		return
 	}
 
-	// Récupérer l'utilisateur
-	user, err := h.userStore.GetUserByUsername(req.Username)
+	if req.Username == "" || req.Password == "" {
+		utils.WriteValidationError(w, "Username and password are required")
+		return
+	}
+
+	user, err := h.userStore.GetByUsername(ctx, req.Username)
 	if err != nil {
 		h.logger.Error("auth", "Database error during login", err)
 		utils.WriteInternalError(w)
@@ -135,19 +62,18 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if user == nil {
+		h.logger.Warning("auth", "Failed login attempt for non-existent user: "+req.Username)
 		utils.WriteUnauthorized(w, "Invalid credentials")
 		return
 	}
 
-	// Vérifier le mot de passe
 	if matches, _ := user.PasswordHash.Matches(req.Password); !matches {
 		h.logger.Warning("auth", "Failed login attempt for: "+req.Username)
 		utils.WriteUnauthorized(w, "Invalid credentials")
 		return
 	}
 
-	// Créer les tokens
-	token, err := h.tokenStore.CreateNewToken(user.ID, tokens.DefaultTTL)
+	token, err := h.tokenStore.Create(ctx, user.ID, tokens.DefaultTTL)
 	if err != nil {
 		h.logger.Error("auth", "Failed to create token", err)
 		utils.WriteInternalError(w)
@@ -157,20 +83,31 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	h.logger.Info("auth", "User logged in: "+user.Username)
 
 	response := &AuthResponse{
-		User:  mapUserToResponse(user),
+		User: &UserResponse{
+			ID:       user.ID.String(),
+			Username: user.Username,
+			Email:    user.Email,
+			Role:     user.Role,
+		},
 		Token: token,
 	}
 
 	utils.WriteSuccess(w, http.StatusOK, response)
 }
 
-func mapUserToResponse(user *store.User) *utils.UserResponse {
-	return &utils.UserResponse{
-		ID:        user.ID.String(),
-		Username:  user.Username,
-		Email:     user.Email,
-		Role:      user.Role,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
+func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	authHeader := r.Header.Get("Authorization")
+	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+		token := authHeader[7:]
+		if err := h.tokenStore.Delete(ctx, token); err != nil {
+			h.logger.Warning("auth", "Failed to delete token on logout: "+err.Error())
+		}
 	}
+
+	h.logger.Info("auth", "User logged out")
+	utils.WriteSuccess(w, http.StatusOK, map[string]string{
+		"message": "Logged out successfully",
+	})
 }

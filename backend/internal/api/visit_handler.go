@@ -2,10 +2,13 @@ package api
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
+	"fisheye/internal/middleware"
 	"fisheye/internal/store"
 	"fisheye/internal/utils"
 
@@ -25,53 +28,75 @@ func NewVisitHandler(visitStore store.VisitStore, logger *utils.Logger) *VisitHa
 	}
 }
 
-type CreateVisitRequest struct {
-	Type string `json:"type"`
-}
+// GET /api/visits - List all visits with filters
+func (h *VisitHandler) List(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 
-type UpdateVisitStatusRequest struct {
-	Status string `json:"status"`
-}
-
-func (h *VisitHandler) HandleCreateVisit(w http.ResponseWriter, r *http.Request) {
-	var req CreateVisitRequest
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.logger.Error("visits", "Invalid create visit request", err)
-		utils.WriteValidationError(w, "Invalid request payload")
-		return
+	filter := store.ListFilter{
+		Limit:  20,
+		Offset: 0,
 	}
 
-	// Valider le type de visite
-	if err := utils.ValidateVisitType(req.Type); err != nil {
-		utils.WriteValidationError(w, err.Error())
-		return
+	// Parse query parameters
+	if limit := r.URL.Query().Get("limit"); limit != "" {
+		if l, err := strconv.Atoi(limit); err == nil && l > 0 && l <= 100 {
+			filter.Limit = l
+		}
 	}
 
-	visit := &store.Visit{
-		Type:   req.Type,
-		Status: "unanswered",
+	if offset := r.URL.Query().Get("offset"); offset != "" {
+		if o, err := strconv.Atoi(offset); err == nil && o >= 0 {
+			filter.Offset = o
+		}
 	}
 
-	if err := h.visitStore.CreateVisit(visit); err != nil {
-		h.logger.Error("visits", "Failed to create visit", err)
+	filter.Status = r.URL.Query().Get("status")
+
+	if hasMessage := r.URL.Query().Get("has_message"); hasMessage != "" {
+		if b, err := strconv.ParseBool(hasMessage); err == nil {
+			filter.HasMessage = &b
+		}
+	}
+
+	// Parse date filters
+	if startDate := r.URL.Query().Get("start_date"); startDate != "" {
+		if sd, err := time.Parse("2006-01-02", startDate); err == nil {
+			filter.StartDate = &sd
+		}
+	}
+
+	if endDate := r.URL.Query().Get("end_date"); endDate != "" {
+		if ed, err := time.Parse("2006-01-02", endDate); err == nil {
+			endOfDay := ed.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+			filter.EndDate = &endOfDay
+		}
+	}
+
+	visits, total, err := h.visitStore.List(ctx, filter)
+	if err != nil {
+		h.logger.Error("visits", "Failed to list visits", err)
 		utils.WriteInternalError(w)
 		return
 	}
 
-	h.logger.Info("visits", "New visit created: "+visit.ID.String())
-	utils.WriteSuccess(w, http.StatusCreated, visit)
+	utils.WriteSuccessWithMeta(w, http.StatusOK, visits, utils.PaginationMeta{
+		Limit:  filter.Limit,
+		Offset: filter.Offset,
+		Total:  total,
+	})
 }
 
-func (h *VisitHandler) HandleGetVisit(w http.ResponseWriter, r *http.Request) {
-	idParam := chi.URLParam(r, "id")
-	id, err := uuid.Parse(idParam)
+// GET /api/visits/:id - Get single visit
+func (h *VisitHandler) GetByID(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		utils.WriteValidationError(w, "Invalid visit ID")
 		return
 	}
 
-	visit, err := h.visitStore.GetVisitByID(id)
+	visit, err := h.visitStore.GetByID(ctx, id)
 	if err != nil {
 		h.logger.Error("visits", "Failed to get visit", err)
 		utils.WriteInternalError(w)
@@ -86,85 +111,28 @@ func (h *VisitHandler) HandleGetVisit(w http.ResponseWriter, r *http.Request) {
 	utils.WriteSuccess(w, http.StatusOK, visit)
 }
 
-func (h *VisitHandler) HandleListVisits(w http.ResponseWriter, r *http.Request) {
-	// Pagination
-	limitStr := r.URL.Query().Get("limit")
-	offsetStr := r.URL.Query().Get("offset")
+// PATCH /api/visits/:id - Update visit (status, mark message as listened)
+func (h *VisitHandler) Update(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	user := middleware.GetUser(r)
 
-	limit := 20 // Par défaut
-	offset := 0
-
-	if limitStr != "" {
-		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
-			limit = l
-		}
-	}
-
-	if offsetStr != "" {
-		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
-			offset = o
-		}
-	}
-
-	// Filtres
-	status := r.URL.Query().Get("status")
-	visitType := r.URL.Query().Get("type")
-
-	var startDate, endDate *time.Time
-
-	if startDateStr := r.URL.Query().Get("start_date"); startDateStr != "" {
-		if sd, err := time.Parse("2006-01-02", startDateStr); err == nil {
-			startDate = &sd
-		}
-	}
-
-	if endDateStr := r.URL.Query().Get("end_date"); endDateStr != "" {
-		if ed, err := time.Parse("2006-01-02", endDateStr); err == nil {
-			// Set to end of day
-			endOfDay := ed.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
-			endDate = &endOfDay
-		}
-	}
-
-	visits, total, err := h.visitStore.ListVisits(limit, offset, status, visitType, startDate, endDate)
-	if err != nil {
-		h.logger.Error("visits", "Failed to list visits", err)
-		utils.WriteInternalError(w)
-		return
-	}
-
-	meta := utils.PaginationMeta{
-		Limit:  limit,
-		Offset: offset,
-		Total:  total,
-	}
-
-	utils.WriteSuccessWithMeta(w, http.StatusOK, visits, meta)
-}
-
-func (h *VisitHandler) HandleUpdateVisitStatus(w http.ResponseWriter, r *http.Request) {
-	idParam := chi.URLParam(r, "id")
-	id, err := uuid.Parse(idParam)
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		utils.WriteValidationError(w, "Invalid visit ID")
 		return
 	}
 
-	var req UpdateVisitStatusRequest
+	var req struct {
+		Status          *string `json:"status,omitempty"`
+		MessageListened *bool   `json:"message_listened,omitempty"`
+	}
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.logger.Error("visits", "Invalid update status request", err)
 		utils.WriteValidationError(w, "Invalid request payload")
 		return
 	}
 
-	// Valider le statut
-	if err := utils.ValidateVisitStatus(req.Status); err != nil {
-		utils.WriteValidationError(w, err.Error())
-		return
-	}
-
-	// Vérifier que la visite existe
-	visit, err := h.visitStore.GetVisitByID(id)
+	visit, err := h.visitStore.GetByID(ctx, id)
 	if err != nil {
 		h.logger.Error("visits", "Failed to get visit", err)
 		utils.WriteInternalError(w)
@@ -176,27 +144,85 @@ func (h *VisitHandler) HandleUpdateVisitStatus(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Mettre à jour le statut
-	if err := h.visitStore.UpdateVisitStatus(id, req.Status); err != nil {
-		h.logger.Error("visits", "Failed to update visit status", err)
-		utils.WriteInternalError(w)
+	updated := false
+
+	// Update status
+	if req.Status != nil {
+		validStatuses := map[string]bool{
+			"pending":  true,
+			"answered": true,
+			"missed":   true,
+			"ignored":  true,
+		}
+
+		if !validStatuses[*req.Status] {
+			utils.WriteValidationError(w, "Invalid status")
+			return
+		}
+
+		if visit.Status != *req.Status {
+			visit.Status = *req.Status
+			updated = true
+
+			// If marking as answered, update timestamp
+			if *req.Status == "answered" {
+				if err := h.visitStore.MarkAnswered(ctx, id); err != nil {
+					h.logger.Error("visits", "Failed to mark as answered", err)
+					utils.WriteInternalError(w)
+					return
+				}
+				// Re-fetch to get updated timestamps
+				visit, _ = h.visitStore.GetByID(ctx, id)
+			}
+		}
+	}
+
+	// Mark message as listened
+	if req.MessageListened != nil && *req.MessageListened && visit.HasMessage && !visit.MessageListened {
+		if err := h.visitStore.MarkMessageListened(ctx, id); err != nil {
+			h.logger.Error("visits", "Failed to mark message as listened", err)
+			utils.WriteInternalError(w)
+			return
+		}
+		updated = true
+		// Re-fetch to get updated fields
+		visit, _ = h.visitStore.GetByID(ctx, id)
+	}
+
+	if updated {
+		if req.Status == nil || *req.Status != "answered" {
+			// Only update if we didn't already update via MarkAnswered
+			if err := h.visitStore.Update(ctx, visit); err != nil {
+				h.logger.Error("visits", "Failed to update visit", err)
+				utils.WriteInternalError(w)
+				return
+			}
+		}
+
+		h.logger.Info("visits", "Visit updated by user: "+user.Username)
+	}
+
+	utils.WriteSuccess(w, http.StatusOK, visit)
+}
+
+// DELETE /api/visits/:id - Delete visit (admin only)
+func (h *VisitHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	user := middleware.GetUser(r)
+
+	if !user.IsAdmin() {
+		utils.WriteForbidden(w, "Admin access required")
 		return
 	}
 
-	h.logger.Info("visits", "Visit status updated: "+id.String()+" to "+req.Status)
-	utils.WriteSuccess(w, http.StatusOK, map[string]string{"message": "Status updated successfully"})
-}
-
-func (h *VisitHandler) HandleRespondToVisit(w http.ResponseWriter, r *http.Request) {
-	idParam := chi.URLParam(r, "id")
-	id, err := uuid.Parse(idParam)
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		utils.WriteValidationError(w, "Invalid visit ID")
 		return
 	}
 
-	// Vérifier que la visite existe
-	visit, err := h.visitStore.GetVisitByID(id)
+	// Get visit to delete associated file if exists
+	visit, err := h.visitStore.GetByID(ctx, id)
 	if err != nil {
 		h.logger.Error("visits", "Failed to get visit", err)
 		utils.WriteInternalError(w)
@@ -208,21 +234,77 @@ func (h *VisitHandler) HandleRespondToVisit(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Marquer comme répondu
-	if err := h.visitStore.MarkAsResponded(id); err != nil {
-		h.logger.Error("visits", "Failed to mark visit as responded", err)
+	// Delete visit
+	if err := h.visitStore.Delete(ctx, id); err != nil {
+		h.logger.Error("visits", "Failed to delete visit", err)
 		utils.WriteInternalError(w)
 		return
 	}
 
-	h.logger.Info("visits", "Visit marked as responded: "+id.String())
-	utils.WriteSuccess(w, http.StatusOK, map[string]string{"message": "Visit marked as responded"})
+	// Delete associated file if exists
+	if visit.MessageFilepath != nil && *visit.MessageFilepath != "" {
+		if err := os.Remove(*visit.MessageFilepath); err != nil {
+			h.logger.Warning("visits", "Failed to delete message file: "+err.Error())
+		}
+	}
+
+	h.logger.Info("visits", "Visit deleted by admin: "+user.Username)
+	utils.WriteSuccess(w, http.StatusOK, map[string]string{
+		"message": "Visit deleted successfully",
+	})
 }
 
-func (h *VisitHandler) HandleGetStatistics(w http.ResponseWriter, r *http.Request) {
-	stats, err := h.visitStore.GetVisitStatistics()
+// GET /api/visits/:id/message - Download voice message
+func (h *VisitHandler) DownloadMessage(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		h.logger.Error("visits", "Failed to get visit statistics", err)
+		utils.WriteValidationError(w, "Invalid visit ID")
+		return
+	}
+
+	visit, err := h.visitStore.GetByID(ctx, id)
+	if err != nil {
+		h.logger.Error("visits", "Failed to get visit", err)
+		utils.WriteInternalError(w)
+		return
+	}
+
+	if visit == nil {
+		utils.WriteNotFound(w, "Visit not found")
+		return
+	}
+
+	if !visit.HasMessage || visit.MessageFilepath == nil {
+		utils.WriteNotFound(w, "No message available for this visit")
+		return
+	}
+
+	file, err := os.Open(*visit.MessageFilepath)
+	if err != nil {
+		h.logger.Error("visits", "Failed to open message file", err)
+		utils.WriteNotFound(w, "Message file not found")
+		return
+	}
+	defer file.Close()
+
+	// Set headers for download
+	w.Header().Set("Content-Type", "audio/mpeg")
+	if visit.MessageFilename != nil {
+		w.Header().Set("Content-Disposition", `attachment; filename="`+*visit.MessageFilename+`"`)
+	}
+
+	io.Copy(w, file)
+}
+
+// GET /api/visits/stats - Get visit statistics
+func (h *VisitHandler) GetStats(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	stats, err := h.visitStore.GetStatistics(ctx)
+	if err != nil {
+		h.logger.Error("visits", "Failed to get statistics", err)
 		utils.WriteInternalError(w)
 		return
 	}
