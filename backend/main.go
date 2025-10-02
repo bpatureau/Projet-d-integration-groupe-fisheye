@@ -12,8 +12,6 @@ import (
 	"time"
 )
 
-const addr = ":8080"
-
 func main() {
 	application, err := app.NewApplication()
 	if err != nil {
@@ -33,6 +31,12 @@ func main() {
 }
 
 func runServer(application *app.Application) error {
+	// Get server address from environment variable or use default
+	addr := os.Getenv("SERVER_HOST")
+	if addr == "" {
+		addr = "0.0.0.0:8080"
+	}
+
 	router := routes.SetupRoutes(application)
 
 	server := &http.Server{
@@ -48,7 +52,7 @@ func runServer(application *app.Application) error {
 
 	go func() {
 		application.Logger.Info("server", fmt.Sprintf("Starting server on %s", addr))
-		fmt.Printf("\n🚀 Server starting on http://localhost%s\n", addr)
+		fmt.Printf("\n🚀 Server starting on %s\n", addr)
 		fmt.Printf("📝 Default admin credentials: admin / admin\n\n")
 		serverErrors <- server.ListenAndServe()
 	}()
