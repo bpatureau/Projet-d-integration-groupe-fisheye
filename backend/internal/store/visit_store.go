@@ -17,8 +17,9 @@ type Visit struct {
 
 	// Message fields
 	HasMessage        bool       `json:"has_message"`
-	MessageFilename   *string    `json:"message_filename,omitempty"`
-	MessageFilepath   *string    `json:"-"` // Internal only
+	MessageType       *string    `json:"message_type,omitempty"`
+	MessageText       *string    `json:"message_text,omitempty"`
+	MessageFilepath   *string    `json:"message_filepath,omitempty"`
 	MessageSize       *int64     `json:"message_size,omitempty"`
 	MessageDuration   *int       `json:"message_duration,omitempty"`
 	MessageListened   bool       `json:"message_listened"`
@@ -40,7 +41,8 @@ type VisitStore interface {
 	Update(ctx context.Context, visit *Visit) error
 	Delete(ctx context.Context, id uuid.UUID) error
 
-	AddMessage(ctx context.Context, visitID uuid.UUID, filename, filepath string, size int64, duration int) error
+	AddVoiceMessage(ctx context.Context, visitID uuid.UUID, filepath string, size int64, duration int) error
+	AddTextMessage(ctx context.Context, visitID uuid.UUID, text string) error
 	MarkMessageListened(ctx context.Context, visitID uuid.UUID) error
 	MarkAnswered(ctx context.Context, visitID uuid.UUID) error
 	GetStatistics(ctx context.Context) (*VisitStats, error)
@@ -92,7 +94,7 @@ func (s *PostgresVisitStore) GetByID(ctx context.Context, id uuid.UUID) (*Visit,
 	visit := &Visit{}
 
 	query := `
-		SELECT id, type, status, has_message, message_filename, message_filepath,
+		SELECT id, type, status, has_message, message_type, message_text, message_filepath,
 			   message_size, message_duration, message_listened, message_listened_at,
 			   answered_at, response_time, created_at, updated_at
 		FROM visits
@@ -104,7 +106,8 @@ func (s *PostgresVisitStore) GetByID(ctx context.Context, id uuid.UUID) (*Visit,
 		&visit.Type,
 		&visit.Status,
 		&visit.HasMessage,
-		&visit.MessageFilename,
+		&visit.MessageType,
+		&visit.MessageText,
 		&visit.MessageFilepath,
 		&visit.MessageSize,
 		&visit.MessageDuration,
@@ -127,7 +130,7 @@ func (s *PostgresVisitStore) GetLatestPending(ctx context.Context) (*Visit, erro
 	visit := &Visit{}
 
 	query := `
-		SELECT id, type, status, has_message, message_filename, message_filepath,
+		SELECT id, type, status, has_message, message_type, message_text, message_filepath,
 			   message_size, message_duration, message_listened, message_listened_at,
 			   answered_at, response_time, created_at, updated_at
 		FROM visits
@@ -141,7 +144,8 @@ func (s *PostgresVisitStore) GetLatestPending(ctx context.Context) (*Visit, erro
 		&visit.Type,
 		&visit.Status,
 		&visit.HasMessage,
-		&visit.MessageFilename,
+		&visit.MessageType,
+		&visit.MessageText,
 		&visit.MessageFilepath,
 		&visit.MessageSize,
 		&visit.MessageDuration,
@@ -201,7 +205,7 @@ func (s *PostgresVisitStore) List(ctx context.Context, filter ListFilter) ([]*Vi
 	// Get visits
 	args = append(args, filter.Limit, filter.Offset)
 	query := fmt.Sprintf(`
-		SELECT id, type, status, has_message, message_filename, message_filepath,
+		SELECT id, type, status, has_message, message_type, message_text, message_filepath,
 			   message_size, message_duration, message_listened, message_listened_at,
 			   answered_at, response_time, created_at, updated_at
 		FROM visits
@@ -224,7 +228,8 @@ func (s *PostgresVisitStore) List(ctx context.Context, filter ListFilter) ([]*Vi
 			&visit.Type,
 			&visit.Status,
 			&visit.HasMessage,
-			&visit.MessageFilename,
+			&visit.MessageType,
+			&visit.MessageText,
 			&visit.MessageFilepath,
 			&visit.MessageSize,
 			&visit.MessageDuration,
@@ -262,11 +267,12 @@ func (s *PostgresVisitStore) Delete(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
-func (s *PostgresVisitStore) AddMessage(ctx context.Context, visitID uuid.UUID, filename, filepath string, size int64, duration int) error {
+func (s *PostgresVisitStore) AddVoiceMessage(ctx context.Context, visitID uuid.UUID, filepath string, size int64, duration int) error {
+	messageType := "voice"
 	query := `
 		UPDATE visits
 		SET has_message = true,
-			message_filename = $1,
+			message_type = $1,
 			message_filepath = $2,
 			message_size = $3,
 			message_duration = $4,
@@ -274,7 +280,22 @@ func (s *PostgresVisitStore) AddMessage(ctx context.Context, visitID uuid.UUID, 
 		WHERE id = $5
 	`
 
-	_, err := s.db.ExecContext(ctx, query, filename, filepath, size, duration, visitID)
+	_, err := s.db.ExecContext(ctx, query, messageType, filepath, size, duration, visitID)
+	return err
+}
+
+func (s *PostgresVisitStore) AddTextMessage(ctx context.Context, visitID uuid.UUID, text string) error {
+	messageType := "text"
+	query := `
+		UPDATE visits
+		SET has_message = true,
+			message_type = $1,
+			message_text = $2,
+			updated_at = CURRENT_TIMESTAMP
+		WHERE id = $3
+	`
+
+	_, err := s.db.ExecContext(ctx, query, messageType, text, visitID)
 	return err
 }
 

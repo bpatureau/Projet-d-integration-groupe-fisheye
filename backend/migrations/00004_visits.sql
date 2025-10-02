@@ -4,8 +4,10 @@ CREATE TABLE IF NOT EXISTS visits (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   type VARCHAR(50) NOT NULL DEFAULT 'doorbell' CHECK (type IN ('doorbell', 'motion')),
   status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'answered', 'missed', 'ignored')),
+
   has_message BOOLEAN NOT NULL DEFAULT FALSE,
-  message_filename VARCHAR(255),
+  message_type VARCHAR(20) CHECK (message_type IN ('voice', 'text')),
+  message_text TEXT,
   message_filepath VARCHAR(500),
   message_size BIGINT,
   message_duration INTEGER, -- seconds

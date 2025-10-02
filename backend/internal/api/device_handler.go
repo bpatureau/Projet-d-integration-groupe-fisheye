@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -12,9 +11,6 @@ import (
 	"fisheye/internal/middleware"
 	"fisheye/internal/store"
 	"fisheye/internal/utils"
-
-	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 )
 
 type DeviceHandler struct {
@@ -77,7 +73,7 @@ func (h *DeviceHandler) Ring(w http.ResponseWriter, r *http.Request) {
 	utils.WriteSuccess(w, http.StatusCreated, visit)
 }
 
-// POST /api/device/visits/:id/message - Add voice message to visit
+// POST /api/device/visits/message - Add voice or text message to latest visit
 func (h *DeviceHandler) AddMessage(w http.ResponseWriter, r *http.Request) {
 	if !middleware.IsDevice(r) {
 		utils.WriteForbidden(w, "Device authentication required")
@@ -85,27 +81,30 @@ func (h *DeviceHandler) AddMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	visitID, err := uuid.Parse(chi.URLParam(r, "id"))
-	if err != nil {
-		utils.WriteValidationError(w, "Invalid visit ID")
-		return
-	}
 
-	// Check visit exists and has no message yet
-	visit, err := h.visitStore.GetByID(ctx, visitID)
+	// Get the latest pending visit
+	visit, err := h.visitStore.GetLatestPending(ctx)
 	if err != nil {
-		h.logger.Error("device", "Failed to get visit", err)
+		h.logger.Error("device", "Failed to get latest pending visit", err)
 		utils.WriteInternalError(w)
 		return
 	}
 
 	if visit == nil {
-		utils.WriteNotFound(w, "Visit not found")
-		return
-	}
+		// Create new visit if no pending visit
+		visit = &store.Visit{
+			Type:   "doorbell",
+			Status: "pending",
+		}
 
-	if visit.HasMessage {
-		// Create new visit for new message
+		if err := h.visitStore.Create(ctx, visit); err != nil {
+			h.logger.Error("device", "Failed to create new visit", err)
+			utils.WriteInternalError(w)
+			return
+		}
+		h.logger.Info("device", "Created new visit for message: "+visit.ID.String())
+	} else if visit.HasMessage {
+		// If visit already has a message, create new visit
 		newVisit := &store.Visit{
 			Type:   "doorbell",
 			Status: "pending",
@@ -117,76 +116,75 @@ func (h *DeviceHandler) AddMessage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		visitID = newVisit.ID
 		visit = newVisit
-		h.logger.Info("device", "Created new visit for additional message: "+visitID.String())
+		h.logger.Info("device", "Created new visit for additional message: "+visit.ID.String())
 	}
 
-	// Handle file upload
-	r.Body = http.MaxBytesReader(w, r.Body, 10<<20) // 10MB max
+	var req struct {
+		Type     string `json:"type"`
+		Text     string `json:"text"`
+		Filepath string `json:"filepath"`
+		Size     int64  `json:"size"`
+		Duration int    `json:"duration"`
+	}
 
-	if err := r.ParseMultipartForm(10 << 20); err != nil {
-		utils.WriteValidationError(w, "File too large or invalid form data")
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.WriteValidationError(w, "Invalid request payload")
 		return
 	}
 
-	file, handler, err := r.FormFile("audio")
-	if err != nil {
-		utils.WriteValidationError(w, "Failed to get audio file")
-		return
-	}
-	defer file.Close()
-
-	// Validate file type
-	contentType := handler.Header.Get("Content-Type")
-	if !isValidAudioType(contentType) {
-		utils.WriteValidationError(w, "Invalid audio format. Supported: mp3, wav, m4a, webm, ogg")
+	// Validate request
+	if req.Type != "voice" && req.Type != "text" {
+		utils.WriteValidationError(w, "Invalid message type. Must be 'voice' or 'text'")
 		return
 	}
 
-	// Generate unique filename
-	ext := filepath.Ext(handler.Filename)
-	if ext == "" {
-		ext = ".mp3"
-	}
-	filename := fmt.Sprintf("%s_%d%s", uuid.New().String(), time.Now().Unix(), ext)
-	fullPath := filepath.Join(h.uploadPath, filename)
+	// Handle based on message type
+	if req.Type == "voice" {
+		if req.Filepath == "" {
+			utils.WriteValidationError(w, "Filepath is required for voice messages")
+			return
+		}
+		if req.Size <= 0 {
+			utils.WriteValidationError(w, "Size must be positive for voice messages")
+			return
+		}
+		if req.Duration <= 0 {
+			utils.WriteValidationError(w, "Duration must be positive for voice messages")
+			return
+		}
 
-	// Save file
-	dst, err := os.Create(fullPath)
-	if err != nil {
-		h.logger.Error("device", "Failed to create file", err)
-		utils.WriteInternalError(w)
-		return
-	}
-	defer dst.Close()
+		if err := h.visitStore.AddVoiceMessage(ctx, visit.ID, req.Filepath, req.Size, req.Duration); err != nil {
+			h.logger.Error("device", "Failed to save voice message info", err)
+			utils.WriteInternalError(w)
+			return
+		}
 
-	size, err := io.Copy(dst, file)
-	if err != nil {
-		os.Remove(fullPath)
-		h.logger.Error("device", "Failed to save file", err)
-		utils.WriteInternalError(w)
-		return
-	}
+		h.logger.Info("device", fmt.Sprintf("Voice message added to visit: %s (size: %d bytes, duration: %ds)",
+			visit.ID.String(), req.Size, req.Duration))
 
-	// Parse duration from form
-	duration := 0
-	if d := r.FormValue("duration"); d != "" {
-		fmt.Sscanf(d, "%d", &duration)
-	}
+	} else { // text message
+		if req.Text == "" {
+			utils.WriteValidationError(w, "Text is required for text messages")
+			return
+		}
+		if len(req.Text) > 5000 {
+			utils.WriteValidationError(w, "Text message too long (max 5000 characters)")
+			return
+		}
 
-	// Update visit with message info
-	if err := h.visitStore.AddMessage(ctx, visitID, filename, fullPath, size, duration); err != nil {
-		os.Remove(fullPath)
-		h.logger.Error("device", "Failed to save message info", err)
-		utils.WriteInternalError(w)
-		return
-	}
+		if err := h.visitStore.AddTextMessage(ctx, visit.ID, req.Text); err != nil {
+			h.logger.Error("device", "Failed to save text message", err)
+			utils.WriteInternalError(w)
+			return
+		}
 
-	h.logger.Info("device", fmt.Sprintf("Voice message added to visit: %s (size: %d bytes)", visitID.String(), size))
+		h.logger.Info("device", fmt.Sprintf("Text message added to visit: %s (%d chars)",
+			visit.ID.String(), len(req.Text)))
+	}
 
 	// Return updated visit
-	visit, _ = h.visitStore.GetByID(ctx, visitID)
+	visit, _ = h.visitStore.GetByID(ctx, visit.ID)
 	utils.WriteSuccess(w, http.StatusOK, visit)
 }
 
@@ -270,19 +268,4 @@ func (h *DeviceHandler) getCurrentSchedule(schedule map[string]store.DaySchedule
 	}
 
 	return &store.DaySchedule{Enabled: false}
-}
-
-func isValidAudioType(contentType string) bool {
-	validTypes := map[string]bool{
-		"audio/mpeg":  true,
-		"audio/mp3":   true,
-		"audio/wav":   true,
-		"audio/wave":  true,
-		"audio/x-wav": true,
-		"audio/mp4":   true,
-		"audio/x-m4a": true,
-		"audio/webm":  true,
-		"audio/ogg":   true,
-	}
-	return validTypes[contentType]
 }

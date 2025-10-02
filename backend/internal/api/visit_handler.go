@@ -254,7 +254,7 @@ func (h *VisitHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GET /api/visits/:id/message - Download voice message
+// GET /api/visits/:id/message - Download voice message or get text message
 func (h *VisitHandler) DownloadMessage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -276,8 +276,23 @@ func (h *VisitHandler) DownloadMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !visit.HasMessage || visit.MessageFilepath == nil {
+	if !visit.HasMessage {
 		utils.WriteNotFound(w, "No message available for this visit")
+		return
+	}
+
+	// Handle based on message type
+	if visit.MessageType != nil && *visit.MessageType == "text" {
+		utils.WriteSuccess(w, http.StatusOK, map[string]string{
+			"type": "text",
+			"text": *visit.MessageText,
+		})
+		return
+	}
+
+	// Handle voice message
+	if visit.MessageFilepath == nil || *visit.MessageFilepath == "" {
+		utils.WriteNotFound(w, "Message file path not found")
 		return
 	}
 
@@ -291,9 +306,7 @@ func (h *VisitHandler) DownloadMessage(w http.ResponseWriter, r *http.Request) {
 
 	// Set headers for download
 	w.Header().Set("Content-Type", "audio/mpeg")
-	if visit.MessageFilename != nil {
-		w.Header().Set("Content-Disposition", `attachment; filename="`+*visit.MessageFilename+`"`)
-	}
+	w.Header().Set("Content-Disposition", `attachment; filename="message.mp3"`)
 
 	io.Copy(w, file)
 }
