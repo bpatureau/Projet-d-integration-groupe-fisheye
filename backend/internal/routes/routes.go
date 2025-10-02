@@ -39,7 +39,7 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 
 			r.Post("/ring", app.DeviceHandler.Ring)
 			r.Post("/visits/{id}/message", app.DeviceHandler.AddMessage)
-			r.Post("/visits/{id}/answer", app.DeviceHandler.AnswerVisit)
+			r.Post("/visits/answer", app.DeviceHandler.AnswerVisit)
 			r.Get("/settings", app.DeviceHandler.GetSettings)
 		})
 

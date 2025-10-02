@@ -190,7 +190,7 @@ func (h *DeviceHandler) AddMessage(w http.ResponseWriter, r *http.Request) {
 	utils.WriteSuccess(w, http.StatusOK, visit)
 }
 
-// POST /api/device/visits/:id/answer - Mark visit as answered
+// POST /api/device/visits/answer - Mark latest visit as answered
 func (h *DeviceHandler) AnswerVisit(w http.ResponseWriter, r *http.Request) {
 	if !middleware.IsDevice(r) {
 		utils.WriteForbidden(w, "Device authentication required")
@@ -198,21 +198,39 @@ func (h *DeviceHandler) AnswerVisit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	visitID, err := uuid.Parse(chi.URLParam(r, "id"))
+
+	visit, err := h.visitStore.GetLatestPending(ctx)
 	if err != nil {
-		utils.WriteValidationError(w, "Invalid visit ID")
+		h.logger.Error("device", "Failed to get latest pending visit", err)
+		utils.WriteInternalError(w)
 		return
 	}
 
-	if err := h.visitStore.MarkAnswered(ctx, visitID); err != nil {
+	if visit == nil {
+		utils.WriteNotFound(w, "No pending visit found")
+		return
+	}
+
+	// Vérifier que la visite a moins de 5 minutes
+	fiveMinutesAgo := time.Now().Add(-5 * time.Minute)
+	if visit.CreatedAt.Before(fiveMinutesAgo) {
+		h.logger.Warning("device", fmt.Sprintf("Visit %s is too old to answer (created at %s)",
+			visit.ID.String(), visit.CreatedAt.Format(time.RFC3339)))
+		utils.WriteValidationError(w, "Visit is too old to answer (more than 5 minutes)")
+		return
+	}
+
+	// Marquer comme répondu
+	if err := h.visitStore.MarkAnswered(ctx, visit.ID); err != nil {
 		h.logger.Error("device", "Failed to mark visit as answered", err)
 		utils.WriteInternalError(w)
 		return
 	}
 
-	h.logger.Info("device", "Visit marked as answered: "+visitID.String())
+	h.logger.Info("device", "Latest visit marked as answered: "+visit.ID.String())
 	utils.WriteSuccess(w, http.StatusOK, map[string]string{
-		"message": "Visit marked as answered",
+		"message":  "Latest visit marked as answered",
+		"visit_id": visit.ID.String(),
 	})
 }
 

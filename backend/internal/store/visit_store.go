@@ -35,6 +35,7 @@ type Visit struct {
 type VisitStore interface {
 	Create(ctx context.Context, visit *Visit) error
 	GetByID(ctx context.Context, id uuid.UUID) (*Visit, error)
+	GetLatestPending(ctx context.Context) (*Visit, error)
 	List(ctx context.Context, filter ListFilter) ([]*Visit, int, error)
 	Update(ctx context.Context, visit *Visit) error
 	Delete(ctx context.Context, id uuid.UUID) error
@@ -99,6 +100,43 @@ func (s *PostgresVisitStore) GetByID(ctx context.Context, id uuid.UUID) (*Visit,
 	`
 
 	err := s.db.QueryRowContext(ctx, query, id).Scan(
+		&visit.ID,
+		&visit.Type,
+		&visit.Status,
+		&visit.HasMessage,
+		&visit.MessageFilename,
+		&visit.MessageFilepath,
+		&visit.MessageSize,
+		&visit.MessageDuration,
+		&visit.MessageListened,
+		&visit.MessageListenedAt,
+		&visit.AnsweredAt,
+		&visit.ResponseTime,
+		&visit.CreatedAt,
+		&visit.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+
+	return visit, err
+}
+
+func (s *PostgresVisitStore) GetLatestPending(ctx context.Context) (*Visit, error) {
+	visit := &Visit{}
+
+	query := `
+		SELECT id, type, status, has_message, message_filename, message_filepath,
+			   message_size, message_duration, message_listened, message_listened_at,
+			   answered_at, response_time, created_at, updated_at
+		FROM visits
+		WHERE status = 'pending'
+		ORDER BY created_at DESC
+		LIMIT 1
+	`
+
+	err := s.db.QueryRowContext(ctx, query).Scan(
 		&visit.ID,
 		&visit.Type,
 		&visit.Status,

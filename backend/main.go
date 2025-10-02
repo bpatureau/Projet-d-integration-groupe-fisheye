@@ -31,7 +31,6 @@ func main() {
 }
 
 func runServer(application *app.Application) error {
-	// Get server address from environment variable or use default
 	addr := os.Getenv("SERVER_HOST")
 	if addr == "" {
 		addr = "0.0.0.0:8080"
