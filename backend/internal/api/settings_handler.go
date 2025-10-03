@@ -3,20 +3,24 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"fisheye/internal/middleware"
+	"fisheye/internal/sse"
 	"fisheye/internal/store"
 	"fisheye/internal/utils"
 )
 
 type SettingsHandler struct {
 	settingsStore store.SettingsStore
+	broadcaster   *sse.Broadcaster
 	logger        *utils.Logger
 }
 
-func NewSettingsHandler(settingsStore store.SettingsStore, logger *utils.Logger) *SettingsHandler {
+func NewSettingsHandler(settingsStore store.SettingsStore, broadcaster *sse.Broadcaster, logger *utils.Logger) *SettingsHandler {
 	return &SettingsHandler{
 		settingsStore: settingsStore,
+		broadcaster:   broadcaster,
 		logger:        logger,
 	}
 }
@@ -69,8 +73,32 @@ func (h *SettingsHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	deviceSettings := map[string]any{
+		"device_name":      settings.DeviceName,
+		"do_not_disturb":   settings.DoNotDisturb,
+		"welcome_messages": settings.WelcomeMessages,
+		"rotation_seconds": settings.MessageRotationSeconds,
+		"schedule":         h.getCurrentSchedule(settings.Schedule),
+	}
+
+	h.broadcaster.BroadcastToDevices(sse.Event{
+		Type: "settings_update",
+		Data: deviceSettings,
+	})
+
 	h.logger.Info("settings", "Settings updated by admin: "+admin.Username)
 	utils.WriteSuccess(w, http.StatusOK, settings)
+}
+
+func (h *SettingsHandler) getCurrentSchedule(schedule map[string]store.DaySchedule) *store.DaySchedule {
+	days := []string{"sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"}
+	today := days[time.Now().Weekday()]
+
+	if daySchedule, ok := schedule[today]; ok {
+		return &daySchedule
+	}
+
+	return &store.DaySchedule{Enabled: false}
 }
 
 func (h *SettingsHandler) validateSettings(settings *store.Settings) error {

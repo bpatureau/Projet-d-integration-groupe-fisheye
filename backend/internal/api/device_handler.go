@@ -9,18 +9,22 @@ import (
 	"time"
 
 	"fisheye/internal/middleware"
+	"fisheye/internal/sse"
 	"fisheye/internal/store"
 	"fisheye/internal/utils"
+
+	"github.com/google/uuid"
 )
 
 type DeviceHandler struct {
 	visitStore    store.VisitStore
 	settingsStore store.SettingsStore
+	broadcaster   *sse.Broadcaster
 	uploadPath    string
 	logger        *utils.Logger
 }
 
-func NewDeviceHandler(visitStore store.VisitStore, settingsStore store.SettingsStore, logger *utils.Logger) *DeviceHandler {
+func NewDeviceHandler(visitStore store.VisitStore, settingsStore store.SettingsStore, broadcaster *sse.Broadcaster, logger *utils.Logger) *DeviceHandler {
 	uploadPath := os.Getenv("UPLOAD_PATH")
 	if uploadPath == "" {
 		uploadPath = "./uploads"
@@ -33,6 +37,7 @@ func NewDeviceHandler(visitStore store.VisitStore, settingsStore store.SettingsS
 		visitStore:    visitStore,
 		settingsStore: settingsStore,
 		uploadPath:    absPath,
+		broadcaster:   broadcaster,
 		logger:        logger,
 	}
 }
@@ -232,6 +237,85 @@ func (h *DeviceHandler) AnswerVisit(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *DeviceHandler) SettingsStream(w http.ResponseWriter, r *http.Request) {
+	if !middleware.IsDevice(r) {
+		utils.WriteForbidden(w, "Device authentication required")
+		return
+	}
+
+	// Set SSE headers
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+
+	// Create client
+	clientID := uuid.New().String()
+	client := &sse.Client{
+		ID:       clientID,
+		Channel:  make(chan sse.Event, 10),
+		IsDevice: true,
+	}
+
+	// Register client
+	h.broadcaster.Register(client)
+	defer h.broadcaster.Unregister(client)
+
+	// Send initial settings
+	ctx := r.Context()
+	settings, err := h.settingsStore.Get(ctx)
+	if err == nil {
+		deviceSettings := h.formatDeviceSettings(settings)
+		initialEvent := sse.Event{
+			Type: "initial",
+			Data: deviceSettings,
+		}
+
+		select {
+		case client.Channel <- initialEvent:
+		default:
+		}
+	}
+
+	// Create flusher for real-time streaming
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		h.logger.Error("device", "Streaming not supported", nil)
+		utils.WriteInternalError(w)
+		return
+	}
+
+	h.logger.Info("device", fmt.Sprintf("Device SSE stream started: %s from %s", clientID, r.RemoteAddr))
+
+	// Stream events
+	for {
+		select {
+		case event, ok := <-client.Channel:
+			if !ok {
+				// Channel closed
+				return
+			}
+
+			// Marshal event data
+			data, err := json.Marshal(event.Data)
+			if err != nil {
+				h.logger.Error("device", "Failed to marshal event", err)
+				continue
+			}
+
+			// Write SSE format
+			fmt.Fprintf(w, "event: %s\n", event.Type)
+			fmt.Fprintf(w, "data: %s\n\n", string(data))
+			flusher.Flush()
+
+		case <-r.Context().Done():
+			// Client disconnected
+			h.logger.Info("device", fmt.Sprintf("Device SSE stream ended: %s", clientID))
+			return
+		}
+	}
+}
+
 // GET /api/device/settings - Get current settings for display
 func (h *DeviceHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	if !middleware.IsDevice(r) {
@@ -268,4 +352,14 @@ func (h *DeviceHandler) getCurrentSchedule(schedule map[string]store.DaySchedule
 	}
 
 	return &store.DaySchedule{Enabled: false}
+}
+
+func (h *DeviceHandler) formatDeviceSettings(settings *store.Settings) map[string]any {
+	return map[string]any{
+		"device_name":      settings.DeviceName,
+		"do_not_disturb":   settings.DoNotDisturb,
+		"welcome_messages": settings.WelcomeMessages,
+		"rotation_seconds": settings.MessageRotationSeconds,
+		"schedule":         h.getCurrentSchedule(settings.Schedule),
+	}
 }

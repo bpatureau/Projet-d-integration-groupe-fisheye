@@ -8,6 +8,7 @@ import (
 
 	"fisheye/internal/api"
 	"fisheye/internal/middleware"
+	"fisheye/internal/sse"
 	"fisheye/internal/store"
 	"fisheye/internal/utils"
 	"fisheye/migrations"
@@ -23,6 +24,7 @@ type Application struct {
 	DeviceHandler   *api.DeviceHandler
 	HealthHandler   *api.HealthHandler
 	Middleware      *middleware.Middleware
+	Broadcaster     *sse.Broadcaster
 	DB              *sql.DB
 	ctx             context.Context
 	cancel          context.CancelFunc
@@ -75,13 +77,16 @@ func NewApplication() (*Application, error) {
 
 	logger.Info("app", "Application initialized successfully")
 
+	// Initialize SSE broadcaster
+	broadcaster := sse.NewBroadcaster(logger)
+
 	// Initialize handlers
 	adminHandler := api.NewAdminHandler(userStore, tokenStore, logStore, logger)
 	authHandler := api.NewAuthHandler(userStore, tokenStore, logger)
 	profileHandler := api.NewProfileHandler(userStore, tokenStore, logger)
-	settingsHandler := api.NewSettingsHandler(settingsStore, logger)
+	settingsHandler := api.NewSettingsHandler(settingsStore, broadcaster, logger)
 	visitHandler := api.NewVisitHandler(visitStore, logger)
-	deviceHandler := api.NewDeviceHandler(visitStore, settingsStore, logger)
+	deviceHandler := api.NewDeviceHandler(visitStore, settingsStore, broadcaster, logger)
 	healthHandler := api.NewHealthHandler(db)
 
 	middlewareHandler := middleware.NewMiddleware(userStore, tokenStore, logger)

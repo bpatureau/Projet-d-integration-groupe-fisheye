@@ -41,6 +41,7 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 			r.Post("/visits/message", app.DeviceHandler.AddMessage)
 			r.Post("/visits/answer", app.DeviceHandler.AnswerVisit)
 			r.Get("/settings", app.DeviceHandler.GetSettings)
+			r.Get("/settings/stream", app.DeviceHandler.SettingsStream)
 		})
 
 		// User endpoints (authenticated users)
