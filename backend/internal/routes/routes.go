@@ -3,9 +3,12 @@ package routes
 import (
 	"fisheye/internal/app"
 	"fisheye/internal/middleware"
+	"os"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	"golang.org/x/time/rate"
 )
 
@@ -17,6 +20,9 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 	router.Use(chiMiddleware.RequestID)
 	router.Use(chiMiddleware.RealIP)
 	router.Use(chiMiddleware.Logger)
+
+	// CORS middleware
+	router.Use(cors.Handler(getCORSOptions()))
 
 	// Rate limiter for auth endpoints (10 requests per minute)
 	authLimiter := middleware.NewRateLimiter(rate.Limit(10.0/60.0), 5, app.Logger)
@@ -104,4 +110,38 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 	})
 
 	return router
+}
+
+func getCORSOptions() cors.Options {
+	allowedOrigins := []string{"*"} // Default to allow all
+	if origins := os.Getenv("CORS_ALLOWED_ORIGINS"); origins != "" {
+		allowedOrigins = strings.Split(origins, ",")
+		for i, origin := range allowedOrigins {
+			allowedOrigins[i] = strings.TrimSpace(origin)
+		}
+	}
+
+	debug := os.Getenv("DEBUG") == "true"
+
+	return cors.Options{
+		AllowedOrigins: allowedOrigins,
+		AllowedMethods: []string{
+			"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS",
+		},
+		AllowedHeaders: []string{
+			"Accept",
+			"Authorization",
+			"Content-Type",
+			"X-CSRF-Token",
+			"X-API-Key",
+			"X-Requested-With",
+		},
+		ExposedHeaders: []string{
+			"Link",
+			"Content-Length",
+		},
+		AllowCredentials: true,
+		MaxAge:           300, // 5 minutes
+		Debug:            debug,
+	}
 }
