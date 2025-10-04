@@ -8,26 +8,27 @@ import (
 
 	"fisheye/internal/api"
 	"fisheye/internal/middleware"
-	"fisheye/internal/sse"
 	"fisheye/internal/store"
 	"fisheye/internal/utils"
+	"fisheye/internal/websocket"
 	"fisheye/migrations"
 )
 
 type Application struct {
-	Logger          *utils.Logger
-	AdminHandler    *api.AdminHandler
-	AuthHandler     *api.AuthHandler
-	ProfileHandler  *api.ProfileHandler
-	SettingsHandler *api.SettingsHandler
-	VisitHandler    *api.VisitHandler
-	DeviceHandler   *api.DeviceHandler
-	HealthHandler   *api.HealthHandler
-	Middleware      *middleware.Middleware
-	Broadcaster     *sse.Broadcaster
-	DB              *sql.DB
-	ctx             context.Context
-	cancel          context.CancelFunc
+	Logger           *utils.Logger
+	AdminHandler     *api.AdminHandler
+	AuthHandler      *api.AuthHandler
+	ProfileHandler   *api.ProfileHandler
+	SettingsHandler  *api.SettingsHandler
+	VisitHandler     *api.VisitHandler
+	DeviceHandler    *api.DeviceHandler
+	HealthHandler    *api.HealthHandler
+	Middleware       *middleware.Middleware
+	WebSocketHub     *websocket.Hub
+	WebSocketHandler *websocket.Handler
+	DB               *sql.DB
+	ctx              context.Context
+	cancel           context.CancelFunc
 }
 
 func NewApplication() (*Application, error) {
@@ -77,16 +78,17 @@ func NewApplication() (*Application, error) {
 
 	logger.Info("app", "Application initialized successfully")
 
-	// Initialize SSE broadcaster
-	broadcaster := sse.NewBroadcaster(logger)
+	// Initialize WebSocket hub
+	wsHub := websocket.NewHub(logger)
+	wsHandler := websocket.NewHandler(wsHub, logger)
 
 	// Initialize handlers
 	adminHandler := api.NewAdminHandler(userStore, tokenStore, logStore, logger)
 	authHandler := api.NewAuthHandler(userStore, tokenStore, logger)
 	profileHandler := api.NewProfileHandler(userStore, tokenStore, logger)
-	settingsHandler := api.NewSettingsHandler(settingsStore, broadcaster, logger)
-	visitHandler := api.NewVisitHandler(visitStore, logger)
-	deviceHandler := api.NewDeviceHandler(visitStore, settingsStore, broadcaster, logger)
+	settingsHandler := api.NewSettingsHandler(settingsStore, wsHub, logger)
+	visitHandler := api.NewVisitHandler(visitStore, wsHub, logger)
+	deviceHandler := api.NewDeviceHandler(visitStore, settingsStore, wsHub, logger)
 	healthHandler := api.NewHealthHandler(db)
 
 	middlewareHandler := middleware.NewMiddleware(userStore, tokenStore, logger)
@@ -94,18 +96,20 @@ func NewApplication() (*Application, error) {
 	appCtx, cancel := context.WithCancel(context.Background())
 
 	app := &Application{
-		Logger:          logger,
-		AdminHandler:    adminHandler,
-		AuthHandler:     authHandler,
-		ProfileHandler:  profileHandler,
-		SettingsHandler: settingsHandler,
-		VisitHandler:    visitHandler,
-		DeviceHandler:   deviceHandler,
-		HealthHandler:   healthHandler,
-		Middleware:      middlewareHandler,
-		DB:              db,
-		ctx:             appCtx,
-		cancel:          cancel,
+		Logger:           logger,
+		AdminHandler:     adminHandler,
+		AuthHandler:      authHandler,
+		ProfileHandler:   profileHandler,
+		SettingsHandler:  settingsHandler,
+		VisitHandler:     visitHandler,
+		DeviceHandler:    deviceHandler,
+		HealthHandler:    healthHandler,
+		Middleware:       middlewareHandler,
+		WebSocketHub:     wsHub,
+		WebSocketHandler: wsHandler,
+		DB:               db,
+		ctx:              appCtx,
+		cancel:           cancel,
 	}
 
 	// Start background tasks

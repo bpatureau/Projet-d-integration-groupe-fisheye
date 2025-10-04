@@ -11,6 +11,7 @@ import (
 	"fisheye/internal/middleware"
 	"fisheye/internal/store"
 	"fisheye/internal/utils"
+	"fisheye/internal/websocket"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -18,12 +19,14 @@ import (
 
 type VisitHandler struct {
 	visitStore store.VisitStore
+	wsHub      *websocket.Hub
 	logger     *utils.Logger
 }
 
-func NewVisitHandler(visitStore store.VisitStore, logger *utils.Logger) *VisitHandler {
+func NewVisitHandler(visitStore store.VisitStore, wsHub *websocket.Hub, logger *utils.Logger) *VisitHandler {
 	return &VisitHandler{
 		visitStore: visitStore,
+		wsHub:      wsHub,
 		logger:     logger,
 	}
 }
@@ -161,18 +164,17 @@ func (h *VisitHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if visit.Status != *req.Status {
-			visit.Status = *req.Status
-			updated = true
-
-			// If marking as answered, update timestamp
+			// If marking as answered, use special method
 			if *req.Status == "answered" {
 				if err := h.visitStore.MarkAnswered(ctx, id); err != nil {
 					h.logger.Error("visits", "Failed to mark as answered", err)
 					utils.WriteInternalError(w)
 					return
 				}
-				// Re-fetch to get updated timestamps
-				visit, _ = h.visitStore.GetByID(ctx, id)
+				updated = true
+			} else {
+				visit.Status = *req.Status
+				updated = true
 			}
 		}
 	}
@@ -185,18 +187,36 @@ func (h *VisitHandler) Update(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		updated = true
-		// Re-fetch to get updated fields
-		visit, _ = h.visitStore.GetByID(ctx, id)
 	}
 
+	// Only update if we have regular status changes (not answered)
+	if updated && (req.Status == nil || *req.Status != "answered") {
+		if err := h.visitStore.Update(ctx, visit); err != nil {
+			h.logger.Error("visits", "Failed to update visit", err)
+			utils.WriteInternalError(w)
+			return
+		}
+	}
+
+	// Fetch the latest version after all updates
 	if updated {
-		if req.Status == nil || *req.Status != "answered" {
-			// Only update if we didn't already update via MarkAnswered
-			if err := h.visitStore.Update(ctx, visit); err != nil {
-				h.logger.Error("visits", "Failed to update visit", err)
-				utils.WriteInternalError(w)
-				return
-			}
+		visit, err = h.visitStore.GetByID(ctx, id)
+		if err != nil {
+			h.logger.Error("visits", "Failed to fetch updated visit", err)
+			utils.WriteInternalError(w)
+			return
+		}
+		if visit == nil {
+			utils.WriteNotFound(w, "Visit not found after update")
+			return
+		}
+
+		// Broadcast visit update to all frontends
+		if h.wsHub != nil {
+			h.wsHub.BroadcastToFrontends(&websocket.Message{
+				Type: "visit_update",
+				Data: visit,
+			})
 		}
 
 		h.logger.Info("visits", "Visit updated by user: "+user.Username)
@@ -239,6 +259,16 @@ func (h *VisitHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		h.logger.Error("visits", "Failed to delete visit", err)
 		utils.WriteInternalError(w)
 		return
+	}
+
+	// Broadcast visit deletion to frontends
+	if h.wsHub != nil {
+		h.wsHub.BroadcastToFrontends(&websocket.Message{
+			Type: "visit_deleted",
+			Data: map[string]string{
+				"id": id.String(),
+			},
+		})
 	}
 
 	// Delete associated file if exists

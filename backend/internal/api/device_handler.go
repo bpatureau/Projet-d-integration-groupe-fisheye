@@ -9,22 +9,20 @@ import (
 	"time"
 
 	"fisheye/internal/middleware"
-	"fisheye/internal/sse"
 	"fisheye/internal/store"
 	"fisheye/internal/utils"
-
-	"github.com/google/uuid"
+	"fisheye/internal/websocket"
 )
 
 type DeviceHandler struct {
 	visitStore    store.VisitStore
 	settingsStore store.SettingsStore
-	broadcaster   *sse.Broadcaster
+	wsHub         *websocket.Hub
 	uploadPath    string
 	logger        *utils.Logger
 }
 
-func NewDeviceHandler(visitStore store.VisitStore, settingsStore store.SettingsStore, broadcaster *sse.Broadcaster, logger *utils.Logger) *DeviceHandler {
+func NewDeviceHandler(visitStore store.VisitStore, settingsStore store.SettingsStore, wsHub *websocket.Hub, logger *utils.Logger) *DeviceHandler {
 	uploadPath := os.Getenv("UPLOAD_PATH")
 	if uploadPath == "" {
 		uploadPath = "./uploads"
@@ -37,7 +35,7 @@ func NewDeviceHandler(visitStore store.VisitStore, settingsStore store.SettingsS
 		visitStore:    visitStore,
 		settingsStore: settingsStore,
 		uploadPath:    absPath,
-		broadcaster:   broadcaster,
+		wsHub:         wsHub,
 		logger:        logger,
 	}
 }
@@ -72,6 +70,14 @@ func (h *DeviceHandler) Ring(w http.ResponseWriter, r *http.Request) {
 		h.logger.Error("device", "Failed to create visit", err)
 		utils.WriteInternalError(w)
 		return
+	}
+
+	// Broadcast new visit to frontends via WebSocket
+	if h.wsHub != nil {
+		h.wsHub.BroadcastToFrontends(&websocket.Message{
+			Type: "visit",
+			Data: visit,
+		})
 	}
 
 	h.logger.Info("device", fmt.Sprintf("Visit recorded: %s (%s)", visit.ID.String(), visit.Type))
@@ -190,6 +196,15 @@ func (h *DeviceHandler) AddMessage(w http.ResponseWriter, r *http.Request) {
 
 	// Return updated visit
 	visit, _ = h.visitStore.GetByID(ctx, visit.ID)
+
+	// Broadcast visit update to frontends
+	if h.wsHub != nil {
+		h.wsHub.BroadcastToFrontends(&websocket.Message{
+			Type: "visit_update",
+			Data: visit,
+		})
+	}
+
 	utils.WriteSuccess(w, http.StatusOK, visit)
 }
 
@@ -230,90 +245,20 @@ func (h *DeviceHandler) AnswerVisit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Broadcast visit answered to frontends
+	if h.wsHub != nil {
+		visit, _ = h.visitStore.GetByID(ctx, visit.ID)
+		h.wsHub.BroadcastToFrontends(&websocket.Message{
+			Type: "visit_answered",
+			Data: visit,
+		})
+	}
+
 	h.logger.Info("device", "Latest visit marked as answered: "+visit.ID.String())
 	utils.WriteSuccess(w, http.StatusOK, map[string]string{
 		"message":  "Latest visit marked as answered",
 		"visit_id": visit.ID.String(),
 	})
-}
-
-func (h *DeviceHandler) SettingsStream(w http.ResponseWriter, r *http.Request) {
-	if !middleware.IsDevice(r) {
-		utils.WriteForbidden(w, "Device authentication required")
-		return
-	}
-
-	// Set SSE headers
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("X-Accel-Buffering", "no")
-
-	// Create client
-	clientID := uuid.New().String()
-	client := &sse.Client{
-		ID:       clientID,
-		Channel:  make(chan sse.Event, 10),
-		IsDevice: true,
-	}
-
-	// Register client
-	h.broadcaster.Register(client)
-	defer h.broadcaster.Unregister(client)
-
-	// Send initial settings
-	ctx := r.Context()
-	settings, err := h.settingsStore.Get(ctx)
-	if err == nil {
-		deviceSettings := h.formatDeviceSettings(settings)
-		initialEvent := sse.Event{
-			Type: "initial",
-			Data: deviceSettings,
-		}
-
-		select {
-		case client.Channel <- initialEvent:
-		default:
-		}
-	}
-
-	// Create flusher for real-time streaming
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		h.logger.Error("device", "Streaming not supported", nil)
-		utils.WriteInternalError(w)
-		return
-	}
-
-	h.logger.Info("device", fmt.Sprintf("Device SSE stream started: %s from %s", clientID, r.RemoteAddr))
-
-	// Stream events
-	for {
-		select {
-		case event, ok := <-client.Channel:
-			if !ok {
-				// Channel closed
-				return
-			}
-
-			// Marshal event data
-			data, err := json.Marshal(event.Data)
-			if err != nil {
-				h.logger.Error("device", "Failed to marshal event", err)
-				continue
-			}
-
-			// Write SSE format
-			fmt.Fprintf(w, "event: %s\n", event.Type)
-			fmt.Fprintf(w, "data: %s\n\n", string(data))
-			flusher.Flush()
-
-		case <-r.Context().Done():
-			// Client disconnected
-			h.logger.Info("device", fmt.Sprintf("Device SSE stream ended: %s", clientID))
-			return
-		}
-	}
 }
 
 // GET /api/device/settings - Get current settings for display
@@ -337,29 +282,8 @@ func (h *DeviceHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 		"do_not_disturb":   settings.DoNotDisturb,
 		"welcome_messages": settings.WelcomeMessages,
 		"rotation_seconds": settings.MessageRotationSeconds,
-		"schedule":         h.getCurrentSchedule(settings.Schedule),
+		"schedule":         utils.GetCurrentSchedule(settings.Schedule),
 	}
 
 	utils.WriteSuccess(w, http.StatusOK, deviceSettings)
-}
-
-func (h *DeviceHandler) getCurrentSchedule(schedule map[string]store.DaySchedule) *store.DaySchedule {
-	days := []string{"sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"}
-	today := days[time.Now().Weekday()]
-
-	if daySchedule, ok := schedule[today]; ok {
-		return &daySchedule
-	}
-
-	return &store.DaySchedule{Enabled: false}
-}
-
-func (h *DeviceHandler) formatDeviceSettings(settings *store.Settings) map[string]any {
-	return map[string]any{
-		"device_name":      settings.DeviceName,
-		"do_not_disturb":   settings.DoNotDisturb,
-		"welcome_messages": settings.WelcomeMessages,
-		"rotation_seconds": settings.MessageRotationSeconds,
-		"schedule":         h.getCurrentSchedule(settings.Schedule),
-	}
 }

@@ -3,24 +3,23 @@ package api
 import (
 	"encoding/json"
 	"net/http"
-	"time"
 
 	"fisheye/internal/middleware"
-	"fisheye/internal/sse"
 	"fisheye/internal/store"
 	"fisheye/internal/utils"
+	"fisheye/internal/websocket"
 )
 
 type SettingsHandler struct {
 	settingsStore store.SettingsStore
-	broadcaster   *sse.Broadcaster
+	wsHub         *websocket.Hub
 	logger        *utils.Logger
 }
 
-func NewSettingsHandler(settingsStore store.SettingsStore, broadcaster *sse.Broadcaster, logger *utils.Logger) *SettingsHandler {
+func NewSettingsHandler(settingsStore store.SettingsStore, wsHub *websocket.Hub, logger *utils.Logger) *SettingsHandler {
 	return &SettingsHandler{
 		settingsStore: settingsStore,
-		broadcaster:   broadcaster,
+		wsHub:         wsHub,
 		logger:        logger,
 	}
 }
@@ -78,27 +77,19 @@ func (h *SettingsHandler) Update(w http.ResponseWriter, r *http.Request) {
 		"do_not_disturb":   settings.DoNotDisturb,
 		"welcome_messages": settings.WelcomeMessages,
 		"rotation_seconds": settings.MessageRotationSeconds,
-		"schedule":         h.getCurrentSchedule(settings.Schedule),
+		"schedule":         utils.GetCurrentSchedule(settings.Schedule),
 	}
 
-	h.broadcaster.BroadcastToDevices(sse.Event{
-		Type: "settings_update",
-		Data: deviceSettings,
-	})
+	// Broadcast to devices via WebSocket
+	if h.wsHub != nil {
+		h.wsHub.BroadcastToDevices(&websocket.Message{
+			Type: "settings_update",
+			Data: deviceSettings,
+		})
+	}
 
 	h.logger.Info("settings", "Settings updated by admin: "+admin.Username)
 	utils.WriteSuccess(w, http.StatusOK, settings)
-}
-
-func (h *SettingsHandler) getCurrentSchedule(schedule map[string]store.DaySchedule) *store.DaySchedule {
-	days := []string{"sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"}
-	today := days[time.Now().Weekday()]
-
-	if daySchedule, ok := schedule[today]; ok {
-		return &daySchedule
-	}
-
-	return &store.DaySchedule{Enabled: false}
 }
 
 func (h *SettingsHandler) validateSettings(settings *store.Settings) error {
@@ -125,13 +116,8 @@ func (h *SettingsHandler) validateSettings(settings *store.Settings) error {
 	}
 
 	// Validate schedule
-	for day, schedule := range settings.Schedule {
-		if schedule.Enabled {
-			if schedule.Start == "" || schedule.End == "" {
-				return utils.NewValidationError("start and end times required for " + day)
-			}
-			// TODO: add time format validation
-		}
+	if err := utils.ValidateSchedule(settings.Schedule); err != nil {
+		return err
 	}
 
 	return nil

@@ -3,8 +3,8 @@ package routes
 import (
 	"fisheye/internal/app"
 	"fisheye/internal/middleware"
+	"fisheye/internal/utils"
 	"os"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
@@ -31,6 +31,13 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 		// Health check
 		r.Get("/health", app.HealthHandler.HandleHealth)
 
+		// WebSocket endpoints
+		r.Route("/ws", func(r chi.Router) {
+			r.Use(app.Middleware.AuthenticateUser)
+			r.With(app.Middleware.RequireDevice).Get("/device", app.WebSocketHandler.HandleDeviceConnection)
+			r.With(app.Middleware.RequireAuth).Get("/frontend", app.WebSocketHandler.HandleFrontendConnection)
+		})
+
 		// Authentication
 		r.Route("/auth", func(r chi.Router) {
 			r.Use(authLimiter.StrictLimit)
@@ -47,7 +54,6 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 			r.Post("/visits/message", app.DeviceHandler.AddMessage)
 			r.Post("/visits/answer", app.DeviceHandler.AnswerVisit)
 			r.Get("/settings", app.DeviceHandler.GetSettings)
-			r.Get("/settings/stream", app.DeviceHandler.SettingsStream)
 		})
 
 		// User endpoints (authenticated users)
@@ -113,13 +119,7 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 }
 
 func getCORSOptions() cors.Options {
-	allowedOrigins := []string{"*"} // Default to allow all
-	if origins := os.Getenv("CORS_ALLOWED_ORIGINS"); origins != "" {
-		allowedOrigins = strings.Split(origins, ",")
-		for i, origin := range allowedOrigins {
-			allowedOrigins[i] = strings.TrimSpace(origin)
-		}
-	}
+	allowedOrigins := utils.GetAllowedOrigins()
 
 	debug := os.Getenv("DEBUG") == "true"
 
