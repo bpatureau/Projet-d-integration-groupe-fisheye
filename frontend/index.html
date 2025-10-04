@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Welcome to Windows</title>
+  <link rel="stylesheet" href="https://unpkg.com/98.css" />
+  <link rel="stylesheet" href="style/style.css">
+</head>
+<body>
+  <div class="window logon-window" id="logon">
+    <div class="title-bar">
+      <div class="title-bar-text">Welcome to Windows</div>
+      <div class="title-bar-controls">
+        <button aria-label="Help" id="tb-help" class="help"></button>
+        <button aria-label="Close" id="tb-close" class="close"></button>
+      </div>
+    </div>
+
+    <div class="window-body">
+      <div class="dialog">
+        <p class="prompt">Type a user name and password to log on to Windows.</p>
+
+        <div class="icon-cell">
+          <img src="https://win98icons.alexmeub.com/icons/png/key_win-1.png" alt="Keys icon">
+        </div>
+
+        <div class="fields">
+          <div class="field-row-stacked">
+            <label for="username" accesskey="u"><span class="mn">U</span>ser name:</label>
+            <input id="username" type="text" autocomplete="username" />
+          </div>
+
+          <div class="field-row-stacked">
+            <label for="password" accesskey="p"><span class="mn">P</span>assword:</label>
+            <input id="password" type="password" autocomplete="current-password" />
+          </div>
+        </div>
+
+        <div class="buttons">
+          <button id="btn-ok" class="default" accesskey="o"><span class="mn">O</span>K</button>
+          <button id="btn-cancel" accesskey="c"><span class="mn">C</span>ancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <p class="status-bar-field">Press F1 for help</p>
+      <p class="status-bar-field" id="caps">Caps Lock: Off</p>
+      <p class="status-bar-field" id="num">Num Lock: Unknown</p>
+    </div>
+  </div>
+
+  <!-- Help overlay -->
+  <div id="help-overlay" aria-hidden="true">
+    <div class="backdrop" tabindex="-1"></div>
+    <div id="help-window" class="window" role="dialog" aria-modal="true" aria-labelledby="help-title">
+      <div class="title-bar">
+        <div class="title-bar-text" id="help-title">Windows Help</div>
+        <div class="title-bar-controls">
+          <button aria-label="Close" id="help-close" class="close"></button>
+        </div>
+      </div>
+      <div class="window-body">
+        <p>Enter a user name and password, then choose OK.</p>
+        <ul class="tree-view">
+          <li>Alt+U focuses User name</li>
+          <li>Alt+P focuses Password</li>
+          <li>Enter activates OK; Esc cancels</li>
+        </ul>
+      </div>
+      <div class="status-bar">
+        <p class="status-bar-field">Press Esc to close</p>
+      </div>
+    </div>
+  </div>
+
+
+</body>
+</html>

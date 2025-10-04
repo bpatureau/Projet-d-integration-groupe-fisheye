@@ -1,0 +1,71 @@
+html, body { height: 100%; }
+body {
+    margin: 0;
+    background: #008080;
+    display: grid;
+    place-items: center;
+    font-family: "MS Sans Serif", Tahoma, sans-serif;
+}
+
+.logon-window { width: 520px; }
+
+.dialog {
+    display: grid;
+    grid-template-columns: 72px 1fr 140px;
+    column-gap: 12px;
+    align-items: start;
+}
+
+.prompt {
+    grid-column: 1 / -1;
+    margin-top: 2px;
+    margin-bottom: 12px;
+}
+
+.icon-cell {
+    display: flex;
+    justify-content: center;
+}
+.icon-cell img {
+    width: 40px;
+    height: 40px;
+    image-rendering: pixelated;
+}
+
+.fields .field-row-stacked { margin-bottom: 10px; }
+.fields input[type="text"],
+.fields input[type="password"] { width: 260px; }
+
+.buttons {
+    display: grid;
+    row-gap: 8px;
+    justify-items: end;
+}
+.buttons button { width: 96px; }
+
+
+.status-bar { margin-top: 4px; }
+
+
+.mn { text-decoration: underline; }
+
+
+#help-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: none;
+}
+#help-overlay .backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+}
+#help-window {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 420px;
+    transform: translate(-50%,-50%);
+}
+body.help-open { overflow: hidden; }
