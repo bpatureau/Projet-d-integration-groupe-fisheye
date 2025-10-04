@@ -1,3 +1,5 @@
+BASE_URL = "https://pi.linadu.live";
+
 
     // Shortcuts to elements
 const btnOk = document.getElementById('btn-ok');
@@ -5,8 +7,8 @@ const btnCancel = document.getElementById('btn-cancel');
 const tbHelp = document.getElementById('tb-help');
 const helpOverlay = document.getElementById('help-overlay');
 const helpClose = document.getElementById('help-close');
-const caps = document.getElementById('caps');
-const num = document.getElementById('num');
+//const caps = document.getElementById('caps');
+//const num = document.getElementById('num');
 const inputs = document.querySelectorAll('input');
 
     // Open/close help
@@ -41,23 +43,23 @@ document.addEventListener('keydown', (e) => {
 }, true);
 
 // Caps/Num lock indicators
-function updateCaps(e) {
-    const s = e.getModifierState && e.getModifierState('CapsLock');
-    if (s === true) caps.textContent = 'Caps Lock: On';
-    else if (s === false) caps.textContent = 'Caps Lock: Off';
-}
-function updateNum(e) {
-    if (!e.getModifierState) return;
-    const s = e.getModifierState('NumLock');
-    if (s === true) num.textContent = 'Num Lock: On';
-    else if (s === false) num.textContent = 'Num Lock: Off';
-    else num.textContent = 'Num Lock: Unknown';
-}
-['keydown','keyup'].forEach(t => {
-    document.addEventListener(t, updateCaps, true);
-    document.addEventListener(t, updateNum, true);
-    inputs.forEach(el => el.addEventListener(t, updateCaps, true));
-});
+//function updateCaps(e) {
+//    const s = e.getModifierState && e.getModifierState('CapsLock');
+//    if (s === true) caps.textContent = 'Caps Lock: On';
+//    else if (s === false) caps.textContent = 'Caps Lock: Off';
+//}
+//function updateNum(e) {
+//    if (!e.getModifierState) return;
+//    const s = e.getModifierState('NumLock');
+//    if (s === true) num.textContent = 'Num Lock: On';
+//    else if (s === false) num.textContent = 'Num Lock: Off';
+//    else num.textContent = 'Num Lock: Unknown';
+//}
+//['keydown','keyup'].forEach(t => {
+//    document.addEventListener(t, updateCaps, true);
+//    document.addEventListener(t, updateNum, true);
+//    inputs.forEach(el => el.addEventListener(t, updateCaps, true));
+//});
 
 btnOk.addEventListener('click', () => {
     const username = inputs[0].value.trim();
@@ -65,7 +67,24 @@ btnOk.addEventListener('click', () => {
     if (!username || !password) {
         return;
     }
-    console.log(`${username} ${password ? true : false}`)
+    fetch(`${BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        body: JSON.stringify({"username": username, "password": password}),
+        headers: {'Content-Type': 'application/json'}
+        })
+        .then(res => res.json())
+        .then(data => {
+            console.log(data.data.token.token);
+            fetch(`${BASE_URL}/api/profile`, {
+                method: 'GET',
+                headers: {'Authorization': `Bearer ${data.data.token.token}`}
+            })
+            .then(res => res.json())
+            .then(data => {
+                console.log(data);
+            })
+
+    })
 });
 btnCancel.addEventListener('click', () => {
     inputs.forEach((input) => (input.value = ""));
