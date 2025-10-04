@@ -1,6 +1,7 @@
 /database
 /tmp
 /uploads
+/credentials
 *.log
 .env*
 !.env.example

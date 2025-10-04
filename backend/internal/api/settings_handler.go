@@ -77,7 +77,6 @@ func (h *SettingsHandler) Update(w http.ResponseWriter, r *http.Request) {
 		"do_not_disturb":   settings.DoNotDisturb,
 		"welcome_messages": settings.WelcomeMessages,
 		"rotation_seconds": settings.MessageRotationSeconds,
-		"schedule":         utils.GetCurrentSchedule(settings.Schedule),
 	}
 
 	// Broadcast to devices via WebSocket
@@ -113,11 +112,6 @@ func (h *SettingsHandler) validateSettings(settings *store.Settings) error {
 
 	if settings.MessageRotationSeconds < 1 || settings.MessageRotationSeconds > 3600 {
 		return utils.NewValidationError("message rotation must be between 1 and 3600 seconds")
-	}
-
-	// Validate schedule
-	if err := utils.ValidateSchedule(settings.Schedule); err != nil {
-		return err
 	}
 
 	return nil

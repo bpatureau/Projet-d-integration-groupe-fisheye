@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
 	"time"
 
 	"fisheye/internal/api"
+	"fisheye/internal/calendar"
 	"fisheye/internal/middleware"
 	"fisheye/internal/store"
 	"fisheye/internal/utils"
@@ -23,9 +25,11 @@ type Application struct {
 	VisitHandler     *api.VisitHandler
 	DeviceHandler    *api.DeviceHandler
 	HealthHandler    *api.HealthHandler
+	CalendarHandler  *api.CalendarHandler
 	Middleware       *middleware.Middleware
 	WebSocketHub     *websocket.Hub
 	WebSocketHandler *websocket.Handler
+	CalendarService  *calendar.CalendarService
 	DB               *sql.DB
 	ctx              context.Context
 	cancel           context.CancelFunc
@@ -82,7 +86,23 @@ func NewApplication() (*Application, error) {
 	wsHub := websocket.NewHub(logger)
 	wsHandler := websocket.NewHandler(wsHub, logger)
 
-	// Initialize handlers
+	var calendarService *calendar.CalendarService
+	credPath := os.Getenv("GOOGLE_CREDENTIALS_PATH")
+	calID := os.Getenv("GOOGLE_CALENDAR_ID")
+
+	if credPath != "" && calID != "" {
+		logger.Info("app", "Calendar configuration found in environment")
+		cs, err := calendar.NewCalendarService(credPath, calID, logger)
+		if err != nil {
+			logger.Warning("app", "Failed to initialize calendar service: "+err.Error())
+		} else {
+			calendarService = cs
+			logger.Info("app", "Calendar service initialized successfully")
+		}
+	} else {
+		logger.Info("app", "Calendar not configured (GOOGLE_CREDENTIALS_PATH or GOOGLE_CALENDAR_ID missing)")
+	}
+
 	adminHandler := api.NewAdminHandler(userStore, tokenStore, logStore, logger)
 	authHandler := api.NewAuthHandler(userStore, tokenStore, logger)
 	profileHandler := api.NewProfileHandler(userStore, tokenStore, logger)
@@ -90,6 +110,7 @@ func NewApplication() (*Application, error) {
 	visitHandler := api.NewVisitHandler(visitStore, wsHub, logger)
 	deviceHandler := api.NewDeviceHandler(visitStore, settingsStore, wsHub, logger)
 	healthHandler := api.NewHealthHandler(db)
+	calendarHandler := api.NewCalendarHandler(calendarService, logger)
 
 	middlewareHandler := middleware.NewMiddleware(userStore, tokenStore, logger)
 
@@ -104,9 +125,11 @@ func NewApplication() (*Application, error) {
 		VisitHandler:     visitHandler,
 		DeviceHandler:    deviceHandler,
 		HealthHandler:    healthHandler,
+		CalendarHandler:  calendarHandler,
 		Middleware:       middlewareHandler,
 		WebSocketHub:     wsHub,
 		WebSocketHandler: wsHandler,
+		CalendarService:  calendarService,
 		DB:               db,
 		ctx:              appCtx,
 		cancel:           cancel,

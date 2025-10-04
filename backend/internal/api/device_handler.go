@@ -282,7 +282,6 @@ func (h *DeviceHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 		"do_not_disturb":   settings.DoNotDisturb,
 		"welcome_messages": settings.WelcomeMessages,
 		"rotation_seconds": settings.MessageRotationSeconds,
-		"schedule":         utils.GetCurrentSchedule(settings.Schedule),
 	}
 
 	utils.WriteSuccess(w, http.StatusOK, deviceSettings)

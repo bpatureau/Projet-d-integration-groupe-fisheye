@@ -89,6 +89,12 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 				r.Get("/", app.SettingsHandler.Get)
 				r.With(app.Middleware.RequireAdmin).Put("/", app.SettingsHandler.Update)
 			})
+
+			r.Route("/calendar", func(r chi.Router) {
+				r.Get("/status", app.CalendarHandler.GetStatus)
+				r.Get("/events", app.CalendarHandler.GetEvents)
+				r.With(app.Middleware.RequireAdmin).Post("/sync", app.CalendarHandler.ForceSync)
+			})
 		})
 
 		// Admin endpoints
