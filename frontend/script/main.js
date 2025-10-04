@@ -70,3 +70,21 @@ btnOk.addEventListener('click', () => {
 btnCancel.addEventListener('click', () => {
     inputs.forEach((input) => (input.value = ""));
 });
+
+    window.addEventListener('keypress', (e) => {
+        if(document.activeElement.type !== 'text' && document.activeElement.type !== 'password'){
+            if(e.code == 'KeyU'){
+                document.getElementById('username').focus()
+            }
+            else if(e.code == 'KeyP'){
+                document.getElementById('password').focus()
+            }
+            else if(e.code == 'KeyO'){
+                document.getElementById('btn-ok').focus()
+            }
+            else if(e.code == 'KeyC'){
+                document.getElementById('btn-cancel').focus()
+            }
+
+        }
+    })
