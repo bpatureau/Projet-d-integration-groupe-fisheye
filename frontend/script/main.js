@@ -1,0 +1,72 @@
+
+    // Shortcuts to elements
+const btnOk = document.getElementById('btn-ok');
+const btnCancel = document.getElementById('btn-cancel');
+const tbHelp = document.getElementById('tb-help');
+const helpOverlay = document.getElementById('help-overlay');
+const helpClose = document.getElementById('help-close');
+const caps = document.getElementById('caps');
+const num = document.getElementById('num');
+const inputs = document.querySelectorAll('input');
+
+    // Open/close help
+function openHelp() {
+    document.body.classList.add('help-open');
+    helpOverlay.style.display = 'block';
+    helpClose && helpClose.focus();
+}
+function closeHelp() {
+    helpOverlay.style.display = 'none';
+    document.body.classList.remove('help-open');
+}
+tbHelp && tbHelp.addEventListener('click', openHelp);
+helpClose && helpClose.addEventListener('click', closeHelp);
+helpOverlay.querySelector('.backdrop').addEventListener('click', closeHelp);
+
+// Keyboard: Enter -> OK, Esc -> Cancel, F1 -> Help
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'F1' || e.keyCode === 112) {
+    e.preventDefault();
+    openHelp();
+    } else if (e.key === 'Enter') {
+    btnOk.click();
+    } else if (e.key === 'Escape' || e.keyCode === 27) {
+    if (helpOverlay.style.display !== 'none') {
+        e.preventDefault();
+        closeHelp();
+    } else {
+        btnCancel.click();
+    }
+    }
+}, true);
+
+// Caps/Num lock indicators
+function updateCaps(e) {
+    const s = e.getModifierState && e.getModifierState('CapsLock');
+    if (s === true) caps.textContent = 'Caps Lock: On';
+    else if (s === false) caps.textContent = 'Caps Lock: Off';
+}
+function updateNum(e) {
+    if (!e.getModifierState) return;
+    const s = e.getModifierState('NumLock');
+    if (s === true) num.textContent = 'Num Lock: On';
+    else if (s === false) num.textContent = 'Num Lock: Off';
+    else num.textContent = 'Num Lock: Unknown';
+}
+['keydown','keyup'].forEach(t => {
+    document.addEventListener(t, updateCaps, true);
+    document.addEventListener(t, updateNum, true);
+    inputs.forEach(el => el.addEventListener(t, updateCaps, true));
+});
+
+btnOk.addEventListener('click', () => {
+    const username = inputs[0].value.trim();
+    const password = inputs[1].value;
+    if (!username || !password) {
+        return;
+    }
+    console.log(`${username} ${password ? true : false}`)
+});
+btnCancel.addEventListener('click', () => {
+    inputs.forEach((input) => (input.value = ""));
+});

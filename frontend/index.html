@@ -17,36 +17,37 @@
     </div>
 
     <div class="window-body">
-      <div class="dialog">
-        <p class="prompt">Type a user name and password to log on to Windows.</p>
+        <div class="dialog">
+            <p class="prompt">Type a user name and password to log on to Windows.</p>
 
-        <div class="icon-cell">
-          <img src="https://win98icons.alexmeub.com/icons/png/key_win-1.png" alt="Keys icon">
+            <div class="icon-cell">
+                <img src="https://win98icons.alexmeub.com/icons/png/key_win-1.png" alt="Keys icon">
+            </div>
+
+            <div class="fields">
+                <div class="field-row-stacked">
+                <label for="username" accesskey="u"><span class="mn">U</span>ser name:</label>
+                <input id="username" type="text" autocomplete="username" />
+            </div>
+
+            <div class="field-row-stacked">
+                <label for="password" accesskey="p"><span class="mn">P</span>assword:</label>
+                <input id="password" type="password" autocomplete="current-password" />
+            </div>
+            </div>
+
+            <div class="buttons">
+                <button id="btn-ok" class="default" accesskey="o"><span class="mn">O</span>K</button>
+                <button id="btn-cancel" accesskey="c"><span class="mn">C</span>ancel</button>
+            </div>
         </div>
 
-        <div class="fields">
-          <div class="field-row-stacked">
-            <label for="username" accesskey="u"><span class="mn">U</span>ser name:</label>
-            <input id="username" type="text" autocomplete="username" />
-          </div>
-
-          <div class="field-row-stacked">
-            <label for="password" accesskey="p"><span class="mn">P</span>assword:</label>
-            <input id="password" type="password" autocomplete="current-password" />
-          </div>
-        </div>
-
-        <div class="buttons">
-          <button id="btn-ok" class="default" accesskey="o"><span class="mn">O</span>K</button>
-          <button id="btn-cancel" accesskey="c"><span class="mn">C</span>ancel</button>
-        </div>
-      </div>
     </div>
 
-    <div class="status-bar">
-      <p class="status-bar-field">Press F1 for help</p>
-      <p class="status-bar-field" id="caps">Caps Lock: Off</p>
-      <p class="status-bar-field" id="num">Num Lock: Unknown</p>
+    <div class="status-bar" id="status-bar-window">
+        <p class="status-bar-field">Press F1 for help</p>
+        <p class="status-bar-field" id="caps">Caps Lock: Off</p>
+        <p class="status-bar-field" id="num">Num Lock: Unknown</p>
     </div>
   </div>
 
@@ -74,6 +75,6 @@
     </div>
   </div>
 
-
+  <script src="script/main.js"></script>
 </body>
 </html>
