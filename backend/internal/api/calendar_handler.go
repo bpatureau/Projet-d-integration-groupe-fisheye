@@ -6,17 +6,20 @@ import (
 	"fisheye/internal/calendar"
 	"fisheye/internal/middleware"
 	"fisheye/internal/utils"
+	"fisheye/internal/websocket"
 )
 
 type CalendarHandler struct {
 	calendarService *calendar.CalendarService
 	logger          *utils.Logger
+	wsHub           *websocket.Hub
 }
 
-func NewCalendarHandler(calendarService *calendar.CalendarService, logger *utils.Logger) *CalendarHandler {
+func NewCalendarHandler(calendarService *calendar.CalendarService, logger *utils.Logger, wsHub *websocket.Hub) *CalendarHandler {
 	return &CalendarHandler{
 		calendarService: calendarService,
 		logger:          logger,
+		wsHub:           wsHub,
 	}
 }
 
@@ -31,12 +34,12 @@ func (h *CalendarHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	available := h.calendarService.IsAvailable()
+	isBusy := h.calendarService.IsBusy()
 	currentEvent := h.calendarService.GetCurrentEvent()
 
 	response := map[string]any{
 		"enabled":   true,
-		"available": available,
+		"available": !isBusy,
 		"last_sync": h.calendarService.GetLastSyncTime(),
 	}
 

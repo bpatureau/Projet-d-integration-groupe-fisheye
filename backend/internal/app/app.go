@@ -92,7 +92,7 @@ func NewApplication() (*Application, error) {
 
 	if credPath != "" && calID != "" {
 		logger.Info("app", "Calendar configuration found in environment")
-		cs, err := calendar.NewCalendarService(credPath, calID, logger)
+		cs, err := calendar.NewCalendarService(credPath, calID, logger, wsHub)
 		if err != nil {
 			logger.Warning("app", "Failed to initialize calendar service: "+err.Error())
 		} else {
@@ -110,7 +110,7 @@ func NewApplication() (*Application, error) {
 	visitHandler := api.NewVisitHandler(visitStore, wsHub, logger)
 	deviceHandler := api.NewDeviceHandler(visitStore, settingsStore, wsHub, logger)
 	healthHandler := api.NewHealthHandler(db)
-	calendarHandler := api.NewCalendarHandler(calendarService, logger)
+	calendarHandler := api.NewCalendarHandler(calendarService, logger, wsHub)
 
 	middlewareHandler := middleware.NewMiddleware(userStore, tokenStore, logger)
 

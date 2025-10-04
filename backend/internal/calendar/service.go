@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"fisheye/internal/utils"
+	"fisheye/internal/websocket"
 
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/calendar/v3"
@@ -27,6 +28,7 @@ type CalendarService struct {
 	calendarID string
 	cache      *EventCache
 	logger     *utils.Logger
+	wsHub      *websocket.Hub
 	mu         sync.RWMutex
 }
 
@@ -37,7 +39,7 @@ type EventCache struct {
 	mu         sync.RWMutex
 }
 
-func NewCalendarService(credentialsPath, calendarID string, logger *utils.Logger) (*CalendarService, error) {
+func NewCalendarService(credentialsPath, calendarID string, logger *utils.Logger, wsHub *websocket.Hub) (*CalendarService, error) {
 	ctx := context.Background()
 
 	credentialsJSON, err := os.ReadFile(credentialsPath)
@@ -60,9 +62,10 @@ func NewCalendarService(credentialsPath, calendarID string, logger *utils.Logger
 		client:     calendarService,
 		calendarID: calendarID,
 		logger:     logger,
+		wsHub:      wsHub,
 		cache: &EventCache{
 			events:     []*CalendarEvent{},
-			syncPeriod: 5 * time.Minute,
+			syncPeriod: 1 * time.Minute,
 		},
 	}
 
@@ -80,13 +83,14 @@ func (s *CalendarService) SyncEvents() error {
 	defer cancel()
 
 	now := time.Now()
-	endTime := now.AddDate(0, 0, 7)
+	startOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	endOfMonth := startOfMonth.AddDate(0, 1, 0)
 
 	events, err := s.client.Events.List(s.calendarID).
 		ShowDeleted(false).
 		SingleEvents(true).
-		TimeMin(now.Format(time.RFC3339)).
-		TimeMax(endTime.Format(time.RFC3339)).
+		TimeMin(startOfMonth.Format(time.RFC3339)).
+		TimeMax(endOfMonth.Format(time.RFC3339)).
 		OrderBy("startTime").
 		Context(ctx).
 		Do()
@@ -127,18 +131,40 @@ func (s *CalendarService) SyncEvents() error {
 	s.cache.mu.Unlock()
 
 	s.logger.Info("calendar", fmt.Sprintf("Synced %d events from calendar", len(calendarEvents)))
+	s.BroadcastSchedule()
+
 	return nil
 }
 
-func (s *CalendarService) IsAvailable() bool {
+func (s *CalendarService) BroadcastSchedule() {
+	if s.wsHub == nil {
+		return
+	}
+
+	s.wsHub.BroadcastToDevices(&websocket.Message{
+		Type: "schedule_update",
+		Data: map[string]any{
+			"events":    s.GetCachedEvents(),
+			"last_sync": s.GetLastSyncTime(),
+		},
+	})
+	s.logger.Info("calendar", "Broadcasted schedule update to devices")
+}
+
+func (s *CalendarService) IsBusy() bool {
 	now := time.Now()
 
 	s.cache.mu.RLock()
 	defer s.cache.mu.RUnlock()
 
 	for _, event := range s.cache.events {
-		if now.After(event.StartTime) && now.Before(event.EndTime) {
+		if !event.AllDay && now.After(event.StartTime) && now.Before(event.EndTime) {
 			return true
+		}
+		if event.AllDay {
+			if (now.Equal(event.StartTime) || now.After(event.StartTime)) && now.Before(event.EndTime) {
+				return true
+			}
 		}
 	}
 
@@ -152,8 +178,13 @@ func (s *CalendarService) GetCurrentEvent() *CalendarEvent {
 	defer s.cache.mu.RUnlock()
 
 	for _, event := range s.cache.events {
-		if now.After(event.StartTime) && now.Before(event.EndTime) {
+		if !event.AllDay && now.After(event.StartTime) && now.Before(event.EndTime) {
 			return event
+		}
+		if event.AllDay {
+			if (now.Equal(event.StartTime) || now.After(event.StartTime)) && now.Before(event.EndTime) {
+				return event
+			}
 		}
 	}
 
