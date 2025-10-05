@@ -91,3 +91,7 @@ body.help-open { overflow: hidden; }
         position: relative;
     }
 }
+.row { display: grid; grid-template-columns: 160px 1fr auto; gap: 10px 12px; align-items: center; }
+.display, .editor { width: 100%; }
+.display .muted { display: inline-block; width: 100%; }
+.hidden { display: none; }

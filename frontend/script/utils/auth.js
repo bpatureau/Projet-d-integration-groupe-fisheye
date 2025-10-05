@@ -7,7 +7,7 @@ function saveAuth(authData) {
 
 // Récupérer les infos
 function getAuthToken() {
-    return localStorage.getItem('authToken');
+    return localStorage.getItem('authToken') || null;
 }
 
 function getUser() {

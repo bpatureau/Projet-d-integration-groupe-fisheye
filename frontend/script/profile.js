@@ -1,4 +1,8 @@
 const BASE_URL = 'https://pi.linadu.live';
+const TOKEN = getAuthToken();
+if(TOKEN == null){
+    window.location.href = "/login.html";
+}
 
 const statusEl = document.getElementById("status");
 
@@ -29,6 +33,13 @@ const btnSavePw = document.getElementById("btn-save-password");
 const pwdCurrent = document.getElementById("pwd-current");
 const pwdNew = document.getElementById("pwd-new");
 const pwdConfirm = document.getElementById("pwd-confirm");
+
+
+const btnClose = document.getElementById("btn-close");
+
+btnClose.addEventListener("click", function() {
+    window.location.href = "/home.html";
+})
 
 function setStatus(msg) { statusEl.textContent = msg; }
 
