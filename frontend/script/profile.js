@@ -35,12 +35,6 @@ const pwdNew = document.getElementById("pwd-new");
 const pwdConfirm = document.getElementById("pwd-confirm");
 
 
-const btnClose = document.getElementById("btn-close");
-
-btnClose.addEventListener("click", function() {
-    window.location.href = "/home.html";
-})
-
 function setStatus(msg) { statusEl.textContent = msg; }
 
 function authHeaders(extra = {}) {
