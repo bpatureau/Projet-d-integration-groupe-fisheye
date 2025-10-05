@@ -16,13 +16,11 @@ type Logger struct {
 	debugMode  bool
 }
 
-func NewFileLogger(logFilePath string) (*Logger, error) {
+func NewFileLogger(logFilePath string, debugMode bool) (*Logger, error) {
 	file, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open log file: %w", err)
 	}
-
-	debugMode := os.Getenv("DEBUG") == "true"
 
 	return &Logger{
 		fileLogger: log.New(file, "", log.Ldate|log.Ltime|log.Lshortfile),

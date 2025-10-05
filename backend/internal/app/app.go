@@ -4,11 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
 	"time"
 
 	"fisheye/internal/api"
 	"fisheye/internal/calendar"
+	"fisheye/internal/config"
 	"fisheye/internal/middleware"
 	"fisheye/internal/store"
 	"fisheye/internal/utils"
@@ -17,6 +17,7 @@ import (
 )
 
 type Application struct {
+	Config           *config.Config
 	Logger           *utils.Logger
 	AdminHandler     *api.AdminHandler
 	AuthHandler      *api.AuthHandler
@@ -36,13 +37,23 @@ type Application struct {
 }
 
 func NewApplication() (*Application, error) {
-	logger, err := utils.NewFileLogger("app.log")
+	// Load configuration
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	// Initialize logger
+	logger, err := utils.NewFileLogger(cfg.Logging.LogFile, cfg.Logging.Debug)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
 
+	logger.Info("app", "Configuration loaded successfully")
 	logger.Info("app", "Opening database connection")
-	db, err := store.Open()
+
+	// Open database connection
+	db, err := store.OpenWithConfig(cfg.Database.URL)
 	if err != nil {
 		logger.Error("app", "Failed to open database", err)
 		logger.Close()
@@ -50,9 +61,9 @@ func NewApplication() (*Application, error) {
 	}
 
 	// Configure connection pool
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(25)
-	db.SetConnMaxLifetime(5 * time.Minute)
+	db.SetMaxOpenConns(cfg.Database.MaxOpenConns)
+	db.SetMaxIdleConns(cfg.Database.MaxIdleConns)
+	db.SetConnMaxLifetime(cfg.Database.ConnMaxLifetime)
 
 	logger.Info("app", "Running database migrations")
 	if err := store.MigrateFS(db, migrations.FS, "."); err != nil {
@@ -84,32 +95,24 @@ func NewApplication() (*Application, error) {
 
 	// Initialize WebSocket hub
 	wsHub := websocket.NewHub(logger)
-	deviceAPIKey := os.Getenv("DEVICE_API_KEY")
-	if deviceAPIKey == "" {
-		logger.Warning("app", "DEVICE_API_KEY not configured - device WebSocket connections will fail")
-	} else {
-		logger.Info("app", "Device API key configured for WebSocket connections")
+	wsHandler := websocket.NewHandler(wsHub, userStore, tokenStore, cfg.Auth.DeviceAPIKey, cfg.CORS.AllowedOrigins, logger)
+
+	// Initialize calendar service
+	logger.Info("app", "Initializing calendar service")
+	calendarService, err := calendar.NewCalendarService(
+		cfg.Calendar.CredentialsPath,
+		cfg.Calendar.CalendarID,
+		cfg.Calendar.SyncInterval,
+		logger,
+		wsHub,
+	)
+	if err != nil {
+		logger.Error("app", "Failed to initialize calendar service", err)
+		db.Close()
+		logger.Close()
+		return nil, fmt.Errorf("failed to initialize calendar service: %w", err)
 	}
-
-	wsHandler := websocket.NewHandler(wsHub, userStore, tokenStore, deviceAPIKey, logger)
-
-	// Initialize calendar service if configured
-	var calendarService *calendar.CalendarService
-	credPath := os.Getenv("GOOGLE_CREDENTIALS_PATH")
-	calID := os.Getenv("GOOGLE_CALENDAR_ID")
-
-	if credPath != "" && calID != "" {
-		logger.Info("app", "Calendar configuration found in environment")
-		cs, err := calendar.NewCalendarService(credPath, calID, logger, wsHub)
-		if err != nil {
-			logger.Warning("app", "Failed to initialize calendar service: "+err.Error())
-		} else {
-			calendarService = cs
-			logger.Info("app", "Calendar service initialized successfully")
-		}
-	} else {
-		logger.Info("app", "Calendar not configured (GOOGLE_CREDENTIALS_PATH or GOOGLE_CALENDAR_ID missing)")
-	}
+	logger.Info("app", "Calendar service initialized successfully")
 
 	// Initialize API handlers
 	adminHandler := api.NewAdminHandler(userStore, tokenStore, logStore, logger)
@@ -117,15 +120,16 @@ func NewApplication() (*Application, error) {
 	profileHandler := api.NewProfileHandler(userStore, tokenStore, logger)
 	settingsHandler := api.NewSettingsHandler(settingsStore, wsHub, logger)
 	visitHandler := api.NewVisitHandler(visitStore, wsHub, logger)
-	deviceHandler := api.NewDeviceHandler(visitStore, settingsStore, wsHub, logger)
+	deviceHandler := api.NewDeviceHandler(visitStore, settingsStore, wsHub, cfg.Upload.Path, logger)
 	healthHandler := api.NewHealthHandler(db)
 	calendarHandler := api.NewCalendarHandler(calendarService, logger, wsHub)
 
-	middlewareHandler := middleware.NewMiddleware(userStore, tokenStore, logger)
+	middlewareHandler := middleware.NewMiddleware(userStore, tokenStore, cfg.Auth.DeviceAPIKey, logger)
 
 	appCtx, cancel := context.WithCancel(context.Background())
 
 	app := &Application{
+		Config:           cfg,
 		Logger:           logger,
 		AdminHandler:     adminHandler,
 		AuthHandler:      authHandler,

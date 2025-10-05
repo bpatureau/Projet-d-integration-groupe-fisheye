@@ -39,7 +39,7 @@ type EventCache struct {
 	mu         sync.RWMutex
 }
 
-func NewCalendarService(credentialsPath, calendarID string, logger *utils.Logger, wsHub *websocket.Hub) (*CalendarService, error) {
+func NewCalendarService(credentialsPath, calendarID string, syncInterval time.Duration, logger *utils.Logger, wsHub *websocket.Hub) (*CalendarService, error) {
 	ctx := context.Background()
 
 	credentialsJSON, err := os.ReadFile(credentialsPath)
@@ -65,12 +65,12 @@ func NewCalendarService(credentialsPath, calendarID string, logger *utils.Logger
 		wsHub:      wsHub,
 		cache: &EventCache{
 			events:     []*CalendarEvent{},
-			syncPeriod: 1 * time.Minute,
+			syncPeriod: syncInterval,
 		},
 	}
 
 	if err := service.SyncEvents(); err != nil {
-		logger.Warning("calendar", "Initial sync failed: "+err.Error())
+		return nil, fmt.Errorf("initial calendar sync failed: %w", err)
 	}
 
 	go service.startBackgroundSync()

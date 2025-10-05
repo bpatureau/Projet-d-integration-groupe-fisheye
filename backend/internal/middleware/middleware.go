@@ -4,15 +4,12 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	"fisheye/internal/store"
 	"fisheye/internal/tokens"
 	"fisheye/internal/utils"
-
-	"github.com/joho/godotenv"
 )
 
 type contextKey string
@@ -29,16 +26,7 @@ type Middleware struct {
 	DeviceAPIKey string
 }
 
-func NewMiddleware(userStore store.UserStore, tokenStore store.TokenStore, logger *utils.Logger) *Middleware {
-	godotenv.Load()
-
-	deviceAPIKey := os.Getenv("DEVICE_API_KEY")
-	if deviceAPIKey == "" {
-		logger.Error("middleware", "CRITICAL: DEVICE_API_KEY not configured! Device authentication will fail.", nil)
-	} else {
-		logger.Info("middleware", "Device API key configured successfully")
-	}
-
+func NewMiddleware(userStore store.UserStore, tokenStore store.TokenStore, deviceAPIKey string, logger *utils.Logger) *Middleware {
 	return &Middleware{
 		UserStore:    userStore,
 		TokenStore:   tokenStore,
@@ -130,12 +118,6 @@ func (m *Middleware) authenticateWithToken(w http.ResponseWriter, r *http.Reques
 }
 
 func (m *Middleware) authenticateWithApiKey(w http.ResponseWriter, r *http.Request, apiKey string, next http.Handler) {
-	if m.DeviceAPIKey == "" {
-		m.Logger.Error("middleware", "Device API key not configured", nil)
-		utils.WriteError(w, http.StatusServiceUnavailable, "DEVICE_NOT_CONFIGURED", "Device authentication is not configured")
-		return
-	}
-
 	if apiKey != m.DeviceAPIKey {
 		m.Logger.Warning("middleware", "Invalid API key attempt from: "+r.RemoteAddr)
 		utils.WriteUnauthorized(w, "Invalid API key")

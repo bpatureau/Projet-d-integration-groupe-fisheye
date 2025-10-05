@@ -31,19 +31,16 @@ func main() {
 }
 
 func runServer(application *app.Application) error {
-	addr := os.Getenv("SERVER_HOST")
-	if addr == "" {
-		addr = "0.0.0.0:8080"
-	}
+	addr := application.Config.GetServerAddress()
 
 	router := routes.SetupRoutes(application)
 
 	server := &http.Server{
 		Addr:           addr,
 		Handler:        router,
-		IdleTimeout:    time.Minute,
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   30 * time.Second,
+		IdleTimeout:    application.Config.Server.IdleTimeout,
+		ReadTimeout:    application.Config.Server.ReadTimeout,
+		WriteTimeout:   application.Config.Server.WriteTimeout,
 		MaxHeaderBytes: 1 << 20, // 1 MB
 	}
 
@@ -52,7 +49,9 @@ func runServer(application *app.Application) error {
 	go func() {
 		application.Logger.Info("server", fmt.Sprintf("Starting server on %s", addr))
 		fmt.Printf("\n🚀 Server starting on %s\n", addr)
-		fmt.Printf("📝 Default admin credentials: admin / admin\n\n")
+		fmt.Printf("📝 Default admin credentials: admin / admin\n")
+		fmt.Printf("📅 Calendar integration: ENABLED\n")
+		fmt.Printf("\n")
 		serverErrors <- server.ListenAndServe()
 	}()
 

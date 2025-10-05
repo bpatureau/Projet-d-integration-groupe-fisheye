@@ -3,8 +3,6 @@ package routes
 import (
 	"fisheye/internal/app"
 	"fisheye/internal/middleware"
-	"fisheye/internal/utils"
-	"os"
 
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
@@ -22,10 +20,14 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 	router.Use(chiMiddleware.Logger)
 
 	// CORS middleware
-	router.Use(cors.Handler(getCORSOptions()))
+	router.Use(cors.Handler(getCORSOptions(app)))
 
-	// Rate limiter for auth endpoints (10 requests per minute)
-	authLimiter := middleware.NewRateLimiter(rate.Limit(10.0/60.0), 5, app.Logger)
+	// Rate limiter for auth endpoints
+	authLimiter := middleware.NewRateLimiter(
+		rate.Limit(app.Config.Auth.RateLimitPerMinute/60.0),
+		app.Config.Auth.RateLimitBurst,
+		app.Logger,
+	)
 
 	router.Route("/api", func(r chi.Router) {
 		// Health check
@@ -89,6 +91,7 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 				r.With(app.Middleware.RequireAdmin).Put("/", app.SettingsHandler.Update)
 			})
 
+			// Calendar
 			r.Route("/calendar", func(r chi.Router) {
 				r.Get("/status", app.CalendarHandler.GetStatus)
 				r.Get("/events", app.CalendarHandler.GetEvents)
@@ -123,13 +126,9 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 	return router
 }
 
-func getCORSOptions() cors.Options {
-	allowedOrigins := utils.GetAllowedOrigins()
-
-	debug := os.Getenv("DEBUG") == "true"
-
+func getCORSOptions(app *app.Application) cors.Options {
 	return cors.Options{
-		AllowedOrigins: allowedOrigins,
+		AllowedOrigins: app.Config.CORS.AllowedOrigins,
 		AllowedMethods: []string{
 			"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS",
 		},
@@ -146,7 +145,7 @@ func getCORSOptions() cors.Options {
 			"Content-Length",
 		},
 		AllowCredentials: true,
-		MaxAge:           300, // 5 minutes
-		Debug:            debug,
+		MaxAge:           app.Config.CORS.MaxAge,
+		Debug:            app.Config.Logging.Debug,
 	}
 }

@@ -4,20 +4,12 @@ import (
 	"database/sql"
 	"fmt"
 	"io/fs"
-	"os"
 
 	_ "github.com/jackc/pgx/v4/stdlib"
-	"github.com/joho/godotenv"
 	"github.com/pressly/goose/v3"
 )
 
-func Open() (*sql.DB, error) {
-	godotenv.Load()
-	dbConnStr := os.Getenv("DATABASE_URL")
-	if dbConnStr == "" {
-		return nil, fmt.Errorf("DATABASE_URL environment variable is required")
-	}
-
+func OpenWithConfig(dbConnStr string) (*sql.DB, error) {
 	db, err := sql.Open("pgx", dbConnStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database connection: %w", err)

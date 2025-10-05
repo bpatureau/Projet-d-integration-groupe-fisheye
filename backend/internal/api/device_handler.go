@@ -22,14 +22,17 @@ type DeviceHandler struct {
 	logger        *utils.Logger
 }
 
-func NewDeviceHandler(visitStore store.VisitStore, settingsStore store.SettingsStore, wsHub *websocket.Hub, logger *utils.Logger) *DeviceHandler {
-	uploadPath := os.Getenv("UPLOAD_PATH")
-	if uploadPath == "" {
-		uploadPath = "./uploads"
+func NewDeviceHandler(visitStore store.VisitStore, settingsStore store.SettingsStore, wsHub *websocket.Hub, uploadPath string, logger *utils.Logger) *DeviceHandler {
+	absPath, err := filepath.Abs(uploadPath)
+	if err != nil {
+		logger.Warning("device", "Failed to get absolute upload path: "+err.Error())
+		absPath = uploadPath
 	}
 
-	absPath, _ := filepath.Abs(uploadPath)
-	os.MkdirAll(absPath, 0755)
+	// Ensure upload directory exists
+	if err := os.MkdirAll(absPath, 0755); err != nil {
+		logger.Error("device", "Failed to create upload directory", err)
+	}
 
 	return &DeviceHandler{
 		visitStore:    visitStore,

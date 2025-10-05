@@ -13,51 +13,51 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin:     checkOrigin,
-}
-
-func checkOrigin(r *http.Request) bool {
-	origin := r.Header.Get("Origin")
-	allowedOrigins := utils.GetAllowedOrigins()
-	return utils.IsOriginAllowed(origin, allowedOrigins)
-}
-
 type Handler struct {
-	hub        *Hub
-	logger     *utils.Logger
-	userStore  store.UserStore
-	tokenStore store.TokenStore
-	deviceKey  string
+	hub            *Hub
+	logger         *utils.Logger
+	userStore      store.UserStore
+	tokenStore     store.TokenStore
+	deviceKey      string
+	allowedOrigins []string
 }
 
-func NewHandler(hub *Hub, userStore store.UserStore, tokenStore store.TokenStore, deviceKey string, logger *utils.Logger) *Handler {
+func NewHandler(hub *Hub, userStore store.UserStore, tokenStore store.TokenStore, deviceKey string, allowedOrigins []string, logger *utils.Logger) *Handler {
 	return &Handler{
-		hub:        hub,
-		logger:     logger,
-		userStore:  userStore,
-		tokenStore: tokenStore,
-		deviceKey:  deviceKey,
+		hub:            hub,
+		logger:         logger,
+		userStore:      userStore,
+		tokenStore:     tokenStore,
+		deviceKey:      deviceKey,
+		allowedOrigins: allowedOrigins,
 	}
 }
 
-// HandleDeviceConnection handles WebSocket connections from devices
+func (h *Handler) checkOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+
+	if origin == "" {
+		return true
+	}
+
+	for _, allowed := range h.allowedOrigins {
+		if allowed == "*" {
+			return true
+		}
+		if allowed == origin {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (h *Handler) HandleDeviceConnection(w http.ResponseWriter, r *http.Request) {
-	// Get API key from query parameter
 	apiKey := r.URL.Query().Get("api_key")
 
 	if apiKey == "" {
 		h.logger.Warning("websocket", "Device connection attempt without API key from: "+r.RemoteAddr)
 		http.Error(w, "API key required in query parameter", http.StatusUnauthorized)
-		return
-	}
-
-	// Validate device API key
-	if h.deviceKey == "" {
-		h.logger.Error("websocket", "Device API key not configured in server", nil)
-		http.Error(w, "Device authentication not configured", http.StatusServiceUnavailable)
 		return
 	}
 
@@ -71,11 +71,9 @@ func (h *Handler) HandleDeviceConnection(w http.ResponseWriter, r *http.Request)
 	h.handleConnection(w, r, true, nil)
 }
 
-// HandleFrontendConnection handles WebSocket connections from authenticated users
 func (h *Handler) HandleFrontendConnection(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Get token from query parameter
 	token := r.URL.Query().Get("token")
 
 	if token == "" {
@@ -84,7 +82,6 @@ func (h *Handler) HandleFrontendConnection(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Validate the token and get user
 	user, err := h.userStore.GetByToken(ctx, token)
 	if err != nil {
 		h.logger.Warning("websocket", "Token validation error: "+err.Error())
@@ -98,7 +95,6 @@ func (h *Handler) HandleFrontendConnection(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Extend token expiry asynchronously (like in the middleware)
 	go func() {
 		extCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -111,19 +107,20 @@ func (h *Handler) HandleFrontendConnection(w http.ResponseWriter, r *http.Reques
 	h.handleConnection(w, r, false, user)
 }
 
-// handleConnection upgrades the HTTP connection to WebSocket and registers the client
 func (h *Handler) handleConnection(w http.ResponseWriter, r *http.Request, isDevice bool, user *store.User) {
-	// Upgrade HTTP connection to WebSocket
+	upgrader := websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin:     h.checkOrigin,
+	}
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		h.logger.Error("websocket", "Failed to upgrade connection", err)
 		return
 	}
 
-	// Create unique client ID
 	clientID := uuid.New().String()
-
-	// Create client instance
 	client := &Client{
 		ID:       clientID,
 		Conn:     &Conn{conn},
@@ -132,17 +129,14 @@ func (h *Handler) handleConnection(w http.ResponseWriter, r *http.Request, isDev
 		IsDevice: isDevice,
 	}
 
-	// Register client with hub
 	h.hub.Register(client)
 
-	// Build connection acknowledgment data
 	ackData := map[string]any{
 		"client_id": clientID,
 		"is_device": isDevice,
 		"timestamp": getCurrentTimestamp(),
 	}
 
-	// Include user information for frontend connections
 	if user != nil {
 		ackData["user"] = map[string]string{
 			"id":       user.ID.String(),
@@ -152,17 +146,14 @@ func (h *Handler) handleConnection(w http.ResponseWriter, r *http.Request, isDev
 		}
 	}
 
-	// Send initial connection acknowledgment
 	client.Send <- &Message{
 		Type: "connected",
 		Data: ackData,
 	}
 
-	// Start client read and write pumps
 	client.Start()
 }
 
-// GetHub returns the WebSocket hub instance
 func (h *Handler) GetHub() *Hub {
 	return h.hub
 }
