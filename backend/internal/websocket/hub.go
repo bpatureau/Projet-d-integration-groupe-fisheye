@@ -123,6 +123,27 @@ func (h *Hub) BroadcastToFrontends(message *Message) {
 	h.Broadcast(message)
 }
 
+func (h *Hub) BroadcastToFrontendsRaw(data any) {
+	// Try to extract type if the data is a map with a "type" key
+	messageType := "data"
+	if dataMap, ok := data.(map[string]any); ok {
+		if t, exists := dataMap["type"]; exists {
+			if typeStr, ok := t.(string); ok {
+				messageType = typeStr
+				// Remove type from data and use it as the message type
+				delete(dataMap, "type")
+				data = dataMap
+			}
+		}
+	}
+
+	msg := &Message{
+		Type: messageType,
+		Data: data,
+	}
+	h.BroadcastToFrontends(msg)
+}
+
 func (h *Hub) SendToClient(clientID string, message *Message) bool {
 	h.mu.RLock()
 	defer h.mu.RUnlock()

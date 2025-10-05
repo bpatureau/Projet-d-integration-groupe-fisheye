@@ -95,6 +95,7 @@ func NewApplication() (*Application, error) {
 
 	// Initialize WebSocket hub
 	wsHub := websocket.NewHub(logger)
+	logger.SetWebSocketHub(wsHub)
 	wsHandler := websocket.NewHandler(wsHub, userStore, tokenStore, cfg.Auth.DeviceAPIKey, cfg.CORS.AllowedOrigins, logger)
 
 	// Initialize calendar service

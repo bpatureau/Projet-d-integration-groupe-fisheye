@@ -9,9 +9,14 @@ import (
 	"time"
 )
 
+type WebSocketBroadcaster interface {
+	BroadcastToFrontendsRaw(data any)
+}
+
 type Logger struct {
 	fileLogger *log.Logger
 	logStore   store.LogStore
+	wsHub      WebSocketBroadcaster
 	file       *os.File
 	debugMode  bool
 }
@@ -31,6 +36,10 @@ func NewFileLogger(logFilePath string, debugMode bool) (*Logger, error) {
 
 func (l *Logger) SetLogStore(logStore store.LogStore) {
 	l.logStore = logStore
+}
+
+func (l *Logger) SetWebSocketHub(wsHub WebSocketBroadcaster) {
+	l.wsHub = wsHub
 }
 
 func (l *Logger) Debug(component, message string) {
@@ -68,6 +77,32 @@ func (l *Logger) log(level, component, message string) {
 			l.fileLogger.Printf("[error] logger: failed to insert log into database: %v", err)
 		}
 	}
+
+	// Broadcast to WebSocket clients
+	if l.wsHub != nil {
+		go l.broadcastLog(level, component, message)
+	}
+}
+
+func (l *Logger) broadcastLog(level, component, message string) {
+	defer func() {
+		if r := recover(); r != nil {
+			l.fileLogger.Printf("[error] logger: panic during websocket broadcast: %v", r)
+		}
+	}()
+
+	// Create WebSocket message structure
+	wsMessage := map[string]any{
+		"type": "log",
+		"data": map[string]any{
+			"level":      level,
+			"message":    message,
+			"component":  component,
+			"created_at": time.Now(),
+		},
+	}
+
+	l.wsHub.BroadcastToFrontendsRaw(wsMessage)
 }
 
 func (l *Logger) Close() error {
