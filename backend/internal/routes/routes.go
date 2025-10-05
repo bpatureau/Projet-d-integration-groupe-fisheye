@@ -33,9 +33,8 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 
 		// WebSocket endpoints
 		r.Route("/ws", func(r chi.Router) {
-			r.Use(app.Middleware.AuthenticateUser)
-			r.With(app.Middleware.RequireDevice).Get("/device", app.WebSocketHandler.HandleDeviceConnection)
-			r.With(app.Middleware.RequireAuth).Get("/frontend", app.WebSocketHandler.HandleFrontendConnection)
+			r.Get("/device", app.WebSocketHandler.HandleDeviceConnection)
+			r.Get("/frontend", app.WebSocketHandler.HandleFrontendConnection)
 		})
 
 		// Authentication

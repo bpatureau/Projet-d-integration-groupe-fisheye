@@ -84,8 +84,16 @@ func NewApplication() (*Application, error) {
 
 	// Initialize WebSocket hub
 	wsHub := websocket.NewHub(logger)
-	wsHandler := websocket.NewHandler(wsHub, logger)
+	deviceAPIKey := os.Getenv("DEVICE_API_KEY")
+	if deviceAPIKey == "" {
+		logger.Warning("app", "DEVICE_API_KEY not configured - device WebSocket connections will fail")
+	} else {
+		logger.Info("app", "Device API key configured for WebSocket connections")
+	}
 
+	wsHandler := websocket.NewHandler(wsHub, userStore, tokenStore, deviceAPIKey, logger)
+
+	// Initialize calendar service if configured
 	var calendarService *calendar.CalendarService
 	credPath := os.Getenv("GOOGLE_CREDENTIALS_PATH")
 	calID := os.Getenv("GOOGLE_CALENDAR_ID")
@@ -103,6 +111,7 @@ func NewApplication() (*Application, error) {
 		logger.Info("app", "Calendar not configured (GOOGLE_CREDENTIALS_PATH or GOOGLE_CALENDAR_ID missing)")
 	}
 
+	// Initialize API handlers
 	adminHandler := api.NewAdminHandler(userStore, tokenStore, logStore, logger)
 	authHandler := api.NewAuthHandler(userStore, tokenStore, logger)
 	profileHandler := api.NewProfileHandler(userStore, tokenStore, logger)
