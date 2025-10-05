@@ -1,0 +1,21 @@
+body {
+    height: 100vh;
+    margin: 0;
+    background: #008080;
+    display: flex;
+    place-items: center;
+    font-family: "MS Sans Serif", Tahoma, sans-serif;
+    justify-content: center;
+}
+
+.dialog {
+    display: flex;
+    justify-content: space-around;
+}
+
+.button-swarm {
+    display: flex;
+    flex-wrap: wrap;
+    width: 50%;
+    gap: 5px;
+}
