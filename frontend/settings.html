@@ -29,10 +29,8 @@
             <!-- Device name -->
             <div class="row" id="row-device">
                 <label for="input-device">Device Name</label>
-                <div>
-                    <span id="display-device" class="muted"></span>
-                    <input id="input-device" class="text-input hidden" type="text" />
-                </div>
+                <div class="display"><span id="display-device" class="muted"></span></div>
+                <div class="editor hidden"><input id="input-device" class="text-input" type="text" /></div>
                 <div>
                     <button id="btn-edit-device">Edit</button>
                     <button id="btn-save-device" class="hidden default">Save</button>
@@ -50,7 +48,6 @@
                         <label for="input-dnd" style="margin-left:6px;">Enabled</label>
                     </div>
                 </div>
-
                 <div>
                     <button id="btn-edit-dnd">Edit</button>
                     <button id="btn-save-dnd" class="hidden default">Save</button>
@@ -61,10 +58,8 @@
             <!-- Welcome messages -->
             <div class="row" id="row-welcome">
                 <label for="input-welcome">Welcome Messages</label>
-                <div>
-                    <span id="display-welcome" class="muted"></span>
-                    <textarea id="input-welcome" class="text-input hidden" placeholder="One message per line"></textarea>
-                </div>
+                <div class="display"><span id="display-welcome" class="muted"></span></div>
+                <div class="editor hidden"><textarea id="input-welcome" class="text-input" placeholder="One message per line"></textarea></div>
                 <div>
                     <button id="btn-edit-welcome">Edit</button>
                     <button id="btn-save-welcome" class="hidden default">Save</button>
@@ -75,10 +70,8 @@
             <!-- Rotation seconds -->
             <div class="row" id="row-rotate">
                 <label for="input-rotate">Message Rotation (s)</label>
-                <div>
-                    <span id="display-rotate" class="muted"></span>
-                    <input id="input-rotate" class="text-input hidden" type="number" min="1" />
-                </div>
+                <div class="display"><span id="display-rotate" class="muted"></span></div>
+                <div class="editor hidden"><input id="input-rotate" class="text-input" type="number" min="1" /></div>
                 <div>
                     <button id="btn-edit-rotate">Edit</button>
                     <button id="btn-save-rotate" class="hidden default">Save</button>

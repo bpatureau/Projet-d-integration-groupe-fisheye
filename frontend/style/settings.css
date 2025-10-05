@@ -1,51 +1,53 @@
-        html, body { height: 100%; }
-        body {
-            margin: 0;
-            background: #008080;
-            font-family: "MS Sans Serif", Arial, sans-serif;
-        }
-        /* Center window */
-        .desktop {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 24px;
-        }
-        .window {
-             width: 40vw; 
-            }
-        .row {
-            display: grid;
-            grid-template-columns: 120px 1fr auto;
-            gap: 10px 12px;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        .muted {
-            color: #333;
-            background: #fff;
-            padding: 4px 6px;
-            border: 1px solid #b5b5b5;
-            box-shadow: inset -1px -1px #fff, inset 1px 1px #0a0a0a, inset -2px -2px #dfdfdf, inset 2px 2px grey;
-        }
-        .hidden { display: none; }
-        .actions {
-            display: flex;
-            gap: 8px;
-            justify-content: flex-end;
-            margin-top: 16px;
-        }
-        .status-bar {
-            display: flex;
-            gap: 8px;
-            margin-top: 16px;
-        }
-        .status-bar-field { flex: 1; }
-
-@media (max-width : 620px){
-    .row {
-        display: flex;
-        flex-direction: column;
-    }
+html, body { height: 100%; }
+body {
+    margin: 0;
+    background: #008080;
+    font-family: "MS Sans Serif", Arial, sans-serif;
+}
+.desktop {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+.window { width: 520px; }
+.row {
+    display: grid;
+    grid-template-columns: 160px 1fr auto;
+    gap: 10px 12px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+.muted {
+    color: #333;
+    background: #fff;
+    padding: 4px 6px;
+    border: 1px solid #b5b5b5;
+    box-shadow: inset -1px -1px #fff, inset 1px 1px #0a0a0a, inset -2px -2px #dfdfdf, inset 2px 2px grey;
+    white-space: pre-wrap;
+}
+.display, .editor { width: 100%; }
+.display .muted { display: inline-block; width: 100%; }
+.hidden { display: none; }
+.actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 16px;
+}
+.status-bar {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+}
+.status-bar-field { flex: 1; }
+textarea.text-input {
+    width: 100%;
+    min-height: 90px;
+}
+.two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
 }
