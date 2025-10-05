@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Edit Profile - 98.css</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="https://unpkg.com/98.css" />
+    <link rel="stylesheet" href="style/profile.css" />
+</head>
+<body>
+<div class="desktop">
+    <div class="window">
+        <div class="title-bar">
+            <div class="title-bar-text">Edit Profile</div>
+            <div class="title-bar-controls">
+                <button aria-label="Minimize"></button>
+                <button aria-label="Maximize"></button>
+                <button aria-label="Close"></button>
+            </div>
+        </div>
+        <div class="window-body">
+            <!-- Username row -->
+            <div class="row" id="row-username">
+                <label for="input-username">Username</label>
+                <div>
+                    <span id="display-username" class="muted"></span>
+                    <input id="input-username" class="text-input hidden" type="text" />
+                </div>
+                <div>
+                    <button id="btn-edit-username">Edit</button>
+                    <button id="btn-save-username" class="hidden default">Save</button>
+                    <button id="btn-cancel-username" class="hidden">Cancel</button>
+                </div>
+            </div>
+
+            <!-- Email row -->
+            <div class="row" id="row-email">
+                <label for="input-email">Email</label>
+                <div>
+                    <span id="display-email" class="muted"></span>
+                    <input id="input-email" class="text-input hidden" type="email" />
+                </div>
+                <div>
+                    <button id="btn-edit-email">Edit</button>
+                    <button id="btn-save-email" class="hidden default">Save</button>
+                    <button id="btn-cancel-email" class="hidden">Cancel</button>
+                </div>
+            </div>
+
+            <hr />
+
+            <!-- Change password section -->
+            <div id="password-section-collapsed">
+                <button id="btn-change-password">Change Password…</button>
+            </div>
+
+            <div id="password-section" class="hidden">
+                <fieldset>
+                    <legend>Password</legend>
+                    <div class="field-row" style="align-items:center;">
+                        <label for="pwd-current" style="width:120px;">Current</label>
+                        <input id="pwd-current" type="password" class="text-input" />
+                    </div>
+                    <div class="field-row" style="align-items:center;">
+                        <label for="pwd-new" style="width:120px;">New</label>
+                        <input id="pwd-new" type="password" class="text-input" />
+                    </div>
+                    <div class="field-row" style="align-items:center;">
+                        <label for="pwd-confirm" style="width:120px;">Confirm</label>
+                        <input id="pwd-confirm" type="password" class="text-input" />
+                    </div>
+                    <div class="actions">
+                        <button id="btn-cancel-password">Cancel</button>
+                        <button id="btn-save-password" class="default">Save</button>
+                    </div>
+                </fieldset>
+            </div>
+
+            <div class="status-bar">
+                <p class="status-bar-field" id="status">Ready</p>
+                <p class="status-bar-field" id="caps">Caps Lock: Off</p>
+                <p class="status-bar-field" id="num">Num Lock: Unknown</p>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="script/utils/updateNumCaps.js"></script>
+<script>const TOKEN = "DIDOILHD7BD4OANWQ4PJOMPZTLGRF324HX3ZOMZ2XEF3N35ESLXQ"</script>
+<script src="script/profile.js"></script>
+
+</body>
+</html>

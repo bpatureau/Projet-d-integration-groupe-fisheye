@@ -1,4 +1,4 @@
-BASE_URL = "https://pi.linadu.live";
+const BASE_URL = "https://pi.linadu.live";
 
 
     // Shortcuts to elements
@@ -74,16 +74,8 @@ btnOk.addEventListener('click', () => {
         })
         .then(res => res.json())
         .then(data => {
-            console.log(data.data.token.token);
-            fetch(`${BASE_URL}/api/profile`, {
-                method: 'GET',
-                headers: {'Authorization': `Bearer ${data.data.token.token}`}
-            })
-            .then(res => res.json())
-            .then(data => {
-                console.log(data);
-            })
-
+            saveAuth(data.data)
+            window.location.href = "/home.html"
     })
 });
 btnCancel.addEventListener('click', () => {
