@@ -339,7 +339,7 @@ func (s *PostgresVisitStore) GetStatistics(ctx context.Context) (*VisitStats, er
 			COUNT(CASE WHEN status = 'missed' THEN 1 END) as missed,
 			COUNT(CASE WHEN status = 'ignored' THEN 1 END) as ignored,
 			COUNT(CASE WHEN has_message = true THEN 1 END) as with_messages,
-			COUNT(CASE WHEN has_message = true AND message_listened = false THEN 1 END) as unlistened,
+			COUNT(CASE WHEN has_message = true AND message_type = 'voice' AND message_listened = false THEN 1 END) as unlistened,
 			AVG(response_time) as avg_response_time,
 			COUNT(CASE WHEN created_at >= $1 THEN 1 END) as today,
 			COUNT(CASE WHEN created_at >= $2 THEN 1 END) as week
