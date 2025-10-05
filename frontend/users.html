@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>User Management - 98.css</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="https://unpkg.com/98.css" />
+    <link rel="stylesheet" href="style/users.css" />
+</head>
+<body>
+<div class="desktop">
+    <div class="window">
+        <div class="title-bar">
+            <div class="title-bar-text">User Management</div>
+            <div class="title-bar-controls">
+                <button aria-label="Minimize"></button>
+                <button aria-label="Maximize"></button>
+                <button aria-label="Close" id="btn-close"></button>
+            </div>
+        </div>
+        <div class="window-body">
+            <div class="toolbar">
+                <button id="btn-refresh">Refresh</button>
+                <button id="btn-add-user">Add User…</button>
+            </div>
+
+            <table class="table" id="users-table" aria-label="Users">
+                <thead>
+                <tr>
+                    <th style="width: 28%;">Username</th>
+                    <th style="width: 32%;">Email</th>
+                    <th style="width: 16%;">Role</th>
+                    <th style="width: 24%;">Actions</th>
+                </tr>
+                </thead>
+                <tbody id="users-tbody">
+                <!-- rows injected -->
+                </tbody>
+            </table>
+
+            <fieldset id="add-user-panel" class="hidden">
+                <legend>Add User</legend>
+                <div class="grid">
+                    <label for="new-username">Username</label>
+                    <input id="new-username" class="text-input" type="text" />
+
+                    <label for="new-email">Email</label>
+                    <input id="new-email" class="text-input" type="email" />
+
+                    <label for="new-role">Role</label>
+                    <select id="new-role">
+                        <option value="user">user</option>
+                        <option value="admin">admin</option>
+                    </select>
+
+                    <label for="new-password">Password</label>
+                    <input id="new-password" class="text-input" type="password" />
+                </div>
+                <div class="actions" style="margin-top: 12px;">
+                    <button id="btn-cancel-add">Cancel</button>
+                    <button id="btn-save-add" class="default">Create</button>
+                </div>
+            </fieldset>
+
+            <fieldset id="edit-role-panel" class="hidden">
+                <legend>Edit Role</legend>
+                <div class="grid">
+                    <label>User</label>
+                    <span id="edit-role-username" class="muted" style="background:#fff; padding:4px 6px; border:1px solid #b5b5b5; box-shadow: inset -1px -1px #fff, inset 1px 1px #0a0a0a, inset -2px -2px #dfdfdf, inset 2px 2px grey;"></span>
+
+                    <label for="edit-role-select">Role</label>
+                    <select id="edit-role-select">
+                        <option value="user">user</option>
+                        <option value="admin">admin</option>
+                    </select>
+                </div>
+                <div class="actions" style="margin-top: 12px;">
+                    <button id="btn-cancel-role">Cancel</button>
+                    <button id="btn-save-role" class="default">Save</button>
+                </div>
+            </fieldset>
+
+            <fieldset id="reset-password-panel" class="hidden">
+                <legend>Change Password</legend>
+                <div class="grid">
+                    <label>User</label>
+                    <span id="reset-pw-username" class="muted" style="background:#fff; padding:4px 6px; border:1px solid #b5b5b5; box-shadow: inset -1px -1px #fff, inset 1px 1px #0a0a0a, inset -2px -2px #dfdfdf, inset 2px 2px grey;"></span>
+
+                    <label for="reset-password">New Password</label>
+                    <input id="reset-password" class="text-input" type="password" />
+                </div>
+                <div class="actions" style="margin-top: 12px;">
+                    <button id="btn-cancel-reset">Cancel</button>
+                    <button id="btn-save-reset" class="default">Save</button>
+                </div>
+            </fieldset>
+
+            <div class="status-bar">
+                <p class="status-bar-field" id="status">Ready</p>
+                <p class="status-bar-field" id="caps">Caps Lock: Off</p>
+                <p class="status-bar-field" id="num">Num Lock: Unknown</p>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="script/utils/auth.js"></script>
+<script src="script/utils/updateNumCaps.js"></script>
+<script src="script/utils/btn-close.js"></script>
+<script src="script/users.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,14 @@
+html, body { height: 100%; }
+body { margin: 0; background: #008080; font-family: "MS Sans Serif", Arial, sans-serif; }
+.desktop { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.window { width: 780px; }
+.toolbar { display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 12px; }
+.table { width: 100%; border-collapse: collapse; }
+.table th, .table td { padding: 6px 8px; border: 1px solid #b5b5b5; vertical-align: middle; }
+.table th { background: #c0c0c0; }
+.actions { display: flex; gap: 6px; justify-content: flex-end; }
+.grid { display: grid; grid-template-columns: 140px 1fr; gap: 10px 12px; align-items: center; }
+.hidden { display: none; }
+.status-bar { display: flex; gap: 8px; margin-top: 16px; }
+.status-bar-field { flex: 1; }
+fieldset { margin-top: 12px; }
