@@ -1,0 +1,198 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: "MS Sans Serif", Arial, sans-serif;
+  background: var(--win98-desktop);
+}
+
+.desktop {
+  height: 100vh;
+  padding: 8px;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+}
+
+.main-window {
+  width: 100%;
+  max-width: 1400px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.menu-bar {
+  background: var(--win98-gray);
+  border-bottom: 2px solid var(--win98-white);
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  flex-shrink: 0;
+}
+
+.menu-button {
+  padding: 4px 12px;
+  border: none;
+  background: var(--win98-gray);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.menu-button:hover {
+  background: var(--win98-light-gray);
+}
+
+.menu-button.active {
+  background: var(--win98-white);
+  box-shadow: inset -1px -1px var(--win98-white),
+    inset 1px 1px var(--win98-dark-gray);
+}
+
+.window-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.tab-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.toolbar {
+  background: var(--win98-gray);
+  border-bottom: 2px solid var(--win98-white);
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.toolbar button {
+  font-size: 11px;
+}
+
+.toolbar label {
+  font-size: 11px;
+  margin-left: 8px;
+}
+
+.toolbar select {
+  font-size: 11px;
+}
+
+.toolbar-separator {
+  width: 2px;
+  height: 20px;
+  background: var(--win98-dark-gray);
+  margin: 0 4px;
+}
+
+.content-area {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--win98-white);
+  min-height: 0;
+}
+
+.status-bar {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.status-bar-field {
+  padding: 2px 4px;
+  font-size: 11px;
+}
+
+fieldset {
+  margin-bottom: 16px;
+  padding: 12px;
+}
+
+legend {
+  font-weight: bold;
+  padding: 0 4px;
+}
+
+.field-row-stacked {
+  margin-bottom: 12px;
+}
+
+.field-row-stacked label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+}
+
+.button-row {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.error-message {
+  color: var(--log-error);
+  font-size: 11px;
+  margin-top: 8px;
+}
+
+.success-message {
+  color: #008000;
+  font-size: 11px;
+  margin-top: 8px;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 16px;
+  height: 16px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--win98-white);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--win98-gray);
+  border: 1px solid var(--win98-dark-gray);
+}
+
+::-webkit-scrollbar-corner {
+  background: var(--win98-gray);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .desktop {
+    padding: 4px;
+  }
+
+  .content-area {
+    padding: 8px;
+  }
+
+  .menu-bar {
+    flex-wrap: wrap;
+  }
+}

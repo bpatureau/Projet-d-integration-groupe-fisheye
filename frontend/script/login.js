@@ -75,7 +75,7 @@ btnOk.addEventListener('click', () => {
         .then(res => res.json())
         .then(data => {
             saveAuth(data.data)
-            window.location.href = "/home.html"
+            choose_de()
     })
 });
 btnCancel.addEventListener('click', () => {
@@ -100,5 +100,31 @@ window.addEventListener('keypress', (e) => {
 })
 
 if(getAuthToken()){
-    window.location.href = "/home.html"
+    choose_de()
 }
+
+function choose_de() {
+    const select = document.getElementById('de-select');
+    const value = select.value;
+
+    // Save preference to localStorage
+    localStorage.setItem('desktopEnvironment', value);
+
+    // Redirect based on selection
+    if (value === 'old') {
+        window.location.href = 'home.html';
+    } else if (value === 'new') {
+        window.location.href = 'dashboard.html';
+    }
+}
+
+// Optional: On page load, set select to saved value if any
+window.addEventListener('DOMContentLoaded', () => {
+    const saved = localStorage.getItem('desktopEnvironment');
+    if (saved) {
+        const select = document.getElementById('de-select');
+        if (select) {
+            select.value = saved;
+        }
+    }
+});

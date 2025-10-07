@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fisheye Dashboard</title>
+    <link rel="stylesheet" href="https://unpkg.com/98.css" />
+    <link rel="stylesheet" href="dashboard/script/vars.css" />
+    <link rel="stylesheet" href="dashboard/style/common.css" />
+    <link rel="stylesheet" href="dashboard/style/components.css" />
+  </head>
+  <body>
+    <div class="desktop">
+      <!-- Main Window -->
+      <div class="window main-window">
+        <div class="title-bar">
+          <div class="title-bar-text">🐟 Fisheye Dashboard</div>
+          <div class="title-bar-controls">
+            <button aria-label="Minimize"></button>
+            <button aria-label="Maximize"></button>
+            <button aria-label="Close" id="btn-logout"></button>
+          </div>
+        </div>
+
+        <!-- Menu Bar -->
+        <div class="menu-bar">
+          <button class="menu-button" data-tab="visits">📋 Visits</button>
+          <button class="menu-button" data-tab="calendar">📅 Calendar</button>
+          <button class="menu-button" data-tab="settings">⚙️ Settings</button>
+          <button
+            class="menu-button admin-only"
+            data-tab="users"
+            style="display: none"
+          >
+            👥 Users
+          </button>
+          <button
+            class="menu-button admin-only"
+            data-tab="logs"
+            style="display: none"
+          >
+            📝 Logs
+          </button>
+          <button class="menu-button" data-tab="profile">👤 Profile</button>
+        </div>
+
+        <div class="window-body">
+          <!-- Visits Tab -->
+          <div class="tab-content" id="tab-visits">
+            <div class="toolbar">
+              <button id="btn-refresh-visits">🔄 Refresh</button>
+              <div class="toolbar-separator"></div>
+              <label>Status:</label>
+              <select id="filter-status">
+                <option value="">All</option>
+                <option value="pending">Pending</option>
+                <option value="answered">Answered</option>
+                <option value="missed">Missed</option>
+                <option value="ignored">Ignored</option>
+              </select>
+              <button id="btn-filter-apply">Apply</button>
+            </div>
+
+            <div class="content-area">
+              <div class="stats-panel">
+                <div class="stat-card">
+                  <div class="stat-value" id="stat-total">-</div>
+                  <div class="stat-label">Total Visits</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-value" id="stat-pending">-</div>
+                  <div class="stat-label">Pending</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-value" id="stat-today">-</div>
+                  <div class="stat-label">Today</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-value" id="stat-unlistened">-</div>
+                  <div class="stat-label">Unlistened Messages</div>
+                </div>
+              </div>
+
+              <div class="visits-list" id="visits-list">
+                <p>Loading visits...</p>
+              </div>
+
+              <div class="pagination">
+                <button id="btn-prev-page" disabled>◀ Previous</button>
+                <span id="page-info">Page 1</span>
+                <button id="btn-next-page">Next ▶</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Calendar Tab -->
+          <div class="tab-content" id="tab-calendar" style="display: none">
+            <div class="toolbar">
+              <button id="btn-refresh-calendar">🔄 Refresh</button>
+              <div class="toolbar-separator"></div>
+              <button
+                id="btn-sync-calendar"
+                class="admin-only"
+                style="display: none"
+              >
+                🔄 Force Sync
+              </button>
+            </div>
+
+            <div class="content-area">
+              <div class="calendar-status">
+                <h3>Calendar Status</h3>
+                <div class="status-item">
+                  <span class="status-label">Availability:</span>
+                  <span class="status-value" id="calendar-availability">-</span>
+                </div>
+                <div class="status-item">
+                  <span class="status-label">Last Sync:</span>
+                  <span class="status-value" id="calendar-last-sync">-</span>
+                </div>
+                <div
+                  class="status-item"
+                  id="current-event-container"
+                  style="display: none"
+                >
+                  <span class="status-label">Current Event:</span>
+                  <span class="status-value" id="current-event">-</span>
+                </div>
+              </div>
+
+              <div class="events-list">
+                <h3>Upcoming Events</h3>
+                <div id="events-container">
+                  <p>Loading events...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Settings Tab -->
+          <div class="tab-content" id="tab-settings" style="display: none">
+            <div class="toolbar">
+              <button id="btn-refresh-settings">🔄 Refresh</button>
+              <div class="toolbar-separator"></div>
+              <button
+                id="btn-edit-settings"
+                class="admin-only"
+                style="display: none"
+              >
+                ✏️ Edit Settings
+              </button>
+            </div>
+
+            <div class="content-area">
+              <fieldset>
+                <legend>Device Settings</legend>
+
+                <div class="setting-row-clean">
+                  <label for="device-name">Device Name:</label>
+                  <input
+                    type="text"
+                    id="device-name"
+                    class="setting-input"
+                    disabled
+                  />
+                </div>
+
+                <div class="setting-row-clean">
+                  <label for="do-not-disturb">Do Not Disturb:</label>
+                  <div>
+                    <input type="checkbox" id="do-not-disturb" disabled />
+                    <label
+                      for="do-not-disturb"
+                      style="display: inline; margin-left: 6px"
+                      >Enable Do Not Disturb mode</label
+                    >
+                  </div>
+                </div>
+
+                <div class="setting-row-clean">
+                  <label for="welcome-messages">Welcome Messages:</label>
+                  <textarea
+                    id="welcome-messages"
+                    class="setting-input"
+                    rows="5"
+                    disabled
+                    placeholder="One message per line"
+                  ></textarea>
+                </div>
+
+                <div class="setting-row-clean">
+                  <label for="rotation-seconds">Message Rotation:</label>
+                  <div style="display: flex; align-items: center; gap: 8px">
+                    <input
+                      type="number"
+                      id="rotation-seconds"
+                      class="setting-input"
+                      min="1"
+                      disabled
+                      style="width: 100px"
+                    />
+                    <span>seconds</span>
+                  </div>
+                </div>
+              </fieldset>
+
+              <div
+                class="button-row admin-only"
+                id="settings-buttons"
+                style="display: none"
+              >
+                <button id="btn-cancel-settings">Cancel</button>
+                <button id="btn-save-settings" class="default">
+                  💾 Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Users Tab (Admin Only) -->
+          <div
+            class="tab-content admin-only"
+            id="tab-users"
+            style="display: none"
+          >
+            <div class="toolbar">
+              <button id="btn-refresh-users">🔄 Refresh</button>
+              <div class="toolbar-separator"></div>
+              <button id="btn-add-user">➕ Add User</button>
+            </div>
+
+            <div class="content-area">
+              <div class="users-table-container" id="users-container">
+                <p>Loading users...</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Logs Tab (Admin Only) -->
+          <div
+            class="tab-content admin-only"
+            id="tab-logs"
+            style="display: none"
+          >
+            <div class="toolbar">
+              <button id="btn-refresh-logs">🔄 Refresh</button>
+              <div class="toolbar-separator"></div>
+              <label>Level:</label>
+              <select id="filter-log-level">
+                <option value="">All</option>
+                <option value="debug">Debug</option>
+                <option value="info">Info</option>
+                <option value="warning">Warning</option>
+                <option value="error">Error</option>
+              </select>
+              <button id="btn-filter-logs">Apply</button>
+              <div class="toolbar-separator"></div>
+              <button id="btn-clear-logs">🗑️ Clear Old Logs</button>
+            </div>
+
+            <div class="logs-container" id="logs-container">
+              <p style="color: #808080">Loading logs...</p>
+            </div>
+          </div>
+
+          <!-- Profile Tab -->
+          <div class="tab-content" id="tab-profile" style="display: none">
+            <div class="content-area">
+              <fieldset>
+                <legend>Profile Information</legend>
+
+                <div class="profile-row">
+                  <label>Username:</label>
+                  <span id="profile-username">-</span>
+                </div>
+
+                <div class="profile-row">
+                  <label>Email:</label>
+                  <span id="profile-email">-</span>
+                </div>
+
+                <div class="profile-row">
+                  <label>Role:</label>
+                  <span id="profile-role">-</span>
+                </div>
+
+                <div class="profile-row">
+                  <label>Member Since:</label>
+                  <span id="profile-created">-</span>
+                </div>
+              </fieldset>
+
+              <fieldset>
+                <legend>Change Password</legend>
+                <form id="password-form">
+                  <div class="field-row-stacked">
+                    <label for="current-password">Current Password:</label>
+                    <input type="password" id="current-password" required />
+                  </div>
+                  <div class="field-row-stacked">
+                    <label for="new-password">New Password:</label>
+                    <input type="password" id="new-password" required />
+                  </div>
+                  <div class="field-row-stacked">
+                    <label for="confirm-password">Confirm Password:</label>
+                    <input type="password" id="confirm-password" required />
+                  </div>
+                  <button type="submit" class="default">Change Password</button>
+                </form>
+              </fieldset>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status Bar -->
+        <div class="status-bar">
+          <p class="status-bar-field" id="status-text">Ready</p>
+          <p class="status-bar-field" id="ws-status">🔴 Disconnected</p>
+          <p class="status-bar-field" id="user-info">-</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modals will be inserted here by JavaScript -->
+    <div id="modal-container"></div>
+
+    <script src="dashboard/script/config.js"></script>
+    <script src="dashboard/script/auth.js"></script>
+    <script src="dashboard/script/utils.js"></script>
+    <script src="dashboard/script/api.js"></script>
+    <script src="dashboard/script/websocket.js"></script>
+    <script src="dashboard/script/ui.js"></script>
+    <script src="dashboard/script/dashboard.js"></script>
+  </body>
+</html>
