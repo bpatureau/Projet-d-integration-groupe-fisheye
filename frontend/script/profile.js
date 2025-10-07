@@ -1,4 +1,3 @@
-const BASE_URL = 'https://pi.linadu.live';
 const TOKEN = getAuthToken();
 if(TOKEN == null){
     window.location.href = "/login.html";

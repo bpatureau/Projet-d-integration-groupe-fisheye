@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <title>Logging out...</title>
     <script src="script/utils/auth.js"></script>
+    <script src="script/utils/base_url.js"></script>
     <script>
-        BASE_URL = 'https://pi.linadu.live';
         function authHeaders(extra = {}) {
             return { Authorization: `Bearer ${TOKEN}`, ...extra };
         }

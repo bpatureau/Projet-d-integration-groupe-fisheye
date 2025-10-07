@@ -1,8 +1,5 @@
 // settings.js
 
-// Base URL and auth helpers
-const BASE_URL = 'https://pi.linadu.live';
-
 let isAdmin = getUser()?.role === 'admin';
 
 // Status

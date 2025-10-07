@@ -1,5 +1,3 @@
-const BASE_URL = 'https://pi.linadu.live';
-
 function getUser() {
     const s = localStorage.getItem('user');
     return s ? JSON.parse(s) : null;

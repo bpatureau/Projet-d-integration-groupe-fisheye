@@ -1,6 +1,3 @@
-const BASE_URL = "https://pi.linadu.live";
-
-
     // Shortcuts to elements
 const btnOk = document.getElementById('btn-ok');
 const btnCancel = document.getElementById('btn-cancel');
