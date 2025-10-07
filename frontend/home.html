@@ -1,33 +1,228 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Welcome to Windows</title>
-  <link rel="stylesheet" href="https://unpkg.com/98.css" />
-  <link rel="stylesheet" href="style/home.css">
+    <meta charset="UTF-8" />
+    <title>Windows 98 Desktop</title>
+    <link rel="stylesheet" href="https://unpkg.com/98.css" />
+    <style>
+        html, body {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            min-height: 100vh;
+            min-width: 100vw;
+            overflow: hidden;
+            background: #008080 url('https://win98icons.alexmeub.com/backgrounds/teal.png'); /* optional for extra Win98 vibe */
+            font-family: "MS Sans Serif", Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #desktop {
+            height: 100vh;
+            width: 100vw;
+            position: relative;
+            overflow: hidden;
+        }
+        .desktop-icon {
+            position: absolute;
+            width: 72px;
+            user-select: none;
+            text-align: center;
+            z-index: 1;
+            cursor: pointer;
+            padding: 2px 3px 8px 3px;
+        }
+        .desktop-icon.selected {
+            background: #316ac5;
+            color: white;
+            border: 1px dotted #fff;
+        }
+        .desktop-icon img {
+            width: 36px;
+            height: 36px;
+            image-rendering: pixelated;
+            margin: 0 auto 2px;
+            display: block;
+            background: transparent;
+            pointer-events: none;
+        }
+        .icon-label {
+            font-size: 13px;
+            margin-top: 0;
+            line-height: 1.1;
+            padding: 0 2px;
+            word-break: break-all;
+            pointer-events: none;
+            text-shadow: 1px 1px 0 #fff;
+        }
+    </style>
+    <style>
+        /* Taskbar container fixed to bottom */
+        #taskbar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 40px;
+            background: #c0c0c0;
+            border-top: 2px solid #fff;
+            border-left: 2px solid #404040;
+            border-right: 2px solid #404040;
+            border-bottom: 2px solid #fff;
+            display: flex;
+            align-items: center;
+            padding: 0 8px;
+            box-sizing: border-box;
+            gap: 10px;
+        }
+        /* Start button: classic 3D bevel with 98.css */
+        #start-button {
+            all: unset;
+            background: #c0c0c0;
+            border-top: 2px solid #fff;
+            border-left: 2px solid #fff;
+            border-bottom: 2px solid #404040;
+            border-right: 2px solid #404040;
+            padding: 2px 12px;
+            font-family: "MS Sans Serif", Tahoma, sans-serif;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+        }
+        #start-button:active {
+            border-top: 2px solid #404040;
+            border-left: 2px solid #404040;
+            border-bottom: 2px solid #fff;
+            border-right: 2px solid #fff;
+        }
+    </style>
 </head>
 <body>
-  <div class="window">
-    <div class="title-bar">
-        <div class="title-bar-text">Welcome to Windows</div>
-        <div class="title-bar-controls">
-            <button aria-label="Close" id="tb-close" class="close"></button>
-        </div>
-        </div>
-        <div class="window-body">
-            <div class="dialog">
-                <p>Bienvenue, {username}</p>
-                <div class="button-swarm">
-                    <button class="button">Visite</button>
-                    <button class="button">Settings</button>
-                    <button class="button">Button</button>
-                    <button class="button">Button</button>
-                </div>
-            </div>
-        </div>
-    </div>
-  </div>
+<div id="desktop"></div>
 
-  <script src="script/home.js"></script>
+<div id="taskbar" role="toolbar" aria-label="Taskbar">
+    <button id="start-button" aria-label="Start menu">Start</button>
+    <!-- Add any other taskbar icons here -->
+</div>
+
+<script>
+    // === Desktop Icon Configuration ===
+    const ICONS = [
+        {
+            id: "settings",
+            label: "Settings",
+            icon: "/images/settings_gear.png",
+            url: "/settings.html"
+        },
+        {
+            id: "users",
+            label: "Users",
+            icon: "/images/address_book_card_users.png",
+            url: "/users.html"
+        },
+        {
+            id: "profile",
+            label: "Profile",
+            icon: "images/profile_icon.png",
+            url: "/profile.html"
+        }
+    ];
+
+    // === Restore positions from localStorage if available ===
+    const positions = JSON.parse(localStorage.getItem("w98_desktop_positions")||"{}");
+
+    const desktop = document.getElementById('desktop');
+    ICONS.forEach((icon, idx) => {
+        let div = document.createElement('div');
+        div.className = 'desktop-icon';
+        div.id = icon.id;
+        div.innerHTML = `<img src="${icon.icon}" alt="" draggable="false"><div class="icon-label">${icon.label}</div>`;
+        // Use saved or default position
+        const pos = positions[icon.id] || { left: 40, top: 40 + idx*90 };
+        div.style.left = pos.left + "px";
+        div.style.top = pos.top + "px";
+        // Keyboard nav support
+        div.tabIndex = 0;
+        desktop.appendChild(div);
+
+        // Drag logic:
+        let dragging = false, offsetX = 0, offsetY = 0;
+
+        div.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            dragging = true;
+            offsetX = e.clientX - div.offsetLeft;
+            offsetY = e.clientY - div.offsetTop;
+            div.style.zIndex = 99;
+            div.classList.add('selected');
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (!dragging) return;
+            let left = Math.max(0, Math.min(e.clientX - offsetX, window.innerWidth - div.offsetWidth));
+            let top = Math.max(0, Math.min(e.clientY - offsetY, window.innerHeight - div.offsetHeight));
+            div.style.left = left + 'px';
+            div.style.top = top + 'px';
+        });
+        document.addEventListener('mouseup', (e) => {
+            if (dragging) {
+                dragging = false;
+                div.style.zIndex = 1;
+                // Save position
+                positions[icon.id] = {
+                    left: parseInt(div.style.left,10),
+                    top: parseInt(div.style.top,10)
+                };
+                localStorage.setItem("w98_desktop_positions", JSON.stringify(positions));
+                div.classList.remove('selected');
+            }
+        });
+
+        // Double click or press Enter to open the link
+        div.addEventListener('dblclick', () => window.location = icon.url);
+        div.addEventListener('keydown', (e) => {
+            if (e.key === "Enter" || e.key === " ") window.location = icon.url;
+        });
+
+        // Visual selection on click/focus
+        div.addEventListener('click', (e) => {
+            document.querySelectorAll('.desktop-icon.selected').forEach(el=>el.classList.remove('selected'));
+            div.classList.add('selected');
+        });
+        div.addEventListener('focus', (e) => {
+            document.querySelectorAll('.desktop-icon.selected').forEach(el=>el.classList.remove('selected'));
+            div.classList.add('selected');
+        });
+        div.addEventListener('blur', (e) => div.classList.remove('selected'));
+    });
+
+    // Optional: Prevent text selection during drag
+    document.body.addEventListener('mousedown', (e) => {
+        if (e.target.classList.contains('desktop-icon')) {
+            e.preventDefault();
+        }
+    });
+
+    // Responsive: keep icons in view if window is resized smaller
+    window.addEventListener('resize', () => {
+        // Clamp icon positions to the new window size
+        document.querySelectorAll('.desktop-icon').forEach((div) => {
+            let left = parseInt(div.style.left,10), top = parseInt(div.style.top,10);
+            let changed = false;
+            if (left > window.innerWidth - div.offsetWidth) {
+                left = window.innerWidth - div.offsetWidth; changed = true;
+            }
+            if (top > window.innerHeight - div.offsetHeight) {
+                top = window.innerHeight - div.offsetHeight; changed = true;
+            }
+            if (changed) {
+                div.style.left = left + "px";
+                div.style.top = top + "px";
+                positions[div.id] = { left, top };
+            }
+        });
+        localStorage.setItem("w98_desktop_positions", JSON.stringify(positions));
+    });
+</script>
 </body>
 </html>
