@@ -168,15 +168,27 @@
             if (dragging) {
                 dragging = false;
                 div.style.zIndex = 1;
-                // Save position
-                positions[icon.id] = {
-                    left: parseInt(div.style.left,10),
-                    top: parseInt(div.style.top,10)
-                };
+
+                // Snap to 80x90 grid
+                const gridX = 80;
+                const gridY = 90;
+                let left = Math.round(parseInt(div.style.left, 10) / gridX) * gridX;
+                let top = Math.round(parseInt(div.style.top, 10) / gridY) * gridY;
+
+                // Ensure snapped positions stay within desktop bounds
+                const desktopRect = desktop.getBoundingClientRect();
+                left = Math.min(left, desktopRect.width - div.offsetWidth);
+                top = Math.min(top, desktopRect.height - div.offsetHeight);
+
+                div.style.left = left + 'px';
+                div.style.top = top + 'px';
+
+                positions[icon.id] = { left, top };
                 localStorage.setItem("w98_desktop_positions", JSON.stringify(positions));
                 div.classList.remove('selected');
             }
         });
+
 
         // Double click or press Enter to open the link
         div.addEventListener('dblclick', () => window.location = icon.url);
