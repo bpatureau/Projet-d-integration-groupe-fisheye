@@ -5,16 +5,16 @@ const FAKE_DATA: VisitEvent[] = [
     {
         id: 'a1b2c3',
         date: new Date().toLocaleString('fr-FR'),
-        status: 'missed',
+        status: 'Manquée',
         message: 'Bonjour',
-        teacherCount: 2
+        teacherNames: ["De Smet, Dubruille"]
     },
     {
         id: 'd4e5f6',
         date: new Date().toLocaleString('fr-FR'),
-        status: 'answered',
+        status: 'Présent',
         message: '',
-        teacherCount: 1
+        teacherNames: ["De Smet, VDS"]
     }
 ];
 
@@ -27,7 +27,7 @@ export const api = {
     markAnswered: (id: string): Promise<void> =>
         new Promise(resolve => {
             const idx = FAKE_DATA.findIndex(v => v.id === id);
-            if (idx !== -1) FAKE_DATA[idx].status = 'answered';
+            if (idx !== -1) FAKE_DATA[idx].status = 'Présent';
             setTimeout(() => resolve(), 200);
         }),
 
@@ -47,7 +47,4 @@ export const api = {
         new Promise(resolve => {
             setTimeout(() => resolve({ ...data }), 200);
         }),
-
-    syncCalendars: (): Promise<void> =>
-        new Promise(resolve => setTimeout(() => resolve(), 500))
 };

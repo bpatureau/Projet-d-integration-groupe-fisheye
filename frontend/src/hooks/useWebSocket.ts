@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 
 export interface VisitEvent {
+    teacherNames: any[];
     id: string;
     date: string;
-    status: 'answered' | 'missed';
+    status: 'Présent' | 'Manquée';
     message?: string;
-    teacherCount: number;
 }
 
 export function useWebSocket(path: string) {

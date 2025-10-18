@@ -16,17 +16,22 @@ import {
 import { useWebSocket, type VisitEvent } from '../hooks/useWebSocket';
 import { api } from '../lib/api';
 
+interface VisitEventWithNames extends VisitEvent {
+    teacherNames: string[];
+}
+
 export function Dashboard() {
     const { events: wsEvents } = useWebSocket('/ws');
-    const [visits, setVisits] = useState<VisitEvent[]>([]);
-    const [filter, setFilter] = useState<'all' | 'answered' | 'missed'>('all');
+    const [visits, setVisits] = useState<VisitEventWithNames[]>([]);
+    const [filter, setFilter] = useState<'all' | 'missed'>('all');
     const [search, setSearch] = useState('');
     const [stats, setStats] = useState({ total: 0, missed: 0, today: 0 });
 
     useEffect(() => {
         api.getEvents().then(data => {
-            setVisits(data);
-            computeStats(data);
+            const enriched = data.map(v => ({ ...v, teacherNames: v.teacherNames || [] }));
+            setVisits(enriched);
+            computeStats(enriched);
         });
     }, []);
 
@@ -34,27 +39,37 @@ export function Dashboard() {
 
     useEffect(() => {
         if (wsEvents.length) {
-            setVisits(prev => [wsEvents[0], ...prev]);
+            const ev = wsEvents[0];
+            setVisits(prev => [{ ...ev, teacherNames: ev.teacherNames || [] }, ...prev]);
         }
     }, [wsEvents]);
 
-    const computeStats = (data: VisitEvent[]) => {
+    const computeStats = (data: VisitEventWithNames[]) => {
         const todayStr = new Date().toLocaleDateString('fr-FR');
         setStats({
             total: data.length,
-            missed: data.filter(v => v.status === 'missed').length,
+            // status interne reste 'missed'
+            missed: data.filter(v => v.status === 'Manquée').length,
             today: data.filter(v => v.date.startsWith(todayStr)).length
         });
     };
 
-    const refresh = () => api.getEvents().then(setVisits);
-    const handleMark = (id: string) => api.markAnswered(id).then(refresh);
+    const refresh = () => {
+        api.getEvents().then(data => {
+            const enriched = data.map(v => ({ ...v, teacherNames: v.teacherNames || [] }));
+            setVisits(enriched);
+        });
+    };
+
     const handleDelete = (id: string) => api.deleteVisit(id).then(refresh);
 
     const displayed = visits.filter(v =>
-        (filter === 'all' || v.status === filter) &&
+        (filter === 'all' || v.status === 'Manquée') &&
         v.id.includes(search)
     );
+
+    const formatStatus = (status: string) =>
+        status === 'Manquée' ? 'Manquée' : 'Présent';
 
     return (
         <Container maxWidth="lg" sx={{ mt: 4 }}>
@@ -86,11 +101,10 @@ export function Dashboard() {
                 />
                 <Select
                     value={filter}
-                    onChange={e => setFilter(e.target.value as any)}
+                    onChange={e => setFilter(e.target.value as 'all' | 'missed')}
                 >
                     <MenuItem value="all">Tous</MenuItem>
-                    <MenuItem value="answered">Décroché</MenuItem>
-                    <MenuItem value="missed">Manqué</MenuItem>
+                    <MenuItem value="missed">Manquée</MenuItem>
                 </Select>
                 <Button variant="outlined" onClick={refresh}>
                     Actualiser
@@ -103,19 +117,25 @@ export function Dashboard() {
                     <Card variant="outlined" key={v.id}>
                         <CardHeader
                             title={`Visite #${v.id}`}
-                            subheader={`Profs: ${v.teacherCount}`}
-                            action={
+                            subheader={
                                 <Box>
-                                    <Button onClick={() => handleMark(v.id)}>✓ Décroché</Button>
+                                    <Typography component="span" sx={{ fontWeight: 'bold' }}>
+                                        Profs :
+                                    </Typography>{' '}
+                                    {v.teacherNames.length > 0 ? v.teacherNames.join(', ') : 'Aucun'}
+                                </Box>
+                            }
+                            action={
+                                <Stack direction="row" spacing={1}>
                                     <Button color="error" onClick={() => handleDelete(v.id)}>
                                         🗑 Supprimer
                                     </Button>
-                                </Box>
+                                </Stack>
                             }
                         />
                         <CardContent>
                             <Typography>Date : {v.date}</Typography>
-                            <Typography>Statut : {v.status}</Typography>
+                            <Typography>Statut : {formatStatus(v.status)}</Typography>
                             {v.message && <Typography>Message : {v.message}</Typography>}
                         </CardContent>
                     </Card>
