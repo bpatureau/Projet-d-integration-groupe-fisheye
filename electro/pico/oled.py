@@ -42,6 +42,46 @@ def scroll_prof(prof_array, index,direction='up'):
 
     return index
 
+def button_pressed(index: int):
+    print(f"Button {index} pressed")
+
+
+def scan():
+
+    flag = False
+
+    for pin in col_pins:
+        #print(pin.value())
+        if not pin.value():
+            flag = True
+            break
+    #print(flag)
+    if not flag:
+        return None
+    print('scan ...')
+    for row in row_pins:
+        row.value(1)
+
+    for row in range(len(row_pins)):
+        row_pins[row].value(0)
+
+        for col in range(len(col_pins)):
+            if not col_pins[col].value():
+                row_pins[row].value(1)
+
+                for x in row_pins:
+                    x.value(0)
+
+                return row + (col + col * len(col_pins))
+
+        row_pins[row].value(1)
+
+    for x in row_pins:
+        x.value(0)
+
+    #print('nothing found')
+
+    return None
 
 
 if '__main__' == __name__ or 1:
@@ -53,7 +93,7 @@ if '__main__' == __name__ or 1:
     fill_random_data()
 
 
-    display.rotate(2)
+    #display.rotate(2)
 
     display.text('Prof: ', 0, 0)
     #display.text([key for key in prof_array][index_prof], 0, 10)
@@ -66,11 +106,19 @@ if '__main__' == __name__ or 1:
     
     index_prof = scroll_prof(prof_array, -1)
 
+
+    # Setup for 4x4 matrix (16 buttons)
+    row_pins = [Pin(16, Pin.OUT), Pin(17, Pin.OUT), Pin(18, Pin.OUT), Pin(19, Pin.OUT),
+                Pin(20, Pin.OUT)]
+    col_pins = [Pin(13, Pin.IN, Pin.PULL_UP), Pin(12, Pin.IN, Pin.PULL_UP), Pin(11, Pin.IN, Pin.PULL_UP),
+                Pin(10, Pin.IN, Pin.PULL_UP)]
+
     while True:
         try:
             if pot.read_u16() > 20_000:
                 index_prof = scroll_prof(prof_array, index_prof)
                 time.sleep(0.5)
+
 
         except KeyboardInterrupt:
             for x in range(40):
