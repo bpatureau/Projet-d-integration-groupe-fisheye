@@ -1,9 +1,10 @@
 import type { Teacher } from "@prisma/client";
-import jwt from "jsonwebtoken";
+import jwt, { type JwtPayload } from "jsonwebtoken";
+import type { StringValue } from "ms";
 import config from "../config";
 import { NotFoundError, UnauthorizedError } from "../utils/errors";
 import logger from "../utils/logger";
-import { hashPassword, verifyPassword } from "../utils/password";
+import { verifyPassword } from "../utils/password";
 import prismaService from "../utils/prisma";
 
 class AuthService {
@@ -47,24 +48,28 @@ class AuthService {
       username: teacher.username,
       email: teacher.email,
     };
-    const options: any = {
-      expiresIn: config.jwt.ttl,
-    };
-    return jwt.sign(payload, config.jwt.secret, options);
+    return jwt.sign(payload, config.jwt.secret, {
+      expiresIn: config.jwt.ttl as StringValue,
+    });
   }
 
-  verifyToken(token: string): any {
+  verifyToken(token: string): JwtPayload | string {
     try {
       return jwt.verify(token, config.jwt.secret);
-    } catch (error) {
+    } catch (_error) {
       throw new UnauthorizedError("Invalid or expired token");
     }
   }
 
   async getTeacherFromToken(token: string): Promise<Teacher> {
     const decoded = this.verifyToken(token);
+
+    if (typeof decoded === "string" || !("teacherId" in decoded)) {
+      throw new UnauthorizedError("Invalid token payload");
+    }
+
     const teacher = await prismaService.client.teacher.findUnique({
-      where: { id: decoded.teacherId },
+      where: { id: decoded.teacherId as string },
     });
 
     if (!teacher) {

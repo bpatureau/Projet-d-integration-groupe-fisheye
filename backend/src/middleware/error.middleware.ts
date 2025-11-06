@@ -7,15 +7,15 @@ import logger from "../utils/logger";
  * Capture toutes les erreurs des routes et contrôleurs
  */
 export function errorHandler(
-  err: any,
+  err: unknown,
   req: Request,
   res: Response,
-  next: NextFunction,
+  _next: NextFunction,
 ) {
   let statusCode = 500;
   let message = "Internal server error";
-  let errors: any[] | undefined;
-  let context: Record<string, any> | undefined;
+  let errors: unknown[] | undefined;
+  let context: Record<string, unknown> | undefined;
 
   if (err instanceof AppError) {
     statusCode = err.statusCode;
@@ -43,14 +43,20 @@ export function errorHandler(
         method: req.method,
       });
     }
-  } else if (err.code && err.code.startsWith("P")) {
+  } else if (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    typeof err.code === "string" &&
+    err.code.startsWith("P")
+  ) {
     statusCode = 400;
     message = "Database operation failed";
 
-    if (err.code === "P2002") {
+    if ("code" in err && err.code === "P2002") {
       statusCode = 409;
       message = "A record with this value already exists";
-    } else if (err.code === "P2025") {
+    } else if ("code" in err && err.code === "P2025") {
       statusCode = 404;
       message = "Record not found";
     }
@@ -61,17 +67,30 @@ export function errorHandler(
       path: req.path,
       method: req.method,
     });
-  } else if (err.name === "JsonWebTokenError") {
+  } else if (
+    typeof err === "object" &&
+    err !== null &&
+    "name" in err &&
+    err.name === "JsonWebTokenError"
+  ) {
     statusCode = 401;
     message = "Invalid authentication token";
 
     logger.warn("JWT error", {
       component: "error_handler",
-      message: err.message,
+      message:
+        "message" in err && typeof err.message === "string"
+          ? err.message
+          : "Unknown error",
       path: req.path,
       method: req.method,
     });
-  } else if (err.name === "TokenExpiredError") {
+  } else if (
+    typeof err === "object" &&
+    err !== null &&
+    "name" in err &&
+    err.name === "TokenExpiredError"
+  ) {
     statusCode = 401;
     message = "Authentication token expired";
 
@@ -86,11 +105,14 @@ export function errorHandler(
       error: err,
       path: req.path,
       method: req.method,
-      stack: err.stack,
+      stack:
+        typeof err === "object" && err !== null && "stack" in err
+          ? err.stack
+          : undefined,
     });
   }
 
-  const response: any = {
+  const response: Record<string, unknown> = {
     error: message,
   };
 
@@ -102,7 +124,9 @@ export function errorHandler(
     if (context) {
       response.context = context;
     }
-    response.stack = err.stack;
+    if (typeof err === "object" && err !== null && "stack" in err) {
+      response.stack = err.stack;
+    }
   }
 
   res.status(statusCode).json(response);
@@ -128,7 +152,7 @@ export function notFoundHandler(req: Request, res: Response) {
  * Wrapper pour capturer les erreurs des gestionnaires de routes asynchrones
  */
 export function asyncHandler(
-  fn: (req: Request, res: Response, next: NextFunction) => Promise<any>,
+  fn: (req: Request, res: Response, next: NextFunction) => Promise<void>,
 ) {
   return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);

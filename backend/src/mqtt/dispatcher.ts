@@ -69,7 +69,7 @@ class MQTTDispatcher {
    */
   private async handleDoorOpened(
     topic: string,
-    payload: Buffer,
+    _payload: Buffer,
   ): Promise<void> {
     const parts = topic.split("/");
     const mqttClientId = parts[1];
@@ -110,7 +110,10 @@ class MQTTDispatcher {
    * Gère le heartbeat d'un appareil
    * Topic: fisheye/{clientId}/heartbeat
    */
-  private async handleHeartbeat(topic: string, payload: Buffer): Promise<void> {
+  private async handleHeartbeat(
+    topic: string,
+    _payload: Buffer,
+  ): Promise<void> {
     const parts = topic.split("/");
     const mqttClientId = parts[1];
 

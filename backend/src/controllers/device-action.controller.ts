@@ -35,6 +35,7 @@ export const teacherSelected = asyncHandler(
 
 export const heartbeat = asyncHandler(async (req: Request, res: Response) => {
   const { type, deviceId } = req.params;
-  await deviceActionService.handleHeartbeat(type as any, deviceId);
+  const deviceType = type as "doorbell" | "buzzer" | "panel";
+  await deviceActionService.handleHeartbeat(deviceType, deviceId);
   res.json({ message: "Heartbeat received" });
 });

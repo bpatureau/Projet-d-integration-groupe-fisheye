@@ -11,14 +11,22 @@ export function validateRequest(
   schema: z.ZodSchema,
   source: "body" | "query" | "params" = "body",
 ) {
-  return async (req: Request, res: Response, next: NextFunction) => {
+  return async (req: Request, _res: Response, next: NextFunction) => {
     try {
       const dataToValidate = req[source];
       const validatedData = await schema.parseAsync(dataToValidate);
 
       if (source === "query" || source === "params") {
         Object.keys(validatedData).forEach((key) => {
-          (req[source] as any)[key] = (validatedData as any)[key];
+          if (
+            typeof validatedData === "object" &&
+            validatedData !== null &&
+            key in validatedData
+          ) {
+            (req[source] as Record<string, unknown>)[key] = (
+              validatedData as Record<string, unknown>
+            )[key];
+          }
         });
       } else {
         req[source] = validatedData;

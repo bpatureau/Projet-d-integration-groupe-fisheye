@@ -8,7 +8,7 @@ export const createPanel = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const getAllPanels = asyncHandler(
-  async (req: Request, res: Response) => {
+  async (_req: Request, res: Response) => {
     const panels = await panelService.findAll();
     res.json({ panels });
   },

@@ -10,7 +10,7 @@ export const createLocation = asyncHandler(
 );
 
 export const getAllLocations = asyncHandler(
-  async (req: Request, res: Response) => {
+  async (_req: Request, res: Response) => {
     const locations = await locationService.findAll();
     res.json({ locations });
   },

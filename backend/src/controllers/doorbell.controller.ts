@@ -10,7 +10,7 @@ export const createDoorbell = asyncHandler(
 );
 
 export const getAllDoorbells = asyncHandler(
-  async (req: Request, res: Response) => {
+  async (_req: Request, res: Response) => {
     const doorbells = await doorbellService.findAll();
     res.json({ doorbells });
   },

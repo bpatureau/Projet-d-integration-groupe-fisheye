@@ -10,7 +10,7 @@ import prisma from "../utils/prisma";
  * Vérifie l'état de santé de l'application
  * Retourne 200 si sain, 503 si en erreur
  */
-export async function checkHealth(req: Request, res: Response) {
+export async function checkHealth(_req: Request, res: Response) {
   const health = {
     status: "ok",
     version,
@@ -21,12 +21,12 @@ export async function checkHealth(req: Request, res: Response) {
   // Vérifie la connexion à la base de données
   try {
     await prisma.ping();
-  } catch (error: any) {
+  } catch (error: unknown) {
     res.status(503).json({
       ...health,
       status: "error",
       db: "disconnected",
-      error: error.message,
+      error: error instanceof Error ? error.message : "Unknown error",
     });
     return;
   }

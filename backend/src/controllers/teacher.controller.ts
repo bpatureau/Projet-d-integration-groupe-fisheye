@@ -11,7 +11,7 @@ export const createTeacher = asyncHandler(
 );
 
 export const getAllTeachers = asyncHandler(
-  async (req: Request, res: Response) => {
+  async (_req: Request, res: Response) => {
     const teachers = await teacherService.findAll();
     res.json({ teachers });
   },

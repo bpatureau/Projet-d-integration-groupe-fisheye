@@ -1,4 +1,4 @@
-import type { Visit, VisitStatus } from "@prisma/client";
+import type { Prisma, Visit, VisitStatus } from "@prisma/client";
 import config from "../config";
 import type { VisitStats } from "../types";
 import { NotFoundError } from "../utils/errors";
@@ -63,7 +63,7 @@ class VisitService {
       limit = 20,
     } = filters || {};
 
-    const where: any = {};
+    const where: Prisma.VisitWhereInput = {};
 
     if (status) {
       where.status = status;
@@ -253,7 +253,7 @@ class VisitService {
     startDate?: Date;
     endDate?: Date;
   }): Promise<VisitStats> {
-    const where: any = {};
+    const where: Prisma.VisitWhereInput = {};
 
     if (filters?.locationId) {
       where.locationId = filters.locationId;
@@ -300,7 +300,10 @@ class VisitService {
     let averageResponseTime: number | undefined;
     if (visits.length > 0) {
       const totalResponseTime = visits.reduce((sum, visit) => {
-        const diff = visit.answeredAt!.getTime() - visit.createdAt.getTime();
+        if (!visit.answeredAt) {
+          return sum;
+        }
+        const diff = visit.answeredAt.getTime() - visit.createdAt.getTime();
         return sum + diff / 1000;
       }, 0);
       averageResponseTime = totalResponseTime / visits.length;

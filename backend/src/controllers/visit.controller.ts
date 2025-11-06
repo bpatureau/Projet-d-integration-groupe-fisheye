@@ -1,18 +1,48 @@
+import type { VisitStatus } from "@prisma/client";
 import type { Request, Response } from "express";
 import { asyncHandler } from "../middleware/error.middleware";
 import visitService from "../services/visit.service";
 
+interface VisitFilters {
+  status?: VisitStatus;
+  locationId?: string;
+  teacherId?: string;
+  startDate?: Date;
+  endDate?: Date;
+  page?: number;
+  limit?: number;
+}
+
 export const getAllVisits = asyncHandler(
   async (req: Request, res: Response) => {
-    const { page, limit, ...otherFilters } = req.query;
+    const { page, limit, status, locationId, teacherId, startDate, endDate } =
+      req.query;
 
-    const filters = {
-      ...otherFilters,
-      ...(page && { page: parseInt(page as string, 10) }),
-      ...(limit && { limit: parseInt(limit as string, 10) }),
-    };
+    const filters: VisitFilters = {};
 
-    const result = await visitService.findAll(filters as any);
+    if (page && typeof page === "string") {
+      filters.page = parseInt(page, 10);
+    }
+    if (limit && typeof limit === "string") {
+      filters.limit = parseInt(limit, 10);
+    }
+    if (status && typeof status === "string") {
+      filters.status = status as VisitStatus;
+    }
+    if (locationId && typeof locationId === "string") {
+      filters.locationId = locationId;
+    }
+    if (teacherId && typeof teacherId === "string") {
+      filters.teacherId = teacherId;
+    }
+    if (startDate && typeof startDate === "string") {
+      filters.startDate = new Date(startDate);
+    }
+    if (endDate && typeof endDate === "string") {
+      filters.endDate = new Date(endDate);
+    }
+
+    const result = await visitService.findAll(filters);
     res.json(result);
   },
 );
@@ -34,7 +64,29 @@ export const deleteVisit = asyncHandler(async (req: Request, res: Response) => {
 
 export const getVisitStats = asyncHandler(
   async (req: Request, res: Response) => {
-    const stats = await visitService.getStats(req.query as any);
+    const { locationId, teacherId, startDate, endDate } = req.query;
+
+    const filters: {
+      locationId?: string;
+      teacherId?: string;
+      startDate?: Date;
+      endDate?: Date;
+    } = {};
+
+    if (locationId && typeof locationId === "string") {
+      filters.locationId = locationId;
+    }
+    if (teacherId && typeof teacherId === "string") {
+      filters.teacherId = teacherId;
+    }
+    if (startDate && typeof startDate === "string") {
+      filters.startDate = new Date(startDate);
+    }
+    if (endDate && typeof endDate === "string") {
+      filters.endDate = new Date(endDate);
+    }
+
+    const stats = await visitService.getStats(filters);
     res.json({ stats });
   },
 );

@@ -1,6 +1,5 @@
 import type { Schedule } from "@prisma/client";
 import logger from "../utils/logger";
-import prismaService from "../utils/prisma";
 import calendarService from "./calendar.service";
 import locationService from "./location.service";
 

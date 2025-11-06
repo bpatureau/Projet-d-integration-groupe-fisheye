@@ -24,7 +24,9 @@ const ENV_SCHEMA: EnvVar[] = [
     required: false,
     default: "8080",
     validate: (v) =>
-      !isNaN(parseInt(v)) && parseInt(v) > 0 && parseInt(v) <= 65535,
+      !Number.isNaN(parseInt(v, 10)) &&
+      parseInt(v, 10) > 0 &&
+      parseInt(v, 10) <= 65535,
     description: "Server port (1-65535)",
   },
 
@@ -115,21 +117,21 @@ const ENV_SCHEMA: EnvVar[] = [
     name: "VISIT_TIMEOUT",
     required: false,
     default: "30",
-    validate: (v) => !isNaN(parseInt(v)) && parseInt(v) > 0,
+    validate: (v) => !Number.isNaN(parseInt(v, 10)) && parseInt(v, 10) > 0,
     description: "Visit timeout in seconds",
   },
   {
     name: "MANUAL_STATUS_TIMEOUT",
     required: false,
     default: "7200",
-    validate: (v) => !isNaN(parseInt(v)) && parseInt(v) > 0,
+    validate: (v) => !Number.isNaN(parseInt(v, 10)) && parseInt(v, 10) > 0,
     description: "Manual status timeout in seconds",
   },
   {
     name: "MANUAL_DND_TIMEOUT",
     required: false,
     default: "14400",
-    validate: (v) => !isNaN(parseInt(v)) && parseInt(v) > 0,
+    validate: (v) => !Number.isNaN(parseInt(v, 10)) && parseInt(v, 10) > 0,
     description: "Manual DND timeout in seconds",
   },
 
@@ -138,14 +140,14 @@ const ENV_SCHEMA: EnvVar[] = [
     name: "CALENDAR_SYNC_INTERVAL",
     required: false,
     default: "5",
-    validate: (v) => !isNaN(parseInt(v)) && parseInt(v) > 0,
+    validate: (v) => !Number.isNaN(parseInt(v, 10)) && parseInt(v, 10) > 0,
     description: "Calendar sync interval in minutes",
   },
   {
     name: "DEVICE_OFFLINE_THRESHOLD",
     required: false,
     default: "10",
-    validate: (v) => !isNaN(parseInt(v)) && parseInt(v) > 0,
+    validate: (v) => !Number.isNaN(parseInt(v, 10)) && parseInt(v, 10) > 0,
     description: "Device offline threshold in minutes",
   },
 ];
@@ -233,12 +235,16 @@ export function validateEnv(): ValidationResult {
 export function printValidationResult(result: ValidationResult): void {
   if (result.errors.length > 0) {
     console.error("\n❌ Environment Validation Errors:");
-    result.errors.forEach((error) => console.error(`  • ${error}`));
+    result.errors.forEach((error) => {
+      console.error(`  • ${error}`);
+    });
   }
 
   if (result.warnings.length > 0) {
     console.warn("\n⚠️  Environment Validation Warnings:");
-    result.warnings.forEach((warning) => console.warn(`  • ${warning}`));
+    result.warnings.forEach((warning) => {
+      console.warn(`  • ${warning}`);
+    });
   }
 
   if (result.valid && result.warnings.length === 0) {

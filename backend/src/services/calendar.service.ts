@@ -1,12 +1,25 @@
+import fs from "node:fs";
 import type { Schedule } from "@prisma/client";
-import fs from "fs";
-import { google } from "googleapis";
+import { type calendar_v3, google } from "googleapis";
 import config from "../config";
 import logger from "../utils/logger";
 import prismaService from "../utils/prisma";
 
+interface ScheduleData {
+  calendarId: string;
+  locationId: string;
+  eventId: string;
+  teacherEmail: string;
+  summary: string;
+  description: string | undefined;
+  startTime: Date;
+  endTime: Date;
+  allDay: boolean;
+  lastSync: Date;
+}
+
 class CalendarService {
-  private calendar: any;
+  private calendar: calendar_v3.Calendar | null = null;
   private isInitialized = false;
 
   async initialize(): Promise<void> {
@@ -41,7 +54,7 @@ class CalendarService {
     locationId: string,
     calendarId: string,
   ): Promise<void> {
-    if (!this.isInitialized) {
+    if (!this.isInitialized || !this.calendar) {
       throw new Error("Calendar service not initialized");
     }
 
@@ -66,12 +79,12 @@ class CalendarService {
 
       for (const event of events) {
         const teacherEmail = this.extractTeacherEmail(event);
-        if (!teacherEmail) continue;
+        if (!teacherEmail || !event.id) continue;
 
-        const schedule: Partial<Schedule> = {
+        const schedule: ScheduleData = {
           calendarId,
           locationId,
-          eventId: event.id!,
+          eventId: event.id,
           teacherEmail,
           summary: event.summary || "No Title",
           description: event.description || "",
@@ -98,9 +111,9 @@ class CalendarService {
     }
   }
 
-  private extractTeacherEmail(event: any): string | null {
+  private extractTeacherEmail(event: calendar_v3.Schema$Event): string | null {
     if (event.attendees && event.attendees.length > 0) {
-      return event.attendees[0].email;
+      return event.attendees[0].email || null;
     }
     if (event.creator?.email) {
       return event.creator.email;
@@ -111,29 +124,29 @@ class CalendarService {
     return null;
   }
 
-  private async upsertSchedule(schedule: Partial<Schedule>): Promise<void> {
+  private async upsertSchedule(schedule: ScheduleData): Promise<void> {
     await prismaService.client.schedule.upsert({
-      where: { eventId: schedule.eventId! },
+      where: { eventId: schedule.eventId },
       update: {
-        teacherEmail: schedule.teacherEmail!,
-        summary: schedule.summary!,
+        teacherEmail: schedule.teacherEmail,
+        summary: schedule.summary,
         description: schedule.description,
-        startTime: schedule.startTime!,
-        endTime: schedule.endTime!,
-        allDay: schedule.allDay!,
-        lastSync: schedule.lastSync!,
+        startTime: schedule.startTime,
+        endTime: schedule.endTime,
+        allDay: schedule.allDay,
+        lastSync: schedule.lastSync,
       },
       create: {
-        calendarId: schedule.calendarId!,
-        locationId: schedule.locationId!,
-        eventId: schedule.eventId!,
-        teacherEmail: schedule.teacherEmail!,
-        summary: schedule.summary!,
+        calendarId: schedule.calendarId,
+        locationId: schedule.locationId,
+        eventId: schedule.eventId,
+        teacherEmail: schedule.teacherEmail,
+        summary: schedule.summary,
         description: schedule.description,
-        startTime: schedule.startTime!,
-        endTime: schedule.endTime!,
-        allDay: schedule.allDay!,
-        lastSync: schedule.lastSync!,
+        startTime: schedule.startTime,
+        endTime: schedule.endTime,
+        allDay: schedule.allDay,
+        lastSync: schedule.lastSync,
       },
     });
   }

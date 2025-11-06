@@ -57,7 +57,7 @@ export function parseMqttPayload<T>(
 
     // Valide avec le schéma
     return schema.parse(data);
-  } catch (error) {
+  } catch (_error) {
     return null;
   }
 }

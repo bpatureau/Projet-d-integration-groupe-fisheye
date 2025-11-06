@@ -1,4 +1,4 @@
-import type { Location, Teacher, Visit } from "@prisma/client";
+import type { Doorbell, Location, Teacher, Visit } from "@prisma/client";
 import axios from "axios";
 import { DEVICE_CONFIGS } from "../config/devices.config";
 import type { NotifiedTeacher, TeacherPreferences } from "../types";
@@ -11,7 +11,7 @@ class NotificationService {
    * Notifie les enseignants lors d'une sonnerie (sonnette + Teams + buzzers)
    */
   async notifyTeachersOfRing(
-    visit: Visit & { doorbell: any; location: Location },
+    visit: Visit & { doorbell: Doorbell; location: Location },
     teachers: Teacher[],
   ): Promise<NotifiedTeacher[]> {
     logger.info(`Notifying ${teachers.length} teachers for visit`, {

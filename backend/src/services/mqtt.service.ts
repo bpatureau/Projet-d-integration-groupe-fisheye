@@ -81,7 +81,7 @@ class MQTTService {
 
   async publish(
     topic: string,
-    payload: any,
+    payload: string | object,
     options: { qos?: 0 | 1 | 2; retained?: boolean } = {},
   ): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -122,14 +122,14 @@ class MQTTService {
    */
   async publishWithRetry(
     topic: string,
-    payload: any,
+    payload: string | object,
     maxRetries: number = 3,
   ): Promise<boolean> {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         await this.publish(topic, payload);
         return true;
-      } catch (error) {
+      } catch (_error) {
         logger.warn(`MQTT publish attempt ${attempt} failed`, {
           component: "MQTTService",
           topic,

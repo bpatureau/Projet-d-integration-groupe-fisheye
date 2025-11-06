@@ -10,7 +10,7 @@ export const createBuzzer = asyncHandler(
 );
 
 export const getAllBuzzers = asyncHandler(
-  async (req: Request, res: Response) => {
+  async (_req: Request, res: Response) => {
     const buzzers = await buzzerService.findAll();
     res.json({ buzzers });
   },

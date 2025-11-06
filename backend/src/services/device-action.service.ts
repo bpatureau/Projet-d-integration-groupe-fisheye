@@ -1,4 +1,10 @@
-import type { Doorbell, LEDPanel, Teacher, Visit } from "@prisma/client";
+import type {
+  Buzzer,
+  Doorbell,
+  LEDPanel,
+  Teacher,
+  Visit,
+} from "@prisma/client";
 import { DEVICE_CONFIGS } from "../config/devices.config";
 import { NotFoundError, ValidationError } from "../utils/errors";
 import logger from "../utils/logger";
@@ -197,7 +203,7 @@ class DeviceActionService {
       return Array(5).fill(Array(4).fill(false));
     }
 
-    const config = DEVICE_CONFIGS.ledPanel;
+    const _config = DEVICE_CONFIGS.ledPanel;
     const now = new Date();
 
     const startOfWeek = new Date(now);
@@ -257,7 +263,7 @@ class DeviceActionService {
     deviceType: "doorbell" | "buzzer" | "panel",
     deviceId: string,
   ): Promise<void> {
-    let device: Doorbell | any | LEDPanel | null = null;
+    let device: Doorbell | Buzzer | LEDPanel | null = null;
 
     switch (deviceType) {
       case "doorbell":

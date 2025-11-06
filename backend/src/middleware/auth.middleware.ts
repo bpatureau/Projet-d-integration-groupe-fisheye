@@ -4,6 +4,10 @@ import config from "../config";
 import type { AuthRequest } from "../types";
 import prismaService from "../utils/prisma";
 
+interface JwtPayload {
+  teacherId: string;
+}
+
 export async function authenticate(
   req: AuthRequest,
   res: Response,
@@ -16,7 +20,7 @@ export async function authenticate(
       return res.status(401).json({ error: "Authentication required" });
     }
 
-    const decoded = jwt.verify(token, config.jwt.secret) as any;
+    const decoded = jwt.verify(token, config.jwt.secret) as JwtPayload;
     const teacher = await prismaService.client.teacher.findUnique({
       where: { id: decoded.teacherId },
     });
@@ -27,14 +31,14 @@ export async function authenticate(
 
     req.teacher = teacher;
     next();
-  } catch (error) {
+  } catch (_error) {
     return res.status(401).json({ error: "Invalid or expired token" });
   }
 }
 
 function extractToken(req: AuthRequest): string | null {
   const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith("Bearer ")) {
+  if (authHeader?.startsWith("Bearer ")) {
     return authHeader.substring(7);
   }
 

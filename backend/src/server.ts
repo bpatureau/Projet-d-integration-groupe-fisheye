@@ -1,7 +1,7 @@
+import http from "node:http";
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";
-import http from "http";
 import config from "./config";
 import { errorHandler, notFoundHandler } from "./middleware/error.middleware";
 import mqttDispatcher from "./mqtt/dispatcher";

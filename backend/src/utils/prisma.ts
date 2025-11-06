@@ -23,16 +23,22 @@ class PrismaService {
     });
 
     // Journalise les requêtes en mode debug
-    this.prisma.$on("query" as never, (e: any) => {
+    this.prisma.$on("query" as never, (e: unknown) => {
       logger.debug("Query executed", {
         component: "prisma",
-        duration: e.duration,
-        query: e.query,
+        duration:
+          typeof e === "object" && e !== null && "duration" in e
+            ? e.duration
+            : undefined,
+        query:
+          typeof e === "object" && e !== null && "query" in e
+            ? e.query
+            : undefined,
       });
     });
 
     // Journalise les erreurs
-    this.prisma.$on("error" as never, (e: any) => {
+    this.prisma.$on("error" as never, (e: unknown) => {
       logger.error("Prisma error", {
         component: "prisma",
         error: e,
@@ -40,10 +46,13 @@ class PrismaService {
     });
 
     // Journalise les avertissements
-    this.prisma.$on("warn" as never, (e: any) => {
+    this.prisma.$on("warn" as never, (e: unknown) => {
       logger.warn("Prisma warning", {
         component: "prisma",
-        message: e.message,
+        message:
+          typeof e === "object" && e !== null && "message" in e
+            ? e.message
+            : undefined,
       });
     });
   }

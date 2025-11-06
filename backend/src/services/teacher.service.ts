@@ -36,10 +36,11 @@ class TeacherService {
         name: data.name,
         gmailEmail: data.gmailEmail,
         teamsEmail: data.teamsEmail,
-        preferences: (data.preferences || {
-          notifyOnTeams: true,
-          buzzerEnabled: true,
-        }) as any,
+        preferences: (data.preferences ||
+          ({
+            notifyOnTeams: true,
+            buzzerEnabled: true,
+          } as TeacherPreferences)) as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -90,9 +91,23 @@ class TeacherService {
   ): Promise<Teacher> {
     await this.findById(id);
 
-    const updateData: any = { ...data };
-    if (updateData.preferences) {
-      updateData.preferences = updateData.preferences as any;
+    const updateData: {
+      username?: string;
+      email?: string;
+      name?: string;
+      gmailEmail?: string;
+      teamsEmail?: string;
+      preferences?: Prisma.InputJsonValue;
+    } = {
+      username: data.username,
+      email: data.email,
+      name: data.name,
+      gmailEmail: data.gmailEmail,
+      teamsEmail: data.teamsEmail,
+    };
+    if (data.preferences) {
+      updateData.preferences =
+        data.preferences as unknown as Prisma.InputJsonValue;
     }
 
     const teacher = await prismaService.client.teacher.update({
@@ -136,7 +151,7 @@ class TeacherService {
 
     const updated = await prismaService.client.teacher.update({
       where: { id },
-      data: { preferences: updatedPrefs as any },
+      data: { preferences: updatedPrefs as Prisma.InputJsonValue },
     });
 
     logger.info("Teacher preferences updated", { teacherId: id });
@@ -151,7 +166,7 @@ class TeacherService {
 
     const teacher = await prismaService.client.teacher.update({
       where: { id },
-      data: { manualStatus: status as any },
+      data: { manualStatus: status as unknown as Prisma.InputJsonValue },
     });
 
     logger.info("Teacher manual status set", {
