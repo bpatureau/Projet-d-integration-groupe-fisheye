@@ -1,8 +1,8 @@
-import { google } from "googleapis";
+import type { Schedule } from "@prisma/client";
 import fs from "fs";
+import { google } from "googleapis";
 import config from "../config";
 import logger from "../utils/logger";
-import { Schedule } from "@prisma/client";
 import prismaService from "../utils/prisma";
 
 class CalendarService {
@@ -37,7 +37,10 @@ class CalendarService {
   /**
    * Synchronise un calendrier Google pour un lieu (récupère et stocke les événements)
    */
-  async syncCalendarForLocation(locationId: string, calendarId: string): Promise<void> {
+  async syncCalendarForLocation(
+    locationId: string,
+    calendarId: string,
+  ): Promise<void> {
     if (!this.isInitialized) {
       throw new Error("Calendar service not initialized");
     }
@@ -58,7 +61,7 @@ class CalendarService {
       const events = response.data.items || [];
       logger.info(
         `Fetched ${events.length} events from calendar ${calendarId}`,
-        { component: "calendar" }
+        { component: "calendar" },
       );
 
       for (const event of events) {
@@ -73,7 +76,7 @@ class CalendarService {
           summary: event.summary || "No Title",
           description: event.description || "",
           startTime: new Date(
-            event.start?.dateTime || event.start?.date || now
+            event.start?.dateTime || event.start?.date || now,
           ),
           endTime: new Date(event.end?.dateTime || event.end?.date || now),
           allDay: !event.start?.dateTime,
@@ -141,7 +144,7 @@ class CalendarService {
   async getTeacherSchedule(
     teacherEmail: string,
     startTime: Date,
-    endTime: Date
+    endTime: Date,
   ): Promise<Schedule[]> {
     return prismaService.client.schedule.findMany({
       where: {

@@ -1,19 +1,21 @@
-import { Request, Response } from "express";
-import visitService from "../services/visit.service";
+import type { Request, Response } from "express";
 import { asyncHandler } from "../middleware/error.middleware";
+import visitService from "../services/visit.service";
 
-export const getAllVisits = asyncHandler(async (req: Request, res: Response) => {
-  const { page, limit, ...otherFilters } = req.query;
+export const getAllVisits = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { page, limit, ...otherFilters } = req.query;
 
-  const filters = {
-    ...otherFilters,
-    ...(page && { page: parseInt(page as string, 10) }),
-    ...(limit && { limit: parseInt(limit as string, 10) }),
-  };
+    const filters = {
+      ...otherFilters,
+      ...(page && { page: parseInt(page as string, 10) }),
+      ...(limit && { limit: parseInt(limit as string, 10) }),
+    };
 
-  const result = await visitService.findAll(filters as any);
-  res.json(result);
-});
+    const result = await visitService.findAll(filters as any);
+    res.json(result);
+  },
+);
 
 export const getVisit = asyncHandler(async (req: Request, res: Response) => {
   const visit = await visitService.findById(req.params.id);
@@ -30,7 +32,9 @@ export const deleteVisit = asyncHandler(async (req: Request, res: Response) => {
   res.status(204).send();
 });
 
-export const getVisitStats = asyncHandler(async (req: Request, res: Response) => {
-  const stats = await visitService.getStats(req.query as any);
-  res.json({ stats });
-});
+export const getVisitStats = asyncHandler(
+  async (req: Request, res: Response) => {
+    const stats = await visitService.getStats(req.query as any);
+    res.json({ stats });
+  },
+);

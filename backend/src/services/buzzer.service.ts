@@ -1,7 +1,7 @@
-import { Buzzer } from "@prisma/client";
-import prismaService from "../utils/prisma";
-import { NotFoundError, ConflictError } from "../utils/errors";
+import type { Buzzer } from "@prisma/client";
+import { ConflictError, NotFoundError } from "../utils/errors";
 import logger from "../utils/logger";
+import prismaService from "../utils/prisma";
 
 class BuzzerService {
   async create(data: {
@@ -81,7 +81,7 @@ class BuzzerService {
       deviceId?: string;
       mqttClientId?: string;
       teacherId?: string;
-    }
+    },
   ): Promise<Buzzer> {
     await this.findById(id);
 

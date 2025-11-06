@@ -1,13 +1,13 @@
-import { Response, NextFunction } from "express";
+import type { NextFunction, Response } from "express";
 import jwt from "jsonwebtoken";
-import { AuthRequest } from "../types";
 import config from "../config";
+import type { AuthRequest } from "../types";
 import prismaService from "../utils/prisma";
 
 export async function authenticate(
   req: AuthRequest,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) {
   try {
     const token = extractToken(req);

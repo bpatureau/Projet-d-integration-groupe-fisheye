@@ -1,9 +1,9 @@
-import { Teacher, Prisma } from "@prisma/client";
-import prismaService from "../utils/prisma";
-import { hashPassword } from "../utils/password";
-import { NotFoundError, ConflictError } from "../utils/errors";
+import { Prisma, type Teacher } from "@prisma/client";
+import type { ManualStatus, TeacherPreferences } from "../types";
+import { ConflictError, NotFoundError } from "../utils/errors";
 import logger from "../utils/logger";
-import { TeacherPreferences, ManualStatus } from "../types";
+import { hashPassword } from "../utils/password";
+import prismaService from "../utils/prisma";
 
 class TeacherService {
   async create(data: {
@@ -86,7 +86,7 @@ class TeacherService {
       gmailEmail?: string;
       teamsEmail?: string;
       preferences?: TeacherPreferences;
-    }
+    },
   ): Promise<Teacher> {
     await this.findById(id);
 
@@ -119,14 +119,15 @@ class TeacherService {
 
   async updatePreferences(
     id: string,
-    preferences: Partial<TeacherPreferences>
+    preferences: Partial<TeacherPreferences>,
   ): Promise<Teacher> {
     const teacher = await this.findById(id);
 
-    const currentPrefs = (teacher.preferences as unknown as TeacherPreferences) || {
-      notifyOnTeams: true,
-      buzzerEnabled: true,
-    };
+    const currentPrefs =
+      (teacher.preferences as unknown as TeacherPreferences) || {
+        notifyOnTeams: true,
+        buzzerEnabled: true,
+      };
 
     const updatedPrefs = {
       ...currentPrefs,
@@ -145,10 +146,7 @@ class TeacherService {
   /**
    * Définit un statut de présence manuel pour un enseignant
    */
-  async setManualStatus(
-    id: string,
-    status: ManualStatus
-  ): Promise<Teacher> {
+  async setManualStatus(id: string, status: ManualStatus): Promise<Teacher> {
     await this.findById(id);
 
     const teacher = await prismaService.client.teacher.update({
@@ -156,7 +154,10 @@ class TeacherService {
       data: { manualStatus: status as any },
     });
 
-    logger.info("Teacher manual status set", { teacherId: id, status: status.status });
+    logger.info("Teacher manual status set", {
+      teacherId: id,
+      status: status.status,
+    });
     return teacher;
   }
 
@@ -191,10 +192,11 @@ class TeacherService {
   async getLocations(teacherId: string) {
     await this.findById(teacherId);
 
-    const teacherLocations = await prismaService.client.teacherLocation.findMany({
-      where: { teacherId },
-      include: { location: true },
-    });
+    const teacherLocations =
+      await prismaService.client.teacherLocation.findMany({
+        where: { teacherId },
+        include: { location: true },
+      });
 
     return teacherLocations.map((tl) => tl.location);
   }

@@ -1,19 +1,19 @@
-import { Request } from "express";
-import { Teacher as PrismaTeacher } from "@prisma/client";
+import type { Teacher as PrismaTeacher } from "@prisma/client";
+import type { Request } from "express";
 
 // ========================================
 // RE-EXPORT PRISMA TYPES
 // ========================================
 
 export type {
+  Buzzer,
+  Doorbell,
+  LEDPanel,
   Location,
+  Schedule,
   Teacher,
   TeacherLocation,
-  Doorbell,
-  Buzzer,
-  LEDPanel,
   Visit,
-  Schedule,
   VisitStatus,
 } from "@prisma/client";
 

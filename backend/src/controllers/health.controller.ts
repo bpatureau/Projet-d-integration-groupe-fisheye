@@ -2,9 +2,9 @@
  * Contrôleur de vérification de santé de l'application
  */
 
-import { Request, Response } from "express";
-import prisma from "../utils/prisma";
+import type { Request, Response } from "express";
 import { version } from "../../package.json";
+import prisma from "../utils/prisma";
 
 /**
  * Vérifie l'état de santé de l'application

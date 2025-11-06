@@ -23,7 +23,8 @@ const ENV_SCHEMA: EnvVar[] = [
     name: "SERVER_PORT",
     required: false,
     default: "8080",
-    validate: (v) => !isNaN(parseInt(v)) && parseInt(v) > 0 && parseInt(v) <= 65535,
+    validate: (v) =>
+      !isNaN(parseInt(v)) && parseInt(v) > 0 && parseInt(v) <= 65535,
     description: "Server port (1-65535)",
   },
 
@@ -31,7 +32,8 @@ const ENV_SCHEMA: EnvVar[] = [
   {
     name: "DATABASE_URL",
     required: true,
-    validate: (v) => v.startsWith("postgresql://") || v.startsWith("postgres://"),
+    validate: (v) =>
+      v.startsWith("postgresql://") || v.startsWith("postgres://"),
     description: "PostgreSQL connection string",
   },
 
@@ -94,7 +96,9 @@ const ENV_SCHEMA: EnvVar[] = [
     required: false,
     default: "info",
     validate: (v) =>
-      ["error", "warn", "info", "http", "verbose", "debug", "silly"].includes(v),
+      ["error", "warn", "info", "http", "verbose", "debug", "silly"].includes(
+        v,
+      ),
     description: "Winston log level",
   },
 
@@ -166,7 +170,7 @@ export function validateEnv(): ValidationResult {
     // Vérifie les variables requises
     if (envVar.required && !value) {
       errors.push(
-        `Missing required environment variable: ${envVar.name} - ${envVar.description}`
+        `Missing required environment variable: ${envVar.name} - ${envVar.description}`,
       );
       continue;
     }
@@ -185,7 +189,7 @@ export function validateEnv(): ValidationResult {
     // Exécute la validation personnalisée
     if (envVar.validate && !envVar.validate(value)) {
       errors.push(
-        `Invalid value for ${envVar.name}: "${value}" - ${envVar.description}`
+        `Invalid value for ${envVar.name}: "${value}" - ${envVar.description}`,
       );
     }
   }
@@ -194,13 +198,13 @@ export function validateEnv(): ValidationResult {
   if (process.env.NODE_ENV === "production") {
     if (process.env.CORS_ALLOWED_ORIGINS === "*") {
       warnings.push(
-        "CORS_ALLOWED_ORIGINS is set to '*' in production. Consider restricting to specific origins."
+        "CORS_ALLOWED_ORIGINS is set to '*' in production. Consider restricting to specific origins.",
       );
     }
 
     if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 64) {
       warnings.push(
-        "JWT_SECRET is shorter than recommended 64 characters for production use."
+        "JWT_SECRET is shorter than recommended 64 characters for production use.",
       );
     }
 
@@ -210,7 +214,7 @@ export function validateEnv(): ValidationResult {
         process.env.MQTT_BROKER.startsWith("tcp://"))
     ) {
       warnings.push(
-        "MQTT_BROKER is using unencrypted connection in production. Consider using mqtts:// or tls://"
+        "MQTT_BROKER is using unencrypted connection in production. Consider using mqtts:// or tls://",
       );
     }
   }
@@ -252,7 +256,7 @@ export function validateEnvOrExit(): void {
 
   if (!result.valid) {
     console.error(
-      "\n💥 Application cannot start due to invalid environment configuration.\n"
+      "\n💥 Application cannot start due to invalid environment configuration.\n",
     );
     process.exit(1);
   }

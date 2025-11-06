@@ -1,7 +1,7 @@
-import { Location } from "@prisma/client";
-import prismaService from "../utils/prisma";
-import { NotFoundError, ConflictError } from "../utils/errors";
+import type { Location } from "@prisma/client";
+import { ConflictError, NotFoundError } from "../utils/errors";
 import logger from "../utils/logger";
+import prismaService from "../utils/prisma";
 
 class LocationService {
   async create(data: {
@@ -43,7 +43,7 @@ class LocationService {
       description?: string;
       calendarId?: string;
       teamsWebhookUrl?: string;
-    }
+    },
   ): Promise<Location> {
     await this.findById(id);
 
@@ -69,10 +69,11 @@ class LocationService {
   async getTeachers(locationId: string) {
     await this.findById(locationId);
 
-    const teacherLocations = await prismaService.client.teacherLocation.findMany({
-      where: { locationId },
-      include: { teacher: true },
-    });
+    const teacherLocations =
+      await prismaService.client.teacherLocation.findMany({
+        where: { locationId },
+        include: { teacher: true },
+      });
 
     return teacherLocations.map((tl) => tl.teacher);
   }
@@ -110,14 +111,15 @@ class LocationService {
    * Dissocie un enseignant d'un lieu
    */
   async removeTeacher(locationId: string, teacherId: string): Promise<void> {
-    const teacherLocation = await prismaService.client.teacherLocation.findUnique({
-      where: {
-        teacherId_locationId: {
-          teacherId,
-          locationId,
+    const teacherLocation =
+      await prismaService.client.teacherLocation.findUnique({
+        where: {
+          teacherId_locationId: {
+            teacherId,
+            locationId,
+          },
         },
-      },
-    });
+      });
 
     if (!teacherLocation) {
       throw new NotFoundError("Teacher not associated with this location");

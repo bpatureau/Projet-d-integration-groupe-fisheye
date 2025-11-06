@@ -1,8 +1,8 @@
-import { Schedule } from "@prisma/client";
+import type { Schedule } from "@prisma/client";
+import logger from "../utils/logger";
 import prismaService from "../utils/prisma";
 import calendarService from "./calendar.service";
 import locationService from "./location.service";
-import logger from "../utils/logger";
 
 class ScheduleService {
   /**
@@ -16,7 +16,10 @@ class ScheduleService {
       return 0;
     }
 
-    await calendarService.syncCalendarForLocation(locationId, location.calendarId);
+    await calendarService.syncCalendarForLocation(
+      locationId,
+      location.calendarId,
+    );
 
     const schedules = await calendarService.getSchedulesForLocation(locationId);
     logger.info("Synced schedules for location", {

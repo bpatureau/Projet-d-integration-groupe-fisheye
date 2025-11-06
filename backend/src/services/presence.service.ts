@@ -1,7 +1,7 @@
-import { Teacher } from "@prisma/client";
+import type { Teacher } from "@prisma/client";
+import type { ManualStatus, PresentTeacher } from "../types";
 import prismaService from "../utils/prisma";
 import calendarService from "./calendar.service";
-import { ManualStatus, PresentTeacher } from "../types";
 
 class PresenceService {
   /**
@@ -9,18 +9,20 @@ class PresenceService {
    */
   async getPresentTeachersInLocation(
     locationId: string,
-    now: Date = new Date()
+    now: Date = new Date(),
   ): Promise<PresentTeacher[]> {
     // Récupère tous les enseignants associés à ce lieu
-    const teacherLocations = await prismaService.client.teacherLocation.findMany({
-      where: { locationId },
-      include: { teacher: true },
-    });
+    const teacherLocations =
+      await prismaService.client.teacherLocation.findMany({
+        where: { locationId },
+        include: { teacher: true },
+      });
 
     const teachers = teacherLocations.map((tl) => tl.teacher);
 
     // Récupère la présence basée sur le calendrier
-    const calendarPresentEmails = await calendarService.getPresentTeacherEmails(now);
+    const calendarPresentEmails =
+      await calendarService.getPresentTeacherEmails(now);
 
     // Détermine la présence de chaque enseignant
     const presentTeachers: PresentTeacher[] = teachers.map((teacher) => {
@@ -70,9 +72,12 @@ class PresenceService {
 
   async getOnlyPresentTeachers(
     locationId: string,
-    now: Date = new Date()
+    now: Date = new Date(),
   ): Promise<Teacher[]> {
-    const presentTeachers = await this.getPresentTeachersInLocation(locationId, now);
+    const presentTeachers = await this.getPresentTeachersInLocation(
+      locationId,
+      now,
+    );
 
     const presentIds = presentTeachers
       .filter((pt) => pt.isPresent)
@@ -93,9 +98,12 @@ class PresenceService {
   async isTeacherPresent(
     teacherId: string,
     locationId: string,
-    now: Date = new Date()
+    now: Date = new Date(),
   ): Promise<boolean> {
-    const presentTeachers = await this.getPresentTeachersInLocation(locationId, now);
+    const presentTeachers = await this.getPresentTeachersInLocation(
+      locationId,
+      now,
+    );
     const teacher = presentTeachers.find((pt) => pt.id === teacherId);
     return teacher ? teacher.isPresent : false;
   }

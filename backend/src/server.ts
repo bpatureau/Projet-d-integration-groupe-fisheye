@@ -1,17 +1,17 @@
-import express from "express";
-import http from "http";
 import cors from "cors";
+import express from "express";
 import helmet from "helmet";
+import http from "http";
 import config from "./config";
-import logger from "./utils/logger";
-import prismaService from "./utils/prisma";
-import mqttService from "./services/mqtt.service";
-import calendarService from "./services/calendar.service";
-import mqttDispatcher from "./mqtt/dispatcher";
-import visitAutoMissScheduler from "./schedulers/visit-auto-miss.scheduler";
-import routes from "./routes";
 import { errorHandler, notFoundHandler } from "./middleware/error.middleware";
-import { hashPassword, generatePassword } from "./utils/password";
+import mqttDispatcher from "./mqtt/dispatcher";
+import routes from "./routes";
+import visitAutoMissScheduler from "./schedulers/visit-auto-miss.scheduler";
+import calendarService from "./services/calendar.service";
+import mqttService from "./services/mqtt.service";
+import logger from "./utils/logger";
+import { generatePassword, hashPassword } from "./utils/password";
+import prismaService from "./utils/prisma";
 
 class Server {
   private app: express.Application;
@@ -34,7 +34,7 @@ class Server {
           ? "*"
           : config.cors.allowedOrigins,
         credentials: true,
-      })
+      }),
     );
 
     this.app.use(express.json({ limit: "10mb" }));
@@ -108,7 +108,7 @@ class Server {
         logger.info(`Username: admin`);
         logger.info(`Temporary Password: ${password}`);
         logger.info(
-          "IMPORTANT: Please change this password immediately after first login!"
+          "IMPORTANT: Please change this password immediately after first login!",
         );
         logger.info("========================================");
       } else {
@@ -124,7 +124,7 @@ class Server {
 
     this.server.listen(config.server.port, config.server.host, () => {
       logger.info(
-        `Server listening on ${config.server.host}:${config.server.port}`
+        `Server listening on ${config.server.host}:${config.server.port}`,
       );
     });
 

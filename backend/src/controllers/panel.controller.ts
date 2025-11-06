@@ -1,16 +1,18 @@
-import { Request, Response } from "express";
-import panelService from "../services/panel.service";
+import type { Request, Response } from "express";
 import { asyncHandler } from "../middleware/error.middleware";
+import panelService from "../services/panel.service";
 
 export const createPanel = asyncHandler(async (req: Request, res: Response) => {
   const panel = await panelService.create(req.body);
   res.status(201).json({ panel });
 });
 
-export const getAllPanels = asyncHandler(async (req: Request, res: Response) => {
-  const panels = await panelService.findAll();
-  res.json({ panels });
-});
+export const getAllPanels = asyncHandler(
+  async (req: Request, res: Response) => {
+    const panels = await panelService.findAll();
+    res.json({ panels });
+  },
+);
 
 export const getPanel = asyncHandler(async (req: Request, res: Response) => {
   const panel = await panelService.findById(req.params.id);

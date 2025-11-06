@@ -1,6 +1,6 @@
-import { Request, Response } from "express";
-import authService from "../services/auth.service";
+import type { Request, Response } from "express";
 import { asyncHandler } from "../middleware/error.middleware";
+import authService from "../services/auth.service";
 import logger from "../utils/logger";
 
 /**

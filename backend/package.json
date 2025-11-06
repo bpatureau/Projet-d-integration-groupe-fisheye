@@ -11,7 +11,10 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:reset": "prisma migrate reset",
     "prisma:studio": "prisma studio",
-    "lint": "eslint src --ext .ts"
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "format:check": "biome format ."
   },
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",
@@ -32,15 +35,13 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.3.4",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.10.0",
     "@types/node-cron": "^3.0.11",
     "@types/pg": "^8.15.5",
-    "@typescript-eslint/eslint-plugin": "^8.46.1",
-    "@typescript-eslint/parser": "^8.46.1",
-    "eslint": "^9.38.0",
     "prisma": "^6.18.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"

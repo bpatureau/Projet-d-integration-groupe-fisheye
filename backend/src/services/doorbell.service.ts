@@ -1,7 +1,7 @@
-import { Doorbell } from "@prisma/client";
-import prismaService from "../utils/prisma";
-import { NotFoundError, ConflictError } from "../utils/errors";
+import type { Doorbell } from "@prisma/client";
+import { ConflictError, NotFoundError } from "../utils/errors";
 import logger from "../utils/logger";
+import prismaService from "../utils/prisma";
 
 class DoorbellService {
   async create(data: {
@@ -87,7 +87,7 @@ class DoorbellService {
       mqttClientId?: string;
       locationId?: string;
       hasDoorSensor?: boolean;
-    }
+    },
   ): Promise<Doorbell> {
     await this.findById(id);
 

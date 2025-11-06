@@ -1,6 +1,6 @@
-import { Request, Response, NextFunction } from "express";
+import type { NextFunction, Request, Response } from "express";
+import { AppError, isOperationalError, ValidationError } from "../utils/errors";
 import logger from "../utils/logger";
-import { AppError, ValidationError, isOperationalError } from "../utils/errors";
 
 /**
  * Middleware global de gestion des erreurs
@@ -10,7 +10,7 @@ export function errorHandler(
   err: any,
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) {
   let statusCode = 500;
   let message = "Internal server error";
@@ -128,7 +128,7 @@ export function notFoundHandler(req: Request, res: Response) {
  * Wrapper pour capturer les erreurs des gestionnaires de routes asynchrones
  */
 export function asyncHandler(
-  fn: (req: Request, res: Response, next: NextFunction) => Promise<any>
+  fn: (req: Request, res: Response, next: NextFunction) => Promise<any>,
 ) {
   return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);

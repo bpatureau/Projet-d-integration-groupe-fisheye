@@ -11,7 +11,7 @@ export class AppError extends Error {
     public message: string,
     public statusCode: number = 500,
     public isOperational: boolean = true,
-    public context?: Record<string, any>
+    public context?: Record<string, any>,
   ) {
     super(message);
     this.name = this.constructor.name;
@@ -34,7 +34,7 @@ export class BadRequestError extends AppError {
 export class UnauthorizedError extends AppError {
   constructor(
     message: string = "Authentication required",
-    context?: Record<string, any>
+    context?: Record<string, any>,
   ) {
     super(message, 401, true, context);
   }
@@ -46,7 +46,7 @@ export class UnauthorizedError extends AppError {
 export class ForbiddenError extends AppError {
   constructor(
     message: string = "Insufficient permissions",
-    context?: Record<string, any>
+    context?: Record<string, any>,
   ) {
     super(message, 403, true, context);
   }
@@ -58,7 +58,7 @@ export class ForbiddenError extends AppError {
 export class NotFoundError extends AppError {
   constructor(
     message: string = "Resource not found",
-    context?: Record<string, any>
+    context?: Record<string, any>,
   ) {
     super(message, 404, true, context);
   }
@@ -70,7 +70,7 @@ export class NotFoundError extends AppError {
 export class ConflictError extends AppError {
   constructor(
     message: string = "Resource conflict",
-    context?: Record<string, any>
+    context?: Record<string, any>,
   ) {
     super(message, 409, true, context);
   }
@@ -83,7 +83,7 @@ export class ValidationError extends AppError {
   constructor(
     message: string = "Validation failed",
     public errors?: any[],
-    context?: Record<string, any>
+    context?: Record<string, any>,
   ) {
     super(message, 422, true, context);
   }
@@ -95,7 +95,7 @@ export class ValidationError extends AppError {
 export class RateLimitError extends AppError {
   constructor(
     message: string = "Too many requests",
-    context?: Record<string, any>
+    context?: Record<string, any>,
   ) {
     super(message, 429, true, context);
   }
@@ -107,7 +107,7 @@ export class RateLimitError extends AppError {
 export class InternalServerError extends AppError {
   constructor(
     message: string = "Internal server error",
-    context?: Record<string, any>
+    context?: Record<string, any>,
   ) {
     super(message, 500, false, context);
   }
@@ -119,7 +119,7 @@ export class InternalServerError extends AppError {
 export class ServiceUnavailableError extends AppError {
   constructor(
     message: string = "Service unavailable",
-    context?: Record<string, any>
+    context?: Record<string, any>,
   ) {
     super(message, 503, true, context);
   }

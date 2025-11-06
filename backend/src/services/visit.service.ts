@@ -1,9 +1,9 @@
-import { Visit, VisitStatus } from "@prisma/client";
-import prismaService from "../utils/prisma";
+import type { Visit, VisitStatus } from "@prisma/client";
+import config from "../config";
+import type { VisitStats } from "../types";
 import { NotFoundError } from "../utils/errors";
 import logger from "../utils/logger";
-import config from "../config";
-import { VisitStats } from "../types";
+import prismaService from "../utils/prisma";
 
 class VisitService {
   /**
@@ -53,7 +53,15 @@ class VisitService {
     page?: number;
     limit?: number;
   }): Promise<{ visits: Visit[]; total: number }> {
-    const { status, locationId, teacherId, startDate, endDate, page = 1, limit = 20 } = filters || {};
+    const {
+      status,
+      locationId,
+      teacherId,
+      startDate,
+      endDate,
+      page = 1,
+      limit = 20,
+    } = filters || {};
 
     const where: any = {};
 
@@ -66,10 +74,7 @@ class VisitService {
     }
 
     if (teacherId) {
-      where.OR = [
-        { targetTeacherId: teacherId },
-        { answeredById: teacherId },
-      ];
+      where.OR = [{ targetTeacherId: teacherId }, { answeredById: teacherId }];
     }
 
     if (startDate || endDate) {
@@ -269,9 +274,15 @@ class VisitService {
 
     const [total, pending, answered, missed, visits] = await Promise.all([
       prismaService.client.visit.count({ where }),
-      prismaService.client.visit.count({ where: { ...where, status: "pending" } }),
-      prismaService.client.visit.count({ where: { ...where, status: "answered" } }),
-      prismaService.client.visit.count({ where: { ...where, status: "missed" } }),
+      prismaService.client.visit.count({
+        where: { ...where, status: "pending" },
+      }),
+      prismaService.client.visit.count({
+        where: { ...where, status: "answered" },
+      }),
+      prismaService.client.visit.count({
+        where: { ...where, status: "missed" },
+      }),
       prismaService.client.visit.findMany({
         where: {
           ...where,
@@ -295,9 +306,10 @@ class VisitService {
       averageResponseTime = totalResponseTime / visits.length;
     }
 
-    const doorOpenRate = answered > 0
-      ? (visits.filter(v => v.doorOpened).length / answered) * 100
-      : undefined;
+    const doorOpenRate =
+      answered > 0
+        ? (visits.filter((v) => v.doorOpened).length / answered) * 100
+        : undefined;
 
     return {
       total,

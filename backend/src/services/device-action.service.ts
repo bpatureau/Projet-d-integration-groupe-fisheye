@@ -1,15 +1,15 @@
-import { Doorbell, LEDPanel, Visit, Teacher } from "@prisma/client";
-import doorbellService from "./doorbell.service";
-import buzzerService from "./buzzer.service";
-import panelService from "./panel.service";
-import visitService from "./visit.service";
-import presenceService from "./presence.service";
-import notificationService from "./notification.service";
-import calendarService from "./calendar.service";
-import logger from "../utils/logger";
-import { NotFoundError, ValidationError } from "../utils/errors";
+import type { Doorbell, LEDPanel, Teacher, Visit } from "@prisma/client";
 import { DEVICE_CONFIGS } from "../config/devices.config";
+import { NotFoundError, ValidationError } from "../utils/errors";
+import logger from "../utils/logger";
 import prismaService from "../utils/prisma";
+import buzzerService from "./buzzer.service";
+import calendarService from "./calendar.service";
+import doorbellService from "./doorbell.service";
+import notificationService from "./notification.service";
+import panelService from "./panel.service";
+import presenceService from "./presence.service";
+import visitService from "./visit.service";
 
 /**
  * Service de gestion des actions des appareils (sonnettes, buzzers, panneaux LED)
@@ -22,7 +22,7 @@ class DeviceActionService {
    */
   async handleDoorbellButtonPressed(
     doorbellId: string,
-    targetTeacherId?: string
+    targetTeacherId?: string,
   ): Promise<Visit> {
     const doorbell = await prismaService.client.doorbell.findUnique({
       where: { id: doorbellId },
@@ -62,13 +62,15 @@ class DeviceActionService {
     });
 
     const presentTeachers = await presenceService.getOnlyPresentTeachers(
-      doorbell.locationId
+      doorbell.locationId,
     );
 
     let teachersToNotify: Teacher[] = presentTeachers;
     if (validatedTargetTeacherId) {
       // Notifie uniquement l'enseignant ciblé s'il est présent
-      teachersToNotify = presentTeachers.filter((t) => t.id === validatedTargetTeacherId);
+      teachersToNotify = presentTeachers.filter(
+        (t) => t.id === validatedTargetTeacherId,
+      );
       if (teachersToNotify.length === 0) {
         logger.warn("Target teacher not present", {
           targetTeacherId: validatedTargetTeacherId,
@@ -99,7 +101,7 @@ class DeviceActionService {
 
   async handleDoorbellButtonPressedByDeviceId(
     deviceId: string,
-    targetTeacherId?: string
+    targetTeacherId?: string,
   ): Promise<Visit> {
     const doorbell = await doorbellService.findByDeviceId(deviceId);
     return this.handleDoorbellButtonPressed(doorbell.id, targetTeacherId);
@@ -140,7 +142,7 @@ class DeviceActionService {
    */
   async handleTeacherSelected(
     panelId: string,
-    teacherId: string
+    teacherId: string,
   ): Promise<void> {
     const panel = await prismaService.client.lEDPanel.findUnique({
       where: { id: panelId },
@@ -178,7 +180,7 @@ class DeviceActionService {
 
   async handleTeacherSelectedByDeviceId(
     deviceId: string,
-    teacherId: string
+    teacherId: string,
   ): Promise<void> {
     const panel = await panelService.findByDeviceId(deviceId);
     return this.handleTeacherSelected(panel.id, teacherId);
@@ -189,7 +191,7 @@ class DeviceActionService {
    * 5 jours (Lun-Ven) × 4 blocs horaires (8h-10h, 10h-12h, 14h-16h, 16h-18h)
    */
   private async generateWeekScheduleGrid(
-    teacher: Teacher
+    teacher: Teacher,
   ): Promise<boolean[][]> {
     if (!teacher.gmailEmail) {
       return Array(5).fill(Array(4).fill(false));
@@ -210,11 +212,11 @@ class DeviceActionService {
     const schedules = await calendarService.getTeacherSchedule(
       teacher.gmailEmail,
       startOfWeek,
-      endOfWeek
+      endOfWeek,
     );
 
     const grid: boolean[][] = Array.from({ length: 5 }, () =>
-      Array(4).fill(false)
+      Array(4).fill(false),
     );
 
     const timeBlocks = [
@@ -253,7 +255,7 @@ class DeviceActionService {
    */
   async handleHeartbeat(
     deviceType: "doorbell" | "buzzer" | "panel",
-    deviceId: string
+    deviceId: string,
   ): Promise<void> {
     let device: Doorbell | any | LEDPanel | null = null;
 

@@ -1,5 +1,5 @@
-import { Request, Response, NextFunction } from "express";
-import { z, ZodError } from "zod";
+import type { NextFunction, Request, Response } from "express";
+import { ZodError, type z } from "zod";
 import { ValidationError } from "../utils/errors";
 
 /**
@@ -9,7 +9,7 @@ import { ValidationError } from "../utils/errors";
  */
 export function validateRequest(
   schema: z.ZodSchema,
-  source: "body" | "query" | "params" = "body"
+  source: "body" | "query" | "params" = "body",
 ) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {

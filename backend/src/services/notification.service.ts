@@ -1,10 +1,10 @@
+import type { Location, Teacher, Visit } from "@prisma/client";
 import axios from "axios";
-import { Teacher, Location, Visit } from "@prisma/client";
+import { DEVICE_CONFIGS } from "../config/devices.config";
+import type { NotifiedTeacher, TeacherPreferences } from "../types";
+import logger from "../utils/logger";
 import prismaService from "../utils/prisma";
 import mqttService from "./mqtt.service";
-import logger from "../utils/logger";
-import { DEVICE_CONFIGS } from "../config/devices.config";
-import { TeacherPreferences, NotifiedTeacher } from "../types";
 
 class NotificationService {
   /**
@@ -12,7 +12,7 @@ class NotificationService {
    */
   async notifyTeachersOfRing(
     visit: Visit & { doorbell: any; location: Location },
-    teachers: Teacher[]
+    teachers: Teacher[],
   ): Promise<NotifiedTeacher[]> {
     logger.info(`Notifying ${teachers.length} teachers for visit`, {
       visitId: visit.id,
@@ -37,11 +37,15 @@ class NotificationService {
         }
       }
 
-      if (prefs.notifyOnTeams && teacher.teamsEmail && visit.location.teamsWebhookUrl) {
+      if (
+        prefs.notifyOnTeams &&
+        teacher.teamsEmail &&
+        visit.location.teamsWebhookUrl
+      ) {
         const sent = await this.sendTeamsNotification(
           visit.location.teamsWebhookUrl,
           visit.location,
-          [teacher]
+          [teacher],
         );
         if (sent) {
           channels.push("teams");
@@ -111,7 +115,7 @@ class NotificationService {
   private async sendTeamsNotification(
     webhookUrl: string,
     location: Location,
-    teachers: Teacher[]
+    teachers: Teacher[],
   ): Promise<boolean> {
     const mentions = teachers.map((t) => t.name).join(", ");
 
@@ -154,7 +158,7 @@ class NotificationService {
       teacherName: string;
       teacherId: string;
       weekSchedule: boolean[][];
-    }
+    },
   ): Promise<void> {
     const topic = `fisheye/${mqttClientId}/display/update`;
     await mqttService.publish(topic, data, { qos: 0 });

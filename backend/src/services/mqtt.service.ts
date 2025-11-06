@@ -1,10 +1,11 @@
-import mqtt, { MqttClient } from "mqtt";
+import mqtt, { type MqttClient } from "mqtt";
 import config from "../config";
 import logger from "../utils/logger";
 
 class MQTTService {
   private client: MqttClient | null = null;
-  private subscriptions: Map<string, (topic: string, payload: Buffer) => void> = new Map();
+  private subscriptions: Map<string, (topic: string, payload: Buffer) => void> =
+    new Map();
 
   async connect(): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -57,7 +58,7 @@ class MQTTService {
 
   subscribe(
     topic: string,
-    handler: (topic: string, payload: Buffer) => void
+    handler: (topic: string, payload: Buffer) => void,
   ): void {
     if (!this.client) {
       throw new Error("MQTT client not connected");
@@ -81,7 +82,7 @@ class MQTTService {
   async publish(
     topic: string,
     payload: any,
-    options: { qos?: 0 | 1 | 2; retained?: boolean } = {}
+    options: { qos?: 0 | 1 | 2; retained?: boolean } = {},
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       if (!this.client?.connected) {
@@ -111,7 +112,7 @@ class MQTTService {
             });
             resolve();
           }
-        }
+        },
       );
     });
   }
@@ -122,7 +123,7 @@ class MQTTService {
   async publishWithRetry(
     topic: string,
     payload: any,
-    maxRetries: number = 3
+    maxRetries: number = 3,
   ): Promise<boolean> {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -146,7 +147,7 @@ class MQTTService {
 
         // Attente avec backoff exponentiel avant de réessayer
         await new Promise((resolve) =>
-          setTimeout(resolve, Math.pow(2, attempt) * 1000)
+          setTimeout(resolve, 2 ** attempt * 1000),
         );
       }
     }

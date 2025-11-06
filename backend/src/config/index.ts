@@ -70,11 +70,11 @@ const config: Config = {
   scheduler: {
     calendarSyncInterval: parseInt(
       process.env.CALENDAR_SYNC_INTERVAL || "30",
-      10
+      10,
     ),
     deviceOfflineThreshold: parseInt(
       process.env.DEVICE_OFFLINE_THRESHOLD || "15",
-      10
+      10,
     ),
   },
 };

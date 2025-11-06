@@ -1,6 +1,6 @@
-import mqttService from "../services/mqtt.service";
 import deviceActionService from "../services/device-action.service";
 import doorbellService from "../services/doorbell.service";
+import mqttService from "../services/mqtt.service";
 import panelService from "../services/panel.service";
 import logger from "../utils/logger";
 
@@ -45,7 +45,7 @@ class MQTTDispatcher {
    */
   private async handleDoorbellButtonPressed(
     topic: string,
-    payload: Buffer
+    payload: Buffer,
   ): Promise<void> {
     const parts = topic.split("/");
     const mqttClientId = parts[1];
@@ -54,13 +54,12 @@ class MQTTDispatcher {
     try {
       const data = JSON.parse(payload.toString());
       targetTeacherId = data.targetTeacherId;
-    } catch {
-    }
+    } catch {}
 
     const doorbell = await doorbellService.findByMqttClientId(mqttClientId);
     await deviceActionService.handleDoorbellButtonPressed(
       doorbell.id,
-      targetTeacherId
+      targetTeacherId,
     );
   }
 
@@ -70,7 +69,7 @@ class MQTTDispatcher {
    */
   private async handleDoorOpened(
     topic: string,
-    payload: Buffer
+    payload: Buffer,
   ): Promise<void> {
     const parts = topic.split("/");
     const mqttClientId = parts[1];
@@ -86,7 +85,7 @@ class MQTTDispatcher {
    */
   private async handleTeacherSelected(
     topic: string,
-    payload: Buffer
+    payload: Buffer,
   ): Promise<void> {
     const parts = topic.split("/");
     const mqttClientId = parts[1];
@@ -111,10 +110,7 @@ class MQTTDispatcher {
    * Gère le heartbeat d'un appareil
    * Topic: fisheye/{clientId}/heartbeat
    */
-  private async handleHeartbeat(
-    topic: string,
-    payload: Buffer
-  ): Promise<void> {
+  private async handleHeartbeat(topic: string, payload: Buffer): Promise<void> {
     const parts = topic.split("/");
     const mqttClientId = parts[1];
 

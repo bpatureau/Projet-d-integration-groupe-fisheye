@@ -1,7 +1,7 @@
-import { LEDPanel } from "@prisma/client";
-import prismaService from "../utils/prisma";
-import { NotFoundError, ConflictError } from "../utils/errors";
+import type { LEDPanel } from "@prisma/client";
+import { ConflictError, NotFoundError } from "../utils/errors";
 import logger from "../utils/logger";
+import prismaService from "../utils/prisma";
 
 class PanelService {
   async create(data: {
@@ -93,7 +93,7 @@ class PanelService {
       mqttClientId?: string;
       locationId?: string;
       selectedTeacherId?: string | null;
-    }
+    },
   ): Promise<LEDPanel> {
     await this.findById(id);
 
@@ -112,7 +112,7 @@ class PanelService {
 
   async updateSelectedTeacher(
     id: string,
-    teacherId: string | null
+    teacherId: string | null,
   ): Promise<LEDPanel> {
     return this.update(id, { selectedTeacherId: teacherId });
   }

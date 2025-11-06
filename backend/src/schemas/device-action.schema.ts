@@ -42,7 +42,7 @@ export type HeartbeatPayload = z.infer<typeof heartbeatPayloadSchema>;
  */
 export function parseMqttPayload<T>(
   schema: z.ZodSchema<T>,
-  payload: Buffer
+  payload: Buffer,
 ): T | null {
   try {
     const raw = payload.toString();

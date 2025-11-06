@@ -1,10 +1,10 @@
+import type { Teacher } from "@prisma/client";
 import jwt from "jsonwebtoken";
-import { Teacher } from "@prisma/client";
-import prismaService from "../utils/prisma";
-import { hashPassword, verifyPassword } from "../utils/password";
 import config from "../config";
-import { UnauthorizedError, NotFoundError } from "../utils/errors";
+import { NotFoundError, UnauthorizedError } from "../utils/errors";
 import logger from "../utils/logger";
+import { hashPassword, verifyPassword } from "../utils/password";
+import prismaService from "../utils/prisma";
 
 class AuthService {
   /**
@@ -12,7 +12,7 @@ class AuthService {
    */
   async login(
     username: string,
-    password: string
+    password: string,
   ): Promise<{ teacher: Teacher; token: string }> {
     const teacher = await prismaService.client.teacher.findUnique({
       where: { username },
@@ -22,7 +22,10 @@ class AuthService {
       throw new UnauthorizedError("Invalid credentials");
     }
 
-    const isPasswordValid = await verifyPassword(password, teacher.passwordHash);
+    const isPasswordValid = await verifyPassword(
+      password,
+      teacher.passwordHash,
+    );
 
     if (!isPasswordValid) {
       throw new UnauthorizedError("Invalid credentials");
