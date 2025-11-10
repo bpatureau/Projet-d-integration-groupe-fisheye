@@ -110,10 +110,7 @@ class MQTTDispatcher {
    * Gère le status d'un appareil
    * Topic: fisheye/{clientId}/status
    */
-  private async handleStatus(
-    topic: string,
-    _payload: Buffer,
-  ): Promise<void> {
+  private async handleStatus(topic: string, _payload: Buffer): Promise<void> {
     const parts = topic.split("/");
     const mqttClientId = parts[1];
 
