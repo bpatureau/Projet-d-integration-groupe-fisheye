@@ -21,6 +21,20 @@ export const doorOpened = asyncHandler(async (req: Request, res: Response) => {
   res.json({ visit: visit || null });
 });
 
+export const doorbellMessage = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { deviceId } = req.params;
+    const { text, targetTeacherId, targetLocationId } = req.body;
+    const message = await deviceActionService.handleDoorbellMessageByDeviceId(
+      deviceId,
+      text,
+      targetTeacherId,
+      targetLocationId,
+    );
+    res.json({ message });
+  },
+);
+
 export const teacherSelected = asyncHandler(
   async (req: Request, res: Response) => {
     const { deviceId } = req.params;
@@ -33,9 +47,9 @@ export const teacherSelected = asyncHandler(
   },
 );
 
-export const heartbeat = asyncHandler(async (req: Request, res: Response) => {
+export const status = asyncHandler(async (req: Request, res: Response) => {
   const { type, deviceId } = req.params;
   const deviceType = type as "doorbell" | "buzzer" | "panel";
-  await deviceActionService.handleHeartbeat(deviceType, deviceId);
-  res.json({ message: "Heartbeat received" });
+  await deviceActionService.handleStatus(deviceType, deviceId);
+  res.json({ message: "Status received" });
 });

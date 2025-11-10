@@ -70,8 +70,8 @@ export interface DisplayUpdatePayload {
   weekSchedule: boolean[][]; // 5 jours × 4 blocs = [5][4]
 }
 
-// Payload: Heartbeat
-export interface HeartbeatPayload {
+// Payload: Status
+export interface StatusPayload {
   timestamp: Date;
   uptime?: number;
 }

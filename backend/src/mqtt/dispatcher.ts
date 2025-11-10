@@ -12,7 +12,7 @@ import logger from "../utils/logger";
  * - fisheye/{clientId}/button/pressed - Bouton sonnette appuyé
  * - fisheye/{clientId}/door/opened - Porte ouverte
  * - fisheye/{clientId}/teacher/selected - Sélection enseignant sur panneau
- * - fisheye/{clientId}/heartbeat - Heartbeat de l'appareil
+ * - fisheye/{clientId}/status - Status de l'appareil
  */
 class MQTTDispatcher {
   initialize(): void {
@@ -30,8 +30,8 @@ class MQTTDispatcher {
         await this.handleDoorOpened(topic, payload);
       } else if (topic.endsWith("/teacher/selected")) {
         await this.handleTeacherSelected(topic, payload);
-      } else if (topic.endsWith("/heartbeat")) {
-        await this.handleHeartbeat(topic, payload);
+      } else if (topic.endsWith("/status")) {
+        await this.handleStatus(topic, payload);
       }
     } catch (error) {
       logger.error("Error routing MQTT message", { topic, error });
@@ -107,10 +107,10 @@ class MQTTDispatcher {
   }
 
   /**
-   * Gère le heartbeat d'un appareil
-   * Topic: fisheye/{clientId}/heartbeat
+   * Gère le status d'un appareil
+   * Topic: fisheye/{clientId}/status
    */
-  private async handleHeartbeat(
+  private async handleStatus(
     topic: string,
     _payload: Buffer,
   ): Promise<void> {
@@ -119,17 +119,17 @@ class MQTTDispatcher {
 
     try {
       const doorbell = await doorbellService.findByMqttClientId(mqttClientId);
-      await deviceActionService.handleHeartbeat("doorbell", doorbell.deviceId);
+      await deviceActionService.handleStatus("doorbell", doorbell.deviceId);
       return;
     } catch {}
 
     try {
       const panel = await panelService.findByMqttClientId(mqttClientId);
-      await deviceActionService.handleHeartbeat("panel", panel.deviceId);
+      await deviceActionService.handleStatus("panel", panel.deviceId);
       return;
     } catch {}
 
-    logger.warn("Heartbeat from unknown device", { mqttClientId });
+    logger.warn("Status from unknown device", { mqttClientId });
   }
 }
 

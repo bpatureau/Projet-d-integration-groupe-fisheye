@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",
-    "@prisma/client": "^6.18.0",
+    "@prisma/client": "^6.19.0",
     "@types/ms": "^2.1.0",
     "axios": "^1.12.2",
     "cors": "^2.8.5",
@@ -42,7 +42,7 @@
     "@types/node": "^24.10.0",
     "@types/node-cron": "^3.0.11",
     "@types/pg": "^8.15.5",
-    "prisma": "^6.18.0",
+    "prisma": "^6.19.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   }

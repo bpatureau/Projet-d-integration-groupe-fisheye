@@ -165,7 +165,7 @@ export const teacherSelectedSchema = z.object({
   teacherId: z.string().uuid("Invalid teacher ID"),
 });
 
-export const heartbeatSchema = z.object({
+export const statusSchema = z.object({
   timestamp: z.string().datetime().optional(),
   uptime: z.number().optional(),
 });
@@ -190,4 +190,33 @@ export const visitFilterSchema = paginationSchema.extend({
   teacherId: z.string().uuid().optional(),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
+});
+
+// ========================================
+// SCHÉMAS DE MESSAGE
+// ========================================
+
+export const createMessageSchema = z.object({
+  text: z.string().min(1, "Message text is required"),
+  senderInfo: z.string().optional(),
+  visitId: z.string().uuid().optional(),
+  targetTeacherId: z.string().uuid().optional(),
+  targetLocationId: z.string().uuid().optional(),
+});
+
+export const messageFilterSchema = paginationSchema.extend({
+  isRead: z
+    .string()
+    .transform((val) => val === "true")
+    .optional(),
+  targetTeacherId: z.string().uuid().optional(),
+  targetLocationId: z.string().uuid().optional(),
+  visitId: z.string().uuid().optional(),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+});
+
+export const markAllAsReadSchema = z.object({
+  teacherId: z.string().uuid().optional(),
+  locationId: z.string().uuid().optional(),
 });

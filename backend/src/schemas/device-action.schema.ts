@@ -20,10 +20,10 @@ export type TeacherSelectedPayload = z.infer<
 >;
 
 /**
- * Payload de heartbeat (métadonnées optionnelles)
- * Les appareils peuvent envoyer des informations supplémentaires avec le heartbeat
+ * Payload de status (métadonnées optionnelles)
+ * Les appareils peuvent envoyer des informations supplémentaires avec le status
  */
-export const heartbeatPayloadSchema = z
+export const statusPayloadSchema = z
   .object({
     batteryLevel: z.number().min(0).max(100).optional(),
     signalStrength: z.number().optional(),
@@ -31,7 +31,7 @@ export const heartbeatPayloadSchema = z
   })
   .optional();
 
-export type HeartbeatPayload = z.infer<typeof heartbeatPayloadSchema>;
+export type StatusPayload = z.infer<typeof statusPayloadSchema>;
 
 /**
  * Fonction utilitaire pour parser de manière sécurisée les payloads MQTT

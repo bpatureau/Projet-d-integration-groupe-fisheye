@@ -49,11 +49,12 @@ class CalendarService {
 
   /**
    * Synchronise un calendrier Google pour un lieu (récupère et stocke les événements)
+   * Retourne la liste des emails des enseignants dont les horaires ont changé
    */
   async syncCalendarForLocation(
     locationId: string,
     calendarId: string,
-  ): Promise<void> {
+  ): Promise<string[]> {
     if (!this.isInitialized || !this.calendar) {
       throw new Error("Calendar service not initialized");
     }
@@ -61,6 +62,8 @@ class CalendarService {
     const now = new Date();
     const timeMin = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const timeMax = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    const updatedTeacherEmails = new Set<string>();
 
     try {
       const response = await this.calendar.events.list({
@@ -96,12 +99,18 @@ class CalendarService {
           lastSync: new Date(),
         };
 
-        await this.upsertSchedule(schedule);
+        const wasUpdated = await this.upsertSchedule(schedule);
+        if (wasUpdated) {
+          updatedTeacherEmails.add(teacherEmail);
+        }
       }
 
       logger.info(`Synced ${events.length} events for calendar ${calendarId}`, {
         component: "calendar",
+        updatedTeachers: updatedTeacherEmails.size,
       });
+
+      return Array.from(updatedTeacherEmails);
     } catch (error) {
       logger.error(`Failed to sync calendar ${calendarId}`, {
         component: "calendar",
@@ -124,7 +133,7 @@ class CalendarService {
     return null;
   }
 
-  private async upsertSchedule(schedule: ScheduleData): Promise<void> {
+  private async upsertSchedule(schedule: ScheduleData): Promise<boolean> {
     await prismaService.client.schedule.upsert({
       where: { eventId: schedule.eventId },
       update: {
@@ -149,6 +158,9 @@ class CalendarService {
         lastSync: schedule.lastSync,
       },
     });
+
+    // Return true to indicate schedule was processed
+    return true;
   }
 
   /**

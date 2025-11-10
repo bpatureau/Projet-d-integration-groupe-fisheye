@@ -124,6 +124,22 @@ CREATE TABLE "schedules" (
     CONSTRAINT "schedules_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "messages" (
+    "id" UUID NOT NULL DEFAULT uuid_generate_v4(),
+    "text" TEXT NOT NULL,
+    "sender_info" VARCHAR(255),
+    "visit_id" UUID,
+    "target_teacher_id" UUID,
+    "target_location_id" UUID,
+    "is_read" BOOLEAN NOT NULL DEFAULT false,
+    "read_at" TIMESTAMPTZ(6),
+    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "messages_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE INDEX "idx_locations_calendar_id" ON "locations"("calendar_id");
 
@@ -247,6 +263,21 @@ CREATE INDEX "idx_schedules_teacher_email" ON "schedules"("teacher_email");
 -- CreateIndex
 CREATE INDEX "idx_schedules_start_time" ON "schedules"("start_time");
 
+-- CreateIndex
+CREATE INDEX "idx_messages_visit_id" ON "messages"("visit_id");
+
+-- CreateIndex
+CREATE INDEX "idx_messages_target_teacher_id" ON "messages"("target_teacher_id");
+
+-- CreateIndex
+CREATE INDEX "idx_messages_target_location_id" ON "messages"("target_location_id");
+
+-- CreateIndex
+CREATE INDEX "idx_messages_is_read" ON "messages"("is_read");
+
+-- CreateIndex
+CREATE INDEX "idx_messages_created_at" ON "messages"("created_at" DESC);
+
 -- AddForeignKey
 ALTER TABLE "teacher_locations" ADD CONSTRAINT "teacher_locations_teacher_id_fkey" FOREIGN KEY ("teacher_id") REFERENCES "teachers"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -279,3 +310,12 @@ ALTER TABLE "visits" ADD CONSTRAINT "visits_answered_by_id_fkey" FOREIGN KEY ("a
 
 -- AddForeignKey
 ALTER TABLE "schedules" ADD CONSTRAINT "schedules_location_id_fkey" FOREIGN KEY ("location_id") REFERENCES "locations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "messages" ADD CONSTRAINT "messages_visit_id_fkey" FOREIGN KEY ("visit_id") REFERENCES "visits"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "messages" ADD CONSTRAINT "messages_target_teacher_id_fkey" FOREIGN KEY ("target_teacher_id") REFERENCES "teachers"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "messages" ADD CONSTRAINT "messages_target_location_id_fkey" FOREIGN KEY ("target_location_id") REFERENCES "locations"("id") ON DELETE CASCADE ON UPDATE CASCADE;

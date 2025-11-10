@@ -5,6 +5,7 @@ import * as deviceActionController from "../controllers/device-action.controller
 import * as doorbellController from "../controllers/doorbell.controller";
 import * as healthController from "../controllers/health.controller";
 import * as locationController from "../controllers/location.controller";
+import * as messageController from "../controllers/message.controller";
 import * as panelController from "../controllers/panel.controller";
 import * as profileController from "../controllers/profile.controller";
 import * as scheduleController from "../controllers/schedule.controller";
@@ -41,14 +42,19 @@ router.post(
   deviceActionController.doorOpened,
 );
 router.post(
+  "/device-actions/doorbell/:deviceId/message",
+  validateBody(schemas.createMessageSchema),
+  deviceActionController.doorbellMessage,
+);
+router.post(
   "/device-actions/panel/:deviceId/teacher-selected",
   validateBody(schemas.teacherSelectedSchema),
   deviceActionController.teacherSelected,
 );
 router.post(
-  "/device-actions/:type/:deviceId/heartbeat",
-  validateBody(schemas.heartbeatSchema),
-  deviceActionController.heartbeat,
+  "/device-actions/:type/:deviceId/status",
+  validateBody(schemas.statusSchema),
+  deviceActionController.status,
 );
 
 // ========================================
@@ -183,5 +189,20 @@ router.get(
   "/schedules/teacher/:teacherId",
   scheduleController.getSchedulesForTeacher,
 );
+
+router.get(
+  "/messages",
+  validateQuery(schemas.messageFilterSchema),
+  messageController.getAllMessages,
+);
+router.get("/messages/unread-count", messageController.getUnreadCount);
+router.get("/messages/:id", messageController.getMessage);
+router.put("/messages/:id/read", messageController.markMessageAsRead);
+router.put(
+  "/messages/mark-all-read",
+  validateBody(schemas.markAllAsReadSchema),
+  messageController.markAllAsRead,
+);
+router.delete("/messages/:id", messageController.deleteMessage);
 
 export default router;

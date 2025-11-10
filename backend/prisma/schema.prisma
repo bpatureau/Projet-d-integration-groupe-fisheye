@@ -37,11 +37,12 @@ model Location {
   updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
-  teachers  TeacherLocation[]
-  doorbells Doorbell[]
-  ledPanels LEDPanel[]
-  visits    Visit[]
-  schedules Schedule[]
+  teachers         TeacherLocation[]
+  doorbells        Doorbell[]
+  ledPanels        LEDPanel[]
+  visits           Visit[]
+  schedules        Schedule[]
+  receivedMessages Message[]         @relation("ReceivedMessages")
 
   @@index([calendarId], name: "idx_locations_calendar_id")
   @@map("locations")
@@ -67,6 +68,7 @@ model Teacher {
   targetedVisits   Visit[]           @relation("TargetedVisits")
   answeredVisits   Visit[]           @relation("AnsweredVisits")
   selectedInPanels LEDPanel[]
+  receivedMessages Message[]         @relation("ReceivedMessages")
 
   @@index([username], name: "idx_teachers_username")
   @@index([email], name: "idx_teachers_email")
@@ -174,10 +176,11 @@ model Visit {
   updatedAt       DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
-  doorbell      Doorbell @relation(fields: [doorbellId], references: [id], onDelete: Cascade)
-  location      Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  targetTeacher Teacher? @relation("TargetedVisits", fields: [targetTeacherId], references: [id], onDelete: SetNull)
-  answeredBy    Teacher? @relation("AnsweredVisits", fields: [answeredById], references: [id], onDelete: SetNull)
+  doorbell      Doorbell  @relation(fields: [doorbellId], references: [id], onDelete: Cascade)
+  location      Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  targetTeacher Teacher?  @relation("TargetedVisits", fields: [targetTeacherId], references: [id], onDelete: SetNull)
+  answeredBy    Teacher?  @relation("AnsweredVisits", fields: [answeredById], references: [id], onDelete: SetNull)
+  messages      Message[]
 
   @@index([doorbellId], name: "idx_visits_doorbell_id")
   @@index([locationId], name: "idx_visits_location_id")
@@ -214,4 +217,30 @@ model Schedule {
   @@index([teacherEmail], name: "idx_schedules_teacher_email")
   @@index([startTime], name: "idx_schedules_start_time")
   @@map("schedules")
+}
+
+// Messages textuels depuis la sonnette
+model Message {
+  id               String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  text             String    @db.Text
+  senderInfo       String?   @map("sender_info") @db.VarChar(255)
+  visitId          String?   @map("visit_id") @db.Uuid
+  targetTeacherId  String?   @map("target_teacher_id") @db.Uuid
+  targetLocationId String?   @map("target_location_id") @db.Uuid
+  isRead           Boolean   @default(false) @map("is_read")
+  readAt           DateTime? @map("read_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  visit          Visit?    @relation(fields: [visitId], references: [id], onDelete: SetNull)
+  targetTeacher  Teacher?  @relation("ReceivedMessages", fields: [targetTeacherId], references: [id], onDelete: Cascade)
+  targetLocation Location? @relation("ReceivedMessages", fields: [targetLocationId], references: [id], onDelete: Cascade)
+
+  @@index([visitId], name: "idx_messages_visit_id")
+  @@index([targetTeacherId], name: "idx_messages_target_teacher_id")
+  @@index([targetLocationId], name: "idx_messages_target_location_id")
+  @@index([isRead], name: "idx_messages_is_read")
+  @@index([createdAt(sort: Desc)], name: "idx_messages_created_at")
+  @@map("messages")
 }

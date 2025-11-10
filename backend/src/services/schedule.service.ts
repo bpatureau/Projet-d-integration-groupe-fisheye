@@ -1,11 +1,13 @@
 import type { Schedule } from "@prisma/client";
 import logger from "../utils/logger";
 import calendarService from "./calendar.service";
+import deviceActionService from "./device-action.service";
 import locationService from "./location.service";
 
 class ScheduleService {
   /**
    * Synchronise les emplois du temps depuis le calendrier d'un lieu
+   * Met également à jour les panneaux LED pour les enseignants concernés
    */
   async syncSchedulesForLocation(locationId: string): Promise<number> {
     const location = await locationService.findById(locationId);
@@ -15,7 +17,7 @@ class ScheduleService {
       return 0;
     }
 
-    await calendarService.syncCalendarForLocation(
+    const updatedTeacherEmails = await calendarService.syncCalendarForLocation(
       locationId,
       location.calendarId,
     );
@@ -24,7 +26,20 @@ class ScheduleService {
     logger.info("Synced schedules for location", {
       locationId,
       count: schedules.length,
+      updatedTeachers: updatedTeacherEmails.length,
     });
+
+    // Met à jour les panneaux LED pour les enseignants dont les horaires ont changé
+    if (updatedTeacherEmails.length > 0) {
+      deviceActionService
+        .updatePanelsForTeachers(updatedTeacherEmails)
+        .catch((error) => {
+          logger.error("Failed to update panels after schedule sync", {
+            locationId,
+            error,
+          });
+        });
+    }
 
     return schedules.length;
   }

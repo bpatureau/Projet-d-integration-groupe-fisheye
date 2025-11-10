@@ -2,6 +2,7 @@ import type {
   Buzzer,
   Doorbell,
   LEDPanel,
+  Message,
   Teacher,
   Visit,
 } from "@prisma/client";
@@ -12,6 +13,7 @@ import prismaService from "../utils/prisma";
 import buzzerService from "./buzzer.service";
 import calendarService from "./calendar.service";
 import doorbellService from "./doorbell.service";
+import messageService from "./message.service";
 import notificationService from "./notification.service";
 import panelService from "./panel.service";
 import presenceService from "./presence.service";
@@ -257,9 +259,146 @@ class DeviceActionService {
   }
 
   /**
-   * Gère le heartbeat d'un appareil (met à jour son statut en ligne)
+   * Gère la création d'un message depuis la sonnette
+   * Le message peut être lié à une visite récente ou être autonome
    */
-  async handleHeartbeat(
+  async handleDoorbellMessage(
+    doorbellId: string,
+    text: string,
+    targetTeacherId?: string,
+    targetLocationId?: string,
+  ): Promise<Message> {
+    const doorbell = await prismaService.client.doorbell.findUnique({
+      where: { id: doorbellId },
+      include: { location: true },
+    });
+
+    if (!doorbell) {
+      throw new NotFoundError("Doorbell not found");
+    }
+
+    // Cherche une visite récente (dans les 5 dernières minutes)
+    const recentVisit = await visitService.getLastPendingVisit(doorbellId);
+
+    // Détermine la cible du message
+    // Si aucune cible n'est spécifiée, cible le local de la sonnette
+    const finalTargetLocationId =
+      targetLocationId || (!targetTeacherId ? doorbell.locationId : undefined);
+
+    // Crée le message
+    const message = await messageService.create({
+      text,
+      senderInfo: `Doorbell at ${doorbell.location.name}`,
+      visitId: recentVisit?.id,
+      targetTeacherId,
+      targetLocationId: finalTargetLocationId,
+    });
+
+    logger.info("Message created from doorbell", {
+      messageId: message.id,
+      doorbellId: doorbell.id,
+      visitId: recentVisit?.id,
+      targetTeacherId,
+      targetLocationId: finalTargetLocationId,
+    });
+
+    return message;
+  }
+
+  async handleDoorbellMessageByDeviceId(
+    deviceId: string,
+    text: string,
+    targetTeacherId?: string,
+    targetLocationId?: string,
+  ): Promise<Message> {
+    const doorbell = await doorbellService.findByDeviceId(deviceId);
+    return this.handleDoorbellMessage(
+      doorbell.id,
+      text,
+      targetTeacherId,
+      targetLocationId,
+    );
+  }
+
+  /**
+   * Met à jour les panneaux LED pour les enseignants dont les horaires ont changé
+   */
+  async updatePanelsForTeachers(teacherEmails: string[]): Promise<void> {
+    if (teacherEmails.length === 0) {
+      return;
+    }
+
+    logger.info("Updating panels for teachers with schedule changes", {
+      teacherCount: teacherEmails.length,
+    });
+
+    // Récupère les enseignants par email
+    const teachers = await prismaService.client.teacher.findMany({
+      where: {
+        gmailEmail: {
+          in: teacherEmails,
+        },
+      },
+    });
+
+    if (teachers.length === 0) {
+      logger.warn("No teachers found for the given emails", {
+        teacherEmails,
+      });
+      return;
+    }
+
+    // Pour chaque enseignant, trouve les panneaux qui l'affichent et les met à jour
+    for (const teacher of teachers) {
+      const panels = await prismaService.client.lEDPanel.findMany({
+        where: {
+          selectedTeacherId: teacher.id,
+          isOnline: true, // Only update online panels
+        },
+      });
+
+      if (panels.length === 0) {
+        continue;
+      }
+
+      logger.info("Updating panels for teacher", {
+        teacherId: teacher.id,
+        teacherName: teacher.name,
+        panelCount: panels.length,
+      });
+
+      // Génère la grille d'emploi du temps
+      const weekSchedule = await this.generateWeekScheduleGrid(teacher);
+
+      // Envoie la mise à jour à chaque panneau
+      for (const panel of panels) {
+        try {
+          await notificationService.publishPanelDisplay(panel.mqttClientId, {
+            teacherName: teacher.name,
+            teacherId: teacher.id,
+            weekSchedule,
+          });
+
+          logger.info("Panel updated with new schedule", {
+            panelId: panel.id,
+            teacherId: teacher.id,
+            teacherName: teacher.name,
+          });
+        } catch (error) {
+          logger.error("Failed to update panel", {
+            panelId: panel.id,
+            teacherId: teacher.id,
+            error,
+          });
+        }
+      }
+    }
+  }
+
+  /**
+   * Gère le status d'un appareil (met à jour son statut en ligne)
+   */
+  async handleStatus(
     deviceType: "doorbell" | "buzzer" | "panel",
     deviceId: string,
   ): Promise<void> {
@@ -282,7 +421,7 @@ class DeviceActionService {
         throw new ValidationError(`Unknown device type: ${deviceType}`);
     }
 
-    logger.debug("Device heartbeat received", { deviceType, deviceId });
+    logger.debug("Device status received", { deviceType, deviceId });
   }
 }
 
