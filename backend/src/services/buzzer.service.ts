@@ -55,6 +55,19 @@ class BuzzerService {
     return buzzer;
   }
 
+  async findByMqttClientId(mqttClientId: string): Promise<Buzzer> {
+    const buzzer = await prismaService.client.buzzer.findUnique({
+      where: { mqttClientId },
+      include: { teacher: true },
+    });
+
+    if (!buzzer) {
+      throw new NotFoundError("Buzzer not found");
+    }
+
+    return buzzer;
+  }
+
   async findByDeviceId(deviceId: string): Promise<Buzzer> {
     const buzzer = await prismaService.client.buzzer.findUnique({
       where: { deviceId },

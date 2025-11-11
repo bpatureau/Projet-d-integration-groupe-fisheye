@@ -3,6 +3,7 @@ import type {
   Doorbell,
   LedPanel,
   Message,
+  Prisma,
   Teacher,
   Visit,
 } from "@prisma/client";
@@ -422,6 +423,121 @@ class DeviceActionService {
     }
 
     logger.debug("Device status received", { deviceType, deviceId });
+  }
+
+  /**
+   * Gère la demande de liste des enseignants par un panel
+   * Renvoie la liste des enseignants d'un lieu au panel via MQTT
+   */
+  async handleTeachersRequest(
+    panelId: string,
+    locationId: string,
+  ): Promise<void> {
+    const panel = await prismaService.client.ledPanel.findUnique({
+      where: { id: panelId },
+    });
+
+    if (!panel) {
+      throw new NotFoundError("LED Panel not found");
+    }
+
+    // Récupère tous les enseignants associés à ce lieu avec leurs présences
+    const teacherLocations =
+      await prismaService.client.teacherLocation.findMany({
+        where: { locationId },
+        include: { teacher: true },
+      });
+
+    const teachers = teacherLocations.map((tl) => tl.teacher);
+
+    // Récupère les informations de présence pour chaque enseignant
+    const presentTeachers =
+      await presenceService.getPresentTeachersInLocation(locationId);
+
+    // Crée la liste des enseignants avec leur statut de présence
+    const teachersList = teachers.map((teacher) => {
+      const presenceInfo = presentTeachers.find((pt) => pt.id === teacher.id);
+      return {
+        id: teacher.id,
+        name: teacher.name,
+        email: teacher.email,
+        isPresent: presenceInfo?.isPresent || false,
+        presenceSource: presenceInfo?.presenceSource || "unavailable",
+        manualStatus: presenceInfo?.manualStatus,
+      };
+    });
+
+    // Envoie la liste au panel via MQTT
+    await notificationService.publishTeachersList(
+      panel.mqttClientId,
+      teachersList,
+    );
+
+    logger.info("Teachers list sent to panel", {
+      panelId,
+      locationId,
+      teacherCount: teachersList.length,
+    });
+  }
+
+  /**
+   * Gère la mise à jour de présence d'un enseignant depuis un panel
+   * Met à jour le statut manuel de présence et diffuse le changement
+   */
+  async handlePresenceUpdate(
+    panelId: string,
+    teacherId: string,
+    status: "present" | "absent" | "dnd",
+    until?: string,
+  ): Promise<void> {
+    const panel = await prismaService.client.ledPanel.findUnique({
+      where: { id: panelId },
+    });
+
+    if (!panel) {
+      throw new NotFoundError("LED Panel not found");
+    }
+
+    const teacher = await prismaService.client.teacher.findUnique({
+      where: { id: teacherId },
+    });
+
+    if (!teacher) {
+      throw new NotFoundError("Teacher not found");
+    }
+
+    // Met à jour le statut manuel de l'enseignant
+    const manualStatus: {
+      status: "present" | "absent" | "dnd";
+      until?: string;
+    } = {
+      status,
+      ...(until && { until }),
+    };
+
+    await prismaService.client.teacher.update({
+      where: { id: teacherId },
+      data: {
+        manualStatus: manualStatus as Prisma.InputJsonValue,
+      },
+    });
+
+    logger.info("Teacher presence updated from panel", {
+      panelId,
+      teacherId,
+      teacherName: teacher.name,
+      status,
+      until,
+    });
+
+    // Diffuse le changement de présence à tous les panels
+    await notificationService.broadcastPresenceChange({
+      teacherId,
+      teacherName: teacher.name,
+      status,
+      until,
+      source: "panel",
+    });
   }
 }
 

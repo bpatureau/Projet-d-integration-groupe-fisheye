@@ -1,6 +1,7 @@
 import type { Doorbell, Location, Teacher, Visit } from "@prisma/client";
 import axios from "axios";
 import { DEVICE_CONFIGS } from "../config/devices.config";
+import { getOutboundTopics, type MQTTPayloads } from "../mqtt/mqtt.constants";
 import type { NotifiedTeacher, TeacherPreferences } from "../types";
 import logger from "../utils/logger";
 import prismaService from "../utils/prisma";
@@ -71,10 +72,11 @@ class NotificationService {
 
   private async activateDoorbellBell(mqttClientId: string): Promise<boolean> {
     try {
-      const topic = `fisheye/${mqttClientId}/bell/activate`;
+      const topic = getOutboundTopics(mqttClientId).bellActivate;
       const duration = DEVICE_CONFIGS.doorbell.bellDuration;
+      const payload: MQTTPayloads.BellActivate = { duration };
 
-      await mqttService.publish(topic, { duration }, { qos: 1 });
+      await mqttService.publish(topic, payload, { qos: 1 });
 
       logger.info("Doorbell bell activated", { mqttClientId, duration });
       return true;
@@ -95,10 +97,11 @@ class NotificationService {
         return false;
       }
 
-      const topic = `fisheye/${buzzer.mqttClientId}/buzz/activate`;
+      const topic = getOutboundTopics(buzzer.mqttClientId).buzzActivate;
       const duration = DEVICE_CONFIGS.buzzer.buzzDuration;
+      const payload: MQTTPayloads.BuzzActivate = { duration };
 
-      await mqttService.publish(topic, { duration }, { qos: 1 });
+      await mqttService.publish(topic, payload, { qos: 1 });
 
       logger.info("Buzzer activated", {
         teacherId,
@@ -154,15 +157,58 @@ class NotificationService {
    */
   async publishPanelDisplay(
     mqttClientId: string,
-    data: {
-      teacherName: string;
-      teacherId: string;
-      weekSchedule: boolean[][];
-    },
+    data: MQTTPayloads.DisplayUpdate,
   ): Promise<void> {
-    const topic = `fisheye/${mqttClientId}/display/update`;
+    const topic = getOutboundTopics(mqttClientId).displayUpdate;
     await mqttService.publish(topic, data, { qos: 0 });
     logger.info("Panel display published", { mqttClientId });
+  }
+
+  /**
+   * Publie la liste des enseignants vers un panneau LED via MQTT
+   */
+  async publishTeachersList(
+    mqttClientId: string,
+    teachers: MQTTPayloads.TeacherInfo[],
+  ): Promise<void> {
+    const topic = getOutboundTopics(mqttClientId).teachersList;
+    const payload: MQTTPayloads.TeachersList = { teachers };
+    await mqttService.publish(topic, payload, { qos: 1 });
+    logger.info("Teachers list published to panel", {
+      mqttClientId,
+      teacherCount: teachers.length,
+    });
+  }
+
+  /**
+   * Diffuse un changement de présence à tous les panels en ligne
+   */
+  async broadcastPresenceChange(
+    data: MQTTPayloads.PresenceChanged,
+  ): Promise<void> {
+    const panels = await prismaService.client.ledPanel.findMany({
+      where: { isOnline: true },
+    });
+
+    logger.info("Broadcasting presence change to panels", {
+      teacherId: data.teacherId,
+      teacherName: data.teacherName,
+      status: data.status,
+      panelCount: panels.length,
+    });
+
+    const publishPromises = panels.map((panel) => {
+      const topic = getOutboundTopics(panel.mqttClientId).presenceChanged;
+      return mqttService.publish(topic, data, { qos: 1 }).catch((error) => {
+        logger.error("Failed to broadcast presence change to panel", {
+          panelId: panel.id,
+          mqttClientId: panel.mqttClientId,
+          error,
+        });
+      });
+    });
+
+    await Promise.all(publishPromises);
   }
 }
 
