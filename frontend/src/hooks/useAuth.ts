@@ -1,24 +1,41 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+interface Teacher {
+    id: string;
+    username: string;
+    email: string;
+    name: string;
+}
 
 export function useAuth() {
     const navigate = useNavigate();
+    const [teacher, setTeacher] = useState<Teacher | null>(null);
+    const [loading, setLoading] = useState(true);
 
-    const login = (email: string, password: string) => {
-        // Simulation front-end uniquement
-        if (email === 'admin@exemple.com' && password === 'admin') {
-            localStorage.setItem('auth_token', 'dummy-token');
-            navigate('/dashboard');
+    useEffect(() => {
+        const token = localStorage.getItem('auth_token');
+        const teacherData = localStorage.getItem('teacher');
+
+        if (token && teacherData) {
+            try {
+                setTeacher(JSON.parse(teacherData));
+            } catch {
+                localStorage.removeItem('auth_token');
+                localStorage.removeItem('teacher');
+                navigate('/login');
+            }
         } else {
-            throw new Error('Identifiants invalides');
+            navigate('/login');
         }
-    };
+        setLoading(false);
+    }, [navigate]);
 
     const logout = () => {
         localStorage.removeItem('auth_token');
+        localStorage.removeItem('teacher');
         navigate('/login');
     };
 
-    const isAuthenticated = () => !!localStorage.getItem('auth_token');
-
-    return { login, logout, isAuthenticated };
+    return { teacher, loading, logout };
 }

@@ -1,4 +1,3 @@
-// frontend/src/pages/Integrations.tsx
 import React, { useState } from 'react';
 import {
     Container,

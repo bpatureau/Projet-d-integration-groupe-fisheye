@@ -1,4 +1,3 @@
-// frontend/src/pages/Dashboard.tsx
 import { useState, useEffect } from 'react';
 import {
     Container,
@@ -13,7 +12,7 @@ import {
     Box,
     Stack
 } from '@mui/material';
-import { useWebSocket, type VisitEvent } from '../hooks/useWebSocket';
+import { useWebSocket, type VisitEvent, type VisitStatus } from '../hooks/useWebSocket';
 import { api } from '../lib/api';
 
 interface VisitEventWithNames extends VisitEvent {
@@ -48,8 +47,7 @@ export function Dashboard() {
         const todayStr = new Date().toLocaleDateString('fr-FR');
         setStats({
             total: data.length,
-            // status interne reste 'missed'
-            missed: data.filter(v => v.status === 'Manquée').length,
+            missed: data.filter(v => v.status === 'missed').length,
             today: data.filter(v => v.date.startsWith(todayStr)).length
         });
     };
@@ -64,12 +62,22 @@ export function Dashboard() {
     const handleDelete = (id: string) => api.deleteVisit(id).then(refresh);
 
     const displayed = visits.filter(v =>
-        (filter === 'all' || v.status === 'Manquée') &&
+        (filter === 'all' || v.status === 'missed') &&
         v.id.includes(search)
     );
 
-    const formatStatus = (status: string) =>
-        status === 'Manquée' ? 'Manquée' : 'Présent';
+    const formatStatus = (status: VisitStatus): string => {
+        switch (status) {
+            case 'pending':
+                return '⏳ En attente';
+            case 'answered':
+                return '✓ Décroché';
+            case 'missed':
+                return '❌ Manquée';
+            default:
+                return status;
+        }
+    };
 
     return (
         <Container maxWidth="lg" sx={{ mt: 4 }}>
