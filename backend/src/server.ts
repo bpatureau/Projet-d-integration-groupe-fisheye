@@ -10,7 +10,6 @@ import visitAutoMissScheduler from "./schedulers/visit-auto-miss.scheduler";
 import calendarService from "./services/calendar.service";
 import mqttService from "./services/mqtt.service";
 import logger from "./utils/logger";
-import { generatePassword, hashPassword } from "./utils/password";
 import prismaService from "./utils/prisma";
 
 class Server {
@@ -85,37 +84,18 @@ class Server {
       const teacherCount = await prismaService.client.teacher.count();
 
       if (teacherCount === 0) {
-        logger.info("No teachers found, creating default admin teacher...");
-
-        const password = generatePassword(16);
-        const passwordHash = await hashPassword(password);
-
-        await prismaService.client.teacher.create({
-          data: {
-            username: "admin",
-            email: "admin@fisheye.local",
-            passwordHash,
-            name: "Default Admin",
-            preferences: {
-              notifyOnTeams: false,
-              buzzerEnabled: false,
-            },
-          },
-        });
-
         logger.info("========================================");
-        logger.info("Default admin teacher created successfully!");
-        logger.info(`Username: admin`);
-        logger.info(`Temporary Password: ${password}`);
+        logger.info("No data found in database!");
         logger.info(
-          "IMPORTANT: Please change this password immediately after first login!",
+          "To seed the database with demo data, run: npm run prisma:reset",
         );
+        logger.info("Or manually seed with: npm run seed");
         logger.info("========================================");
       } else {
-        logger.info("Teachers already exist");
+        logger.info(`Database contains ${teacherCount} teacher(s)`);
       }
     } catch (error) {
-      logger.error("Failed to seed default admin", { error });
+      logger.error("Failed to check database status", { error });
     }
   }
 

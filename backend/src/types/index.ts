@@ -8,7 +8,7 @@ import type { Request } from "express";
 export type {
   Buzzer,
   Doorbell,
-  LEDPanel,
+  LedPanel,
   Location,
   Schedule,
   Teacher,

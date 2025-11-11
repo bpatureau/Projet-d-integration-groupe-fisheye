@@ -1,7 +1,7 @@
 import type {
   Buzzer,
   Doorbell,
-  LEDPanel,
+  LedPanel,
   Message,
   Teacher,
   Visit,
@@ -152,7 +152,7 @@ class DeviceActionService {
     panelId: string,
     teacherId: string,
   ): Promise<void> {
-    const panel = await prismaService.client.lEDPanel.findUnique({
+    const panel = await prismaService.client.ledPanel.findUnique({
       where: { id: panelId },
       include: { location: true },
     });
@@ -350,7 +350,7 @@ class DeviceActionService {
 
     // Pour chaque enseignant, trouve les panneaux qui l'affichent et les met à jour
     for (const teacher of teachers) {
-      const panels = await prismaService.client.lEDPanel.findMany({
+      const panels = await prismaService.client.ledPanel.findMany({
         where: {
           selectedTeacherId: teacher.id,
           isOnline: true, // Only update online panels
@@ -402,7 +402,7 @@ class DeviceActionService {
     deviceType: "doorbell" | "buzzer" | "panel",
     deviceId: string,
   ): Promise<void> {
-    let device: Doorbell | Buzzer | LEDPanel | null = null;
+    let device: Doorbell | Buzzer | LedPanel | null = null;
 
     switch (deviceType) {
       case "doorbell":

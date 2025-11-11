@@ -36,11 +36,24 @@ npm start
 docker-compose up -d
 ```
 
-## Astuce rapide
+## Base de données
 
-- Pour la base de données Prisma (si nécessaire) :
+### Commandes Prisma de base
 
 ```bash
-npm run prisma:generate
-npm run prisma:migrate
+npm run prisma:generate  # Générer le client Prisma
+npm run prisma:migrate   # Appliquer les migrations
+npm run prisma:studio    # Ouvrir l'interface Prisma Studio
 ```
+
+### Seeding de la base de données
+
+```bash
+npm run prisma:reset
+```
+
+Cette commande va :
+
+- Supprimer toutes les données existantes
+- Réappliquer toutes les migrations
+- Créer automatiquement des données de démo

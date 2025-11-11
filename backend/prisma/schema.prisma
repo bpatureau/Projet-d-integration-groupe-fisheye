@@ -39,7 +39,7 @@ model Location {
   // Relations
   teachers         TeacherLocation[]
   doorbells        Doorbell[]
-  ledPanels        LEDPanel[]
+  LedPanels        LedPanel[]
   visits           Visit[]
   schedules        Schedule[]
   receivedMessages Message[]         @relation("ReceivedMessages")
@@ -67,7 +67,7 @@ model Teacher {
   buzzer           Buzzer?
   targetedVisits   Visit[]           @relation("TargetedVisits")
   answeredVisits   Visit[]           @relation("AnsweredVisits")
-  selectedInPanels LEDPanel[]
+  selectedInPanels LedPanel[]
   receivedMessages Message[]         @relation("ReceivedMessages")
 
   @@index([username], name: "idx_teachers_username")
@@ -137,7 +137,7 @@ model Buzzer {
 }
 
 // Panneau LED 5×4 (installé dans un local)
-model LEDPanel {
+model LedPanel {
   id                String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   deviceId          String   @unique @map("device_id") @db.VarChar(255)
   mqttClientId      String   @unique @map("mqtt_client_id") @db.VarChar(255)

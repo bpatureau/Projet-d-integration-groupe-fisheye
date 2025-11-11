@@ -1,4 +1,4 @@
-import type { LEDPanel } from "@prisma/client";
+import type { LedPanel } from "@prisma/client";
 import { ConflictError, NotFoundError } from "../utils/errors";
 import logger from "../utils/logger";
 import prismaService from "../utils/prisma";
@@ -8,9 +8,9 @@ class PanelService {
     deviceId: string;
     mqttClientId: string;
     locationId: string;
-  }): Promise<LEDPanel> {
+  }): Promise<LedPanel> {
     // Vérifie qu'aucun panneau LED n'existe déjà avec ces identifiants
-    const existing = await prismaService.client.lEDPanel.findFirst({
+    const existing = await prismaService.client.ledPanel.findFirst({
       where: {
         OR: [{ deviceId: data.deviceId }, { mqttClientId: data.mqttClientId }],
       },
@@ -20,7 +20,7 @@ class PanelService {
       throw new ConflictError("Device ID or MQTT Client ID already exists");
     }
 
-    const panel = await prismaService.client.lEDPanel.create({
+    const panel = await prismaService.client.ledPanel.create({
       data,
     });
 
@@ -28,8 +28,8 @@ class PanelService {
     return panel;
   }
 
-  async findAll(): Promise<LEDPanel[]> {
-    return prismaService.client.lEDPanel.findMany({
+  async findAll(): Promise<LedPanel[]> {
+    return prismaService.client.ledPanel.findMany({
       include: {
         location: true,
         selectedTeacher: true,
@@ -38,8 +38,8 @@ class PanelService {
     });
   }
 
-  async findById(id: string): Promise<LEDPanel> {
-    const panel = await prismaService.client.lEDPanel.findUnique({
+  async findById(id: string): Promise<LedPanel> {
+    const panel = await prismaService.client.ledPanel.findUnique({
       where: { id },
       include: {
         location: true,
@@ -54,8 +54,8 @@ class PanelService {
     return panel;
   }
 
-  async findByDeviceId(deviceId: string): Promise<LEDPanel> {
-    const panel = await prismaService.client.lEDPanel.findUnique({
+  async findByDeviceId(deviceId: string): Promise<LedPanel> {
+    const panel = await prismaService.client.ledPanel.findUnique({
       where: { deviceId },
       include: {
         location: true,
@@ -70,8 +70,8 @@ class PanelService {
     return panel;
   }
 
-  async findByMqttClientId(mqttClientId: string): Promise<LEDPanel> {
-    const panel = await prismaService.client.lEDPanel.findUnique({
+  async findByMqttClientId(mqttClientId: string): Promise<LedPanel> {
+    const panel = await prismaService.client.ledPanel.findUnique({
       where: { mqttClientId },
       include: {
         location: true,
@@ -94,10 +94,10 @@ class PanelService {
       locationId?: string;
       selectedTeacherId?: string | null;
     },
-  ): Promise<LEDPanel> {
+  ): Promise<LedPanel> {
     await this.findById(id);
 
-    const panel = await prismaService.client.lEDPanel.update({
+    const panel = await prismaService.client.ledPanel.update({
       where: { id },
       data,
       include: {
@@ -113,12 +113,12 @@ class PanelService {
   async updateSelectedTeacher(
     id: string,
     teacherId: string | null,
-  ): Promise<LEDPanel> {
+  ): Promise<LedPanel> {
     return this.update(id, { selectedTeacherId: teacherId });
   }
 
   async updateOnlineStatus(id: string, isOnline: boolean): Promise<void> {
-    await prismaService.client.lEDPanel.update({
+    await prismaService.client.ledPanel.update({
       where: { id },
       data: {
         isOnline,
@@ -130,7 +130,7 @@ class PanelService {
   async delete(id: string): Promise<void> {
     await this.findById(id);
 
-    await prismaService.client.lEDPanel.delete({
+    await prismaService.client.ledPanel.delete({
       where: { id },
     });
 
