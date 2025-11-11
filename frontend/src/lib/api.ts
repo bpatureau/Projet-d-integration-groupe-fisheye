@@ -47,4 +47,52 @@ export const api = {
         new Promise(resolve => {
             setTimeout(() => resolve({ ...data }), 200);
         }),
+    getCalendarEvents: (email: string) => new Promise(resolve => {
+        setTimeout(() => {
+            resolve([
+                {
+                    id: 'ev1',
+                    title: 'TDS',
+                    start: '2025-11-04 08:30',
+                    end: '2025-11-04 10:00',
+                    provider: email.includes('gmail') ? 'Google' : 'Outlook',
+                },
+                {
+                    id: 'ev8',
+                    title: 'Admin',
+                    start: '2025-11-04 09:15',
+                    end: '2025-11-04 11:00',
+                    provider: email.includes('gmail') ? 'Google' : 'Outlook',
+                },
+                {
+                    id: 'ev2',
+                    title: 'Électronique Digitale',
+                    start: '2025-11-05 09:00',
+                    end: '2025-11-05 10:30',
+                    provider: email.includes('gmail') ? 'Google' : 'Outlook',
+                },
+                {
+                    id: 'ev3',
+                    title: 'Anglais',
+                    start: '2025-11-06 14:00',
+                    end: '2025-11-06 15:00',
+                    provider: email.includes('gmail') ? 'Google' : 'Outlook',
+                },
+                {
+                    id: 'ev4',
+                    title: 'Dev 2',
+                    start: '2025-11-07 11:30',
+                    end: '2025-11-07 12:30',
+                    provider: email.includes('gmail') ? 'Google' : 'Outlook',
+                },
+                {
+                    id: 'ev5',
+                    title: 'Réseaux',
+                    start: '2025-11-08 15:00',
+                    end: '2025-11-08 16:00',
+                    provider: email.includes('gmail') ? 'Google' : 'Outlook',
+                }
+            ]);
+        }, 800);
+    }),
 };
