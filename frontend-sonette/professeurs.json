@@ -1,0 +1,14 @@
+{
+    "Mme Vroman": {
+        "disponible": true
+    },
+    "M. Dubruille": {
+        "disponible": true
+    },
+    "M. De Smet": {
+        "disponible": false
+    },
+    "M. Van Dormael": {
+        "disponible": true
+    }
+}
