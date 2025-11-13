@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, font as tkfont
 from datetime import datetime
 import serial
 import threading
@@ -8,6 +8,26 @@ import json
 import os
 import paho.mqtt.client as mqtt
 import uuid
+
+# ===================== PALETTE DE COULEURS MODERNE =====================
+COLORS = {
+    'primary': '#87CEEB',      # Bleu ciel
+    'primary_dark': '#4A90A4', # Bleu ciel foncé
+    'primary_light': '#E0F4FF', # Bleu ciel très clair
+    'secondary': '#5AB9EA',     # Bleu vif
+    'accent': '#3498DB',        # Bleu moderne
+    'success': '#2ECC71',       # Vert succès
+    'warning': '#F39C12',       # Orange
+    'danger': '#E74C3C',        # Rouge
+    'white': '#FFFFFF',
+    'light_gray': '#F8F9FA',
+    'medium_gray': '#E9ECEF',
+    'border_light': '#DEE2E6',  # Bordure claire
+    'text_dark': '#2C3E50',
+    'text_light': '#7F8C8D',
+    'online': '#2ECC71',
+    'offline': '#E74C3C',
+}
 
 # ===================== GESTION CONFIGURATION =====================
 def charger_config():
@@ -105,7 +125,6 @@ def create_mqtt_client(broker, port, user, passwd, client_id):
     client.on_publish = on_publish
     client.user_data_set(unacked_publish)
     
-    # Callbacks additionnels
     def on_connect(client, userdata, flags, reason_code, properties):
         if reason_code == 0:
             print(f"[MQTT] ✓ Connecté au broker {broker}:{port}")
@@ -153,7 +172,6 @@ def publish_mqtt(client, topic, payload, qos=1, retain=False, wait=False):
         print(f"[MQTT] ✗ Erreur de publication: {e}")
         return False
 
-# Initialiser le client MQTT
 mqttc = create_mqtt_client(
     config.get("mqtt_broker", "localhost"),
     config.get("mqtt_port", 1883),
@@ -162,15 +180,58 @@ mqttc = create_mqtt_client(
     config.get("mqtt_client_id", f"fisheye_{uuid.uuid4().hex[:8]}")
 )
 
+# ===================== WIDGETS MODERNES =====================
+class ModernButton(tk.Frame):
+    """Bouton moderne avec effet hover"""
+    def __init__(self, parent, text, command=None, bg_color=None, fg_color=None, **kwargs):
+        super().__init__(parent, bg=parent.cget('bg'))
+        
+        self.bg_normal = bg_color or COLORS['primary']
+        self.bg_hover = COLORS['primary_dark']
+        self.fg_color = fg_color or COLORS['white']
+        self.command = command
+        
+        self.button = tk.Label(
+            self, 
+            text=text, 
+            bg=self.bg_normal, 
+            fg=self.fg_color,
+            font=("Segoe UI", 11, "bold"),
+            padx=30,
+            pady=12,
+            cursor="hand2"
+        )
+        self.button.pack()
+        
+        self.button.bind("<Enter>", self.on_enter)
+        self.button.bind("<Leave>", self.on_leave)
+        self.button.bind("<Button-1>", self.on_click)
+    
+    def on_enter(self, e):
+        self.button.config(bg=self.bg_hover)
+    
+    def on_leave(self, e):
+        self.button.config(bg=self.bg_normal)
+    
+    def on_click(self, e):
+        if self.command:
+            self.command()
+
+class ModernCard(tk.Frame):
+    """Carte moderne avec bordure subtile"""
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, bg=COLORS['white'], relief="flat", bd=0, **kwargs)
+        self.configure(highlightbackground=COLORS['border_light'], highlightthickness=1)
+
 # ===================== APPLICATION TKINTER =====================
 class SonnetteApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Interface de la sonnette")
+        self.root.title("Sonnette Intelligente")
         
         # Mode plein écran
         self.root.attributes('-fullscreen', True)
-        self.root.configure(bg="#008b8b")
+        self.root.configure(bg=COLORS['light_gray'])
         
         # Touches de contrôle
         self.root.bind('<Escape>', self.quitter_fullscreen)
@@ -189,37 +250,16 @@ class SonnetteApp:
         self.mqtt_client = mqttc
         self.client_id = config.get("mqtt_client_id")
         
+        # Configuration des polices modernes
+        self.setup_fonts()
+        
         # S'abonner aux topics après connexion
         self.root.after(1000, self.subscribe_topics)
-        
-        # Publier le status initial
         self.root.after(2000, self.publier_status)
         
-        # Titre avec indicateur MQTT
-        titre_frame = tk.Frame(root, bg="#00008b", height=50)
-        titre_frame.pack(fill="x", padx=5, pady=5)
-        titre_frame.pack_propagate(False)
-        
-        titre_container = tk.Frame(titre_frame, bg="#00008b")
-        titre_container.pack(expand=True, fill="x")
-        
-        titre = tk.Label(titre_container, text="Interface de la sonnette",
-                         font=("Arial", 18, "bold"), bg="#00008b", fg="white")
-        titre.pack(side="left", padx=20)
-        
-        self.mqtt_status_label = tk.Label(titre_container, text="● MQTT: Connexion...",
-                                          font=("Arial", 10), bg="#00008b", fg="#ffa500")
-        self.mqtt_status_label.pack(side="right", padx=20)
-        
-        # Vérifier la connexion MQTT périodiquement
-        self.verifier_mqtt()
-        
-        # Layout principal
-        main_frame = tk.Frame(root, bg="#008b8b")
-        main_frame.pack(fill="both", expand=True, padx=5, pady=5)
-        
-        self.create_messages_column(main_frame)
-        self.create_profs_column(main_frame)
+        # Créer l'interface
+        self.create_header()
+        self.create_main_content()
         
         # Sélection initiale
         if self.prof_noms:
@@ -236,6 +276,462 @@ class SonnetteApp:
         # Handler fermeture propre
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
     
+    def setup_fonts(self):
+        """Configure les polices modernes"""
+        self.font_title = tkfont.Font(family="Segoe UI", size=24, weight="bold")
+        self.font_subtitle = tkfont.Font(family="Segoe UI", size=14, weight="bold")
+        self.font_body = tkfont.Font(family="Segoe UI", size=11)
+        self.font_small = tkfont.Font(family="Segoe UI", size=9)
+    
+    def create_header(self):
+        """Crée l'en-tête moderne"""
+        header = tk.Frame(self.root, bg=COLORS['white'], height=80)
+        header.pack(fill="x", padx=0, pady=0)
+        header.pack_propagate(False)
+        
+        # Container pour le contenu de l'en-tête
+        header_content = tk.Frame(header, bg=COLORS['white'])
+        header_content.pack(fill="both", expand=True, padx=30, pady=15)
+        
+        # Titre
+        title_frame = tk.Frame(header_content, bg=COLORS['white'])
+        title_frame.pack(side="left")
+        
+        title = tk.Label(
+            title_frame, 
+            text="🔔 Sonnette Intelligente",
+            font=self.font_title, 
+            bg=COLORS['white'], 
+            fg=COLORS['text_dark']
+        )
+        title.pack(anchor="w")
+        
+        subtitle = tk.Label(
+            title_frame,
+            text="Communication avec les professeurs",
+            font=self.font_small,
+            bg=COLORS['white'],
+            fg=COLORS['text_light']
+        )
+        subtitle.pack(anchor="w")
+        
+        # Status MQTT
+        status_frame = tk.Frame(header_content, bg=COLORS['white'])
+        status_frame.pack(side="right")
+        
+        self.mqtt_status_indicator = tk.Label(
+            status_frame,
+            text="●",
+            font=("Segoe UI", 16),
+            bg=COLORS['white'],
+            fg=COLORS['warning']
+        )
+        self.mqtt_status_indicator.pack(side="left", padx=(0, 10))
+        
+        mqtt_text_frame = tk.Frame(status_frame, bg=COLORS['white'])
+        mqtt_text_frame.pack(side="left")
+        
+        tk.Label(
+            mqtt_text_frame,
+            text="État MQTT",
+            font=self.font_small,
+            bg=COLORS['white'],
+            fg=COLORS['text_light']
+        ).pack(anchor="w")
+        
+        self.mqtt_status_label = tk.Label(
+            mqtt_text_frame,
+            text="Connexion...",
+            font=("Segoe UI", 10, "bold"),
+            bg=COLORS['white'],
+            fg=COLORS['text_dark']
+        )
+        self.mqtt_status_label.pack(anchor="w")
+        
+        # Ligne de séparation
+        separator = tk.Frame(self.root, bg=COLORS['medium_gray'], height=1)
+        separator.pack(fill="x")
+        
+        # Vérifier la connexion MQTT périodiquement
+        self.verifier_mqtt()
+    
+    def create_main_content(self):
+        """Crée le contenu principal"""
+        main_container = tk.Frame(self.root, bg=COLORS['light_gray'])
+        main_container.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        self.create_message_section(main_container)
+        self.create_professors_section(main_container)
+    
+    def create_message_section(self, parent):
+        """Section d'écriture de message"""
+        message_card = ModernCard(parent)
+        message_card.pack(side="left", fill="both", expand=True, padx=(0, 10))
+        
+        # En-tête de la carte
+        header = tk.Frame(message_card, bg=COLORS['primary_light'])
+        header.pack(fill="x")
+        
+        tk.Label(
+            header,
+            text="✍️  Composer un message",
+            font=self.font_subtitle,
+            bg=COLORS['primary_light'],
+            fg=COLORS['text_dark'],
+            anchor="w"
+        ).pack(padx=25, pady=15)
+        
+        # Corps de la carte
+        body = tk.Frame(message_card, bg=COLORS['white'])
+        body.pack(fill="both", expand=True, padx=25, pady=20)
+        
+        # Zone de texte moderne
+        text_container = tk.Frame(body, bg=COLORS['white'])
+        text_container.pack(fill="both", expand=True)
+        
+        tk.Label(
+            text_container,
+            text="Message",
+            font=self.font_body,
+            bg=COLORS['white'],
+            fg=COLORS['text_dark'],
+            anchor="w"
+        ).pack(anchor="w", pady=(0, 8))
+        
+        # Frame pour la zone de texte avec bordure
+        text_frame = tk.Frame(text_container, bg=COLORS['primary'], bd=2)
+        text_frame.pack(fill="both", expand=True)
+        
+        self.message_text = tk.Text(
+            text_frame,
+            height=10,
+            font=self.font_body,
+            relief="flat",
+            bd=0,
+            padx=15,
+            pady=15,
+            bg=COLORS['white'],
+            fg=COLORS['text_dark'],
+            insertbackground=COLORS['primary']
+        )
+        self.message_text.pack(fill="both", expand=True)
+        self.message_text.insert("1.0", "")
+        self.message_text.bind("<FocusIn>", self.clear_placeholder)
+        
+        # Instructions
+        instruction_card = tk.Frame(body, bg=COLORS['primary_light'], bd=0)
+        instruction_card.pack(fill="x", pady=15)
+        
+        instruction_content = tk.Frame(instruction_card, bg=COLORS['primary_light'])
+        instruction_content.pack(padx=20, pady=15)
+        
+        tk.Label(
+            instruction_content,
+            text="🕹️",
+            font=("Segoe UI", 20),
+            bg=COLORS['primary_light']
+        ).pack(side="left", padx=(0, 15))
+        
+        tk.Label(
+            instruction_content,
+            text="Utilisez le joystick pour naviguer\nAppuyez sur le bouton pour envoyer",
+            font=self.font_body,
+            bg=COLORS['primary_light'],
+            fg=COLORS['text_dark'],
+            justify="left"
+        ).pack(side="left")
+        
+        # Sélection actuelle
+        self.selection_label = tk.Label(
+            body,
+            text="Aucun destinataire sélectionné",
+            font=self.font_body,
+            bg=COLORS['white'],
+            fg=COLORS['text_light']
+        )
+        self.selection_label.pack(pady=(10, 0))
+        
+        # Notification
+        self.notif_label = tk.Label(
+            body,
+            text="",
+            font=("Segoe UI", 12, "bold"),
+            bg=COLORS['white'],
+            wraplength=500,
+            justify="center"
+        )
+        self.notif_label.pack(pady=15)
+    
+    def create_professors_section(self, parent):
+        """Section des professeurs"""
+        profs_card = ModernCard(parent)
+        profs_card.pack(side="right", fill="both", expand=True, padx=(10, 0))
+        
+        # En-tête de la carte
+        header = tk.Frame(profs_card, bg=COLORS['primary_light'])
+        header.pack(fill="x")
+        
+        tk.Label(
+            header,
+            text="👥  Destinataires",
+            font=self.font_subtitle,
+            bg=COLORS['primary_light'],
+            fg=COLORS['text_dark'],
+            anchor="w"
+        ).pack(padx=25, pady=15)
+        
+        # Corps avec liste scrollable
+        list_container = tk.Frame(profs_card, bg=COLORS['white'])
+        list_container.pack(fill="both", expand=True, padx=15, pady=15)
+        
+        # Canvas pour le scroll
+        self.canvas = tk.Canvas(
+            list_container,
+            bg=COLORS['white'],
+            highlightthickness=0,
+            bd=0
+        )
+        
+        scrollbar = tk.Scrollbar(
+            list_container,
+            orient="vertical",
+            command=self.canvas.yview
+        )
+        
+        self.profs_list_frame = tk.Frame(self.canvas, bg=COLORS['white'])
+        
+        self.profs_list_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        )
+        
+        self.canvas.create_window((0, 0), window=self.profs_list_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Créer les items
+        widgets_tous = self.create_prof_item_tous()
+        self.prof_widgets["TOUS"] = widgets_tous
+        
+        for i, (nom, info) in enumerate(self.professeurs.items()):
+            widgets = self.create_prof_item(nom, info)
+            self.prof_widgets[nom] = widgets
+        
+        self.canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+    
+    def create_prof_item_tous(self):
+        """Crée l'item 'TOUS'"""
+        item_frame = tk.Frame(
+            self.profs_list_frame,
+            bg=COLORS['primary'],
+            cursor="hand2",
+            bd=0
+        )
+        item_frame.pack(fill="x", padx=10, pady=8)
+        
+        content = tk.Frame(item_frame, bg=COLORS['primary'])
+        content.pack(fill="x", padx=20, pady=15)
+        
+        left_side = tk.Frame(content, bg=COLORS['primary'])
+        left_side.pack(side="left")
+        
+        icon = tk.Label(
+            left_side,
+            text="📢",
+            font=("Segoe UI", 18),
+            bg=COLORS['primary']
+        )
+        icon.pack(side="left", padx=(0, 15))
+        
+        text_frame = tk.Frame(left_side, bg=COLORS['primary'])
+        text_frame.pack(side="left")
+        
+        nom_label = tk.Label(
+            text_frame,
+            text="TOUS LES PROFESSEURS",
+            font=("Segoe UI", 12, "bold"),
+            bg=COLORS['primary'],
+            fg=COLORS['white'],
+            anchor="w"
+        )
+        nom_label.pack(anchor="w")
+        
+        nb_profs = len(self.professeurs)
+        tk.Label(
+            text_frame,
+            text=f"{nb_profs} destinataires",
+            font=self.font_small,
+            bg=COLORS['primary'],
+            fg=COLORS['white'],
+            anchor="w"
+        ).pack(anchor="w")
+        
+        for widget in [item_frame, content, left_side, icon, text_frame, nom_label]:
+            widget.bind("<Button-1>", lambda e: self.selectionner_prof("TOUS"))
+        
+        return {'nom_label': nom_label, 'item_frame': item_frame, 'is_tous': True}
+    
+    def create_prof_item(self, nom, info):
+        """Crée un item professeur"""
+        item_frame = tk.Frame(
+            self.profs_list_frame,
+            bg=COLORS['white'],
+            cursor="hand2",
+            bd=0,
+            highlightbackground=COLORS['medium_gray'],
+            highlightthickness=1
+        )
+        item_frame.pack(fill="x", padx=10, pady=5)
+        
+        content = tk.Frame(item_frame, bg=COLORS['white'])
+        content.pack(fill="x", padx=20, pady=15)
+        
+        # Nom du professeur
+        nom_label = tk.Label(
+            content,
+            text=nom,
+            font=("Segoe UI", 11),
+            bg=COLORS['white'],
+            fg=COLORS['text_dark'],
+            anchor="w"
+        )
+        nom_label.pack(side="left")
+        
+        # Status
+        status_frame = tk.Frame(content, bg=COLORS['white'])
+        status_frame.pack(side="right")
+        
+        couleur = COLORS['success'] if info["disponible"] else COLORS['danger']
+        texte = "Disponible" if info["disponible"] else "Indisponible"
+        
+        status_indicator = tk.Label(
+            status_frame,
+            text="●",
+            font=("Segoe UI", 14),
+            bg=COLORS['white'],
+            fg=couleur
+        )
+        status_indicator.pack(side="left", padx=(0, 8))
+        
+        status_label = tk.Label(
+            status_frame,
+            text=texte,
+            font=self.font_small,
+            bg=COLORS['white'],
+            fg=COLORS['text_light']
+        )
+        status_label.pack(side="left")
+        
+        for widget in [item_frame, content, nom_label, status_frame, status_indicator, status_label]:
+            widget.bind("<Button-1>", lambda e, n=nom: self.selectionner_prof(n))
+        
+        return {
+            'nom_label': nom_label,
+            'item_frame': item_frame,
+            'status_indicator': status_indicator,
+            'status_label': status_label,
+            'is_tous': False
+        }
+    
+    def selectionner_prof(self, nom):
+        """Sélectionne un professeur"""
+        # Désélectionner l'ancien
+        if self.prof_selectionne and self.prof_selectionne in self.prof_widgets:
+            old_widgets = self.prof_widgets[self.prof_selectionne]
+            if old_widgets.get('is_tous'):
+                old_widgets['item_frame'].config(bg=COLORS['primary'])
+            else:
+                old_widgets['item_frame'].config(
+                    bg=COLORS['white'],
+                    highlightbackground=COLORS['medium_gray']
+                )
+        
+        # Sélectionner le nouveau
+        self.prof_selectionne = nom
+        
+        if nom == "TOUS":
+            self.selection_label.config(
+                text=f"📢 Envoi à tous les professeurs ({len(self.professeurs)})",
+                fg=COLORS['primary']
+            )
+        else:
+            self.selection_label.config(
+                text=f"📩 Destinataire : {nom}",
+                fg=COLORS['text_dark']
+            )
+        
+        widgets = self.prof_widgets[nom]
+        if widgets.get('is_tous'):
+            widgets['item_frame'].config(bg=COLORS['primary_dark'])
+        else:
+            widgets['item_frame'].config(
+                bg=COLORS['primary_light'],
+                highlightbackground=COLORS['primary']
+            )
+        
+        self.scroll_vers_selection(nom)
+        print(f"[SÉLECTION] {nom}")
+        
+        # Publier la sélection MQTT
+        if nom != "TOUS" and nom in self.professeurs:
+            teacher_id = self.professeurs[nom].get("id")
+            if teacher_id:
+                self.publier_teacher_selected(teacher_id)
+    
+    def scroll_vers_selection(self, nom):
+        """Scroll automatiquement vers le professeur sélectionné"""
+        if not self.canvas or nom not in self.prof_widgets:
+            return
+        
+        try:
+            item_frame = self.prof_widgets[nom]['item_frame']
+            canvas_height = self.canvas.winfo_height()
+            item_y = item_frame.winfo_y()
+            item_height = item_frame.winfo_height()
+            
+            scroll_region = self.canvas.bbox("all")
+            if scroll_region:
+                total_height = scroll_region[3]
+                position = (item_y + item_height/2 - canvas_height/2) / total_height
+                position = max(0.0, min(1.0, position))
+                self.canvas.yview_moveto(position)
+        except Exception as e:
+            print(f"[ERREUR SCROLL] {e}")
+    
+    def afficher_notification(self, message, duree=3000, couleur=None):
+        """Affiche une notification temporaire"""
+        if couleur is None:
+            couleur = COLORS['text_dark']
+        self.notif_label.config(text=message, fg=couleur)
+        self.root.after(duree, lambda: self.notif_label.config(text=""))
+    
+    def clear_placeholder(self, event):
+        """Efface le placeholder au focus"""
+        contenu = self.message_text.get("1.0", "end-1c")
+        if contenu == "":
+            self.message_text.delete("1.0", "end")
+            self.message_text.config(fg=COLORS['text_dark'])
+    
+    def activer_focus_message(self):
+        self.message_text.focus_set()
+        if self.message_text.get("1.0", "end-1c") == "":
+            self.message_text.delete("1.0", "end")
+    
+    def verifier_mqtt(self):
+        """Vérifie et met à jour le status MQTT"""
+        try:
+            if self.mqtt_client.is_connected():
+                self.mqtt_status_indicator.config(fg=COLORS['online'])
+                self.mqtt_status_label.config(text="Connecté")
+            else:
+                self.mqtt_status_indicator.config(fg=COLORS['offline'])
+                self.mqtt_status_label.config(text="Déconnecté")
+        except:
+            self.mqtt_status_indicator.config(fg=COLORS['danger'])
+            self.mqtt_status_label.config(text="Erreur")
+        
+        self.root.after(2000, self.verifier_mqtt)
+    
     def subscribe_topics(self):
         """S'abonner aux topics MQTT"""
         topics = [
@@ -249,7 +745,6 @@ class SonnetteApp:
             self.mqtt_client.subscribe(topic, qos)
             print(f"[MQTT] ✓ Abonné à '{topic}'")
         
-        # Configurer le callback pour traiter les messages
         self.mqtt_client.on_message = self.handle_mqtt_message
     
     def handle_mqtt_message(self, client, userdata, msg):
@@ -265,7 +760,7 @@ class SonnetteApp:
                 self.root.after(0, lambda: self.afficher_notification(
                     f"🔔 Sonnette activée ({duration}ms)", 
                     duree=duration,
-                    couleur="#ff8c00"
+                    couleur=COLORS['warning']
                 ))
             
             elif "buzz/activate" in topic:
@@ -273,7 +768,7 @@ class SonnetteApp:
                 self.root.after(0, lambda: self.afficher_notification(
                     f"🚨 Buzzer activé ({duration}ms)", 
                     duree=duration,
-                    couleur="#ff4500"
+                    couleur=COLORS['danger']
                 ))
             
             elif "display/update" in topic:
@@ -281,25 +776,13 @@ class SonnetteApp:
                 self.root.after(0, lambda: self.afficher_notification(
                     f"📺 Affichage: {teacher_name}", 
                     duree=3000,
-                    couleur="#1e90ff"
+                    couleur=COLORS['secondary']
                 ))
         
         except json.JSONDecodeError:
             print(f"[MQTT] Message non-JSON reçu: {msg.payload.decode()}")
         except Exception as e:
             print(f"[MQTT] Erreur traitement message: {e}")
-    
-    def verifier_mqtt(self):
-        """Vérifie et met à jour le status MQTT"""
-        try:
-            if self.mqtt_client.is_connected():
-                self.mqtt_status_label.config(text="● MQTT: Connecté", fg="#00ff00")
-            else:
-                self.mqtt_status_label.config(text="● MQTT: Déconnecté", fg="#ff4500")
-        except:
-            self.mqtt_status_label.config(text="● MQTT: Erreur", fg="#ff0000")
-        
-        self.root.after(2000, self.verifier_mqtt)
     
     def publier_button_pressed(self, teacher_id=None):
         """Publier un événement de bouton pressé"""
@@ -314,9 +797,7 @@ class SonnetteApp:
     def publier_teacher_selected(self, teacher_id):
         """Publier une sélection d'enseignant"""
         topic = f"fisheye/{self.client_id}/teacher/selected"
-        payload = {
-            "teacherId": teacher_id
-        }
+        payload = {"teacherId": teacher_id}
         publish_mqtt(self.mqtt_client, topic, payload, qos=0)
     
     def publier_door_opened(self):
@@ -328,38 +809,8 @@ class SonnetteApp:
     def publier_status(self):
         """Publier le status de l'appareil"""
         topic = f"fisheye/{self.client_id}/status"
-        payload = "online"   # <-- TEXTE BRUT
+        payload = "online"
         publish_mqtt(self.mqtt_client, topic, payload, qos=1, retain=True)
-    
-    def on_closing(self):
-        """Handler pour fermeture propre"""
-        print("[INFO] Fermeture de l'application...")
-
-        # Publier status offline en texte brut
-        topic = f"fisheye/{self.client_id}/status"
-        payload = "offline"   # <-- TEXTE BRUT
-        publish_mqtt(self.mqtt_client, topic, payload, qos=1, retain=True, wait=True)
-
-        # Attendre que tous les messages soient envoyés
-        while unacked_publish:
-            time.sleep(0.1)
-
-        self.mqtt_client.loop_stop()
-        self.mqtt_client.disconnect()
-        self.root.destroy()
-
-    
-    def quitter_fullscreen(self, event=None):
-        self.root.attributes('-fullscreen', False)
-    
-    def toggle_fullscreen(self, event=None):
-        is_fullscreen = self.root.attributes('-fullscreen')
-        self.root.attributes('-fullscreen', not is_fullscreen)
-    
-    def activer_focus_message(self):
-        self.message_text.focus_set()
-        if self.message_text.get("1.0", "end-1c") == "Écrire un message...":
-            self.message_text.delete("1.0", "end")
     
     def lire_joystick(self):
         """Boucle de lecture du joystick"""
@@ -398,6 +849,7 @@ class SonnetteApp:
                 time.sleep(1)
     
     def deplacer_selection(self, direction):
+        """Déplace la sélection avec le joystick"""
         if direction in ["haut", "gauche"]:
             self.prof_index = (self.prof_index - 1) % len(self.prof_noms)
         elif direction in ["bas", "droite"]:
@@ -405,31 +857,55 @@ class SonnetteApp:
         
         nom = self.prof_noms[self.prof_index]
         self.selectionner_prof(nom)
-        
-        if nom != "TOUS" and nom in self.professeurs:
-            teacher_id = self.professeurs[nom].get("id")
-            if teacher_id:
-                self.publier_teacher_selected(teacher_id)
     
-    def scroll_vers_selection(self, nom):
-        """Scroll automatiquement vers le professeur sélectionné"""
-        if not self.canvas or nom not in self.prof_widgets:
+    def envoyer_au_prof(self):
+        """Envoie le message au professeur sélectionné via MQTT"""
+        message = self.message_text.get("1.0", "end-1c").strip()
+        
+        if not message or message == "":
+            self.afficher_notification(
+                "⚠️ Veuillez écrire un message", 
+                duree=2000, 
+                couleur=COLORS['warning']
+            )
             return
         
-        try:
-            item_frame = self.prof_widgets[nom]['item_frame']
-            canvas_height = self.canvas.winfo_height()
-            item_y = item_frame.winfo_y()
-            item_height = item_frame.winfo_height()
+        if not self.prof_selectionne:
+            self.afficher_notification(
+                "⚠️ Aucun professeur sélectionné", 
+                duree=2000, 
+                couleur=COLORS['warning']
+            )
+            return
+        
+        # Préparer le payload MQTT
+        topic = f"fisheye/{self.client_id}/message/sent"
+        payload = {"message": message}
+        
+        if self.prof_selectionne == "TOUS":
+            payload["to"] = "all"
+            payload["recipients"] = list(self.professeurs.keys())
+            notif_text = f"✓ Message envoyé à TOUS les professeurs"
+        else:
+            payload["teacherId"] = self.professeurs[self.prof_selectionne].get("id")
+            notif_text = f"✓ Message envoyé à {self.prof_selectionne}"
             
-            scroll_region = self.canvas.bbox("all")
-            if scroll_region:
-                total_height = scroll_region[3]
-                position = (item_y + item_height/2 - canvas_height/2) / total_height
-                position = max(0.0, min(1.0, position))
-                self.canvas.yview_moveto(position)
-        except Exception as e:
-            print(f"[ERREUR SCROLL] {e}")
+            teacher_id = self.professeurs[self.prof_selectionne].get("id")
+            if teacher_id:
+                self.publier_button_pressed(teacher_id)
+        
+        # Publier le message
+        if publish_mqtt(self.mqtt_client, topic, payload, qos=1):
+            self.afficher_notification(notif_text, duree=3000, couleur=COLORS['success'])
+            self.message_text.delete("1.0", "end")
+            self.message_text.insert("1.0", "")
+            print(f"[MESSAGE] Envoyé à {self.prof_selectionne}: {message}")
+        else:
+            self.afficher_notification(
+                "✗ Erreur d'envoi du message", 
+                duree=3000, 
+                couleur=COLORS['danger']
+            )
     
     def mettre_a_jour_disponibilite(self, nom, disponible):
         """Met à jour la disponibilité d'un professeur"""
@@ -447,24 +923,17 @@ class SonnetteApp:
     
     def rafraichir_affichage_prof(self, nom):
         """Rafraîchit l'affichage d'un professeur"""
-        if nom not in self.prof_widgets:
+        if nom not in self.prof_widgets or nom == "TOUS":
             return
         
         info = self.professeurs[nom]
         widgets = self.prof_widgets[nom]
         
-        for widget in widgets['item_frame'].winfo_children():
-            if isinstance(widget, tk.Frame):
-                for child in widget.winfo_children():
-                    if isinstance(child, tk.Frame):
-                        for subchild in child.winfo_children():
-                            if isinstance(subchild, tk.Label):
-                                if subchild.cget("text") == "●":
-                                    couleur = "#00ff00" if info["disponible"] else "#ff0000"
-                                    subchild.config(fg=couleur)
-                                elif subchild.cget("text") in ["Disponible", "Indisponible"]:
-                                    texte = "Disponible" if info["disponible"] else "Indisponible"
-                                    subchild.config(text=texte)
+        couleur = COLORS['success'] if info["disponible"] else COLORS['danger']
+        texte = "Disponible" if info["disponible"] else "Indisponible"
+        
+        widgets['status_indicator'].config(fg=couleur)
+        widgets['status_label'].config(text=texte)
     
     def recharger_professeurs(self):
         """Recharge la liste des professeurs"""
@@ -479,8 +948,8 @@ class SonnetteApp:
         widgets_tous = self.create_prof_item_tous()
         self.prof_widgets["TOUS"] = widgets_tous
         
-        for i, (nom, info) in enumerate(self.professeurs.items()):
-            widgets = self.create_prof_item(nom, info, i + 1)
+        for nom, info in self.professeurs.items():
+            widgets = self.create_prof_item(nom, info)
             self.prof_widgets[nom] = widgets
         
         self.prof_index = 0
@@ -489,199 +958,31 @@ class SonnetteApp:
         
         print(f"[INFO] {len(self.professeurs)} professeurs rechargés")
     
-    def create_messages_column(self, parent):
-        left_frame = tk.Frame(parent, bg="#c0c0c0", relief="raised", bd=3)
-        left_frame.pack(side="left", fill="both", expand=True, padx=(0, 3))
-        
-        write_section = tk.Frame(left_frame, bg="#c0c0c0")
-        write_section.pack(fill="both", expand=True, padx=10, pady=10)
-        
-        label_write = tk.Label(write_section, text="Écrire un message",
-                               font=("Arial", 11, "bold"), bg="#c0c0c0", fg="#00008b")
-        label_write.pack(anchor="w", pady=(0, 10))
-        
-        self.message_text = tk.Text(write_section, height=8, font=("Arial", 10),
-                                    relief="solid", bd=2)
-        self.message_text.pack(fill="both", expand=True)
-        self.message_text.insert("1.0", "Écrire un message...")
-        self.message_text.bind("<FocusIn>", self.clear_placeholder)
-        
-        instruction_frame = tk.Frame(write_section, bg="#e8f4f8", relief="solid", bd=2)
-        instruction_frame.pack(pady=15, fill="x")
-        
-        instruction_label = tk.Label(
-            instruction_frame, 
-            text="🕹️ Appuyez sur le bouton du joystick pour envoyer le message",
-            font=("Arial", 11, "bold"), 
-            bg="#e8f4f8", 
-            fg="#00008b",
-            pady=12
-        )
-        instruction_label.pack()
-        
-        self.selection_label = tk.Label(write_section, text="Aucun professeur sélectionné",
-                                        font=("Arial", 9), bg="#c0c0c0", fg="#333333")
-        self.selection_label.pack(pady=5)
-        
-        self.notif_label = tk.Label(write_section, text="", 
-                                    font=("Arial", 11, "bold"), 
-                                    bg="#c0c0c0", fg="#00008b",
-                                    wraplength=400, justify="center")
-        self.notif_label.pack(pady=10)
+    def quitter_fullscreen(self, event=None):
+        """Quitte le mode plein écran"""
+        self.root.attributes('-fullscreen', False)
     
-    def create_profs_column(self, parent):
-        right_frame = tk.Frame(parent, bg="#c0c0c0", relief="raised", bd=3)
-        right_frame.pack(side="right", fill="both", expand=True, padx=(3, 0))
-        
-        titre_profs = tk.Label(right_frame, text="Professeurs disponibles",
-                               font=("Arial", 11, "bold"), bg="#c0c0c0", fg="#00008b")
-        titre_profs.pack(anchor="w", padx=10, pady=10)
-        
-        list_frame = tk.Frame(right_frame, bg="white", relief="solid", bd=2)
-        list_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
-        
-        self.canvas = tk.Canvas(list_frame, bg="white", highlightthickness=0)
-        scrollbar = tk.Scrollbar(list_frame, orient="vertical", command=self.canvas.yview)
-        self.profs_list_frame = tk.Frame(self.canvas, bg="white")
-        
-        self.profs_list_frame.bind(
-            "<Configure>",
-            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-        )
-        
-        self.canvas.create_window((0, 0), window=self.profs_list_frame, anchor="nw")
-        self.canvas.configure(yscrollcommand=scrollbar.set)
-        
-        widgets_tous = self.create_prof_item_tous()
-        self.prof_widgets["TOUS"] = widgets_tous
-        
-        for i, (nom, info) in enumerate(self.professeurs.items()):
-            widgets = self.create_prof_item(nom, info, i + 1)
-            self.prof_widgets[nom] = widgets
-        
-        self.canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+    def toggle_fullscreen(self, event=None):
+        """Bascule le mode plein écran"""
+        is_fullscreen = self.root.attributes('-fullscreen')
+        self.root.attributes('-fullscreen', not is_fullscreen)
     
-    def create_prof_item_tous(self):
-        bg_color = "#e8f4f8"
-        item_frame = tk.Frame(self.profs_list_frame, bg=bg_color, relief="raised", bd=2, cursor="hand2")
-        item_frame.pack(fill="x", padx=5, pady=5)
+    def on_closing(self):
+        """Handler pour fermeture propre"""
+        print("[INFO] Fermeture de l'application...")
         
-        content_frame = tk.Frame(item_frame, bg=bg_color)
-        content_frame.pack(fill="x", padx=10, pady=10)
+        # Publier status offline
+        topic = f"fisheye/{self.client_id}/status"
+        payload = "offline"
+        publish_mqtt(self.mqtt_client, topic, payload, qos=1, retain=True, wait=True)
         
-        nom_label = tk.Label(content_frame, text="TOUS LES PROFESSEURS", 
-                            font=("Arial", 10, "bold"), bg=bg_color, anchor="w")
-        nom_label.pack(side="left")
+        # Attendre que tous les messages soient envoyés
+        while unacked_publish:
+            time.sleep(0.1)
         
-        dispo_frame = tk.Frame(content_frame, bg=bg_color)
-        dispo_frame.pack(side="right")
-        
-        nb_profs = len(self.professeurs)
-        info_label = tk.Label(dispo_frame, text=f"({nb_profs} profs)", 
-                             font=("Arial", 9), bg=bg_color)
-        info_label.pack(side="left")
-        
-        for widget in [item_frame, content_frame, nom_label, dispo_frame, info_label]:
-            widget.bind("<Button-1>", lambda e: self.selectionner_prof("TOUS"))
-        
-        return {'nom_label': nom_label, 'item_frame': item_frame}
-    
-    def create_prof_item(self, nom, info, index):
-        bg_color = "white" if index % 2 == 0 else "#f5f5f5"
-        item_frame = tk.Frame(self.profs_list_frame, bg=bg_color, relief="flat", bd=1, cursor="hand2")
-        item_frame.pack(fill="x", padx=5, pady=2)
-        
-        content_frame = tk.Frame(item_frame, bg=bg_color)
-        content_frame.pack(fill="x", padx=10, pady=8)
-        
-        nom_label = tk.Label(content_frame, text=nom, font=("Arial", 10), bg=bg_color, anchor="w")
-        nom_label.pack(side="left")
-        
-        dispo_frame = tk.Frame(content_frame, bg=bg_color)
-        dispo_frame.pack(side="right")
-        
-        couleur = "#00ff00" if info["disponible"] else "#ff0000"
-        texte = "Disponible" if info["disponible"] else "Indisponible"
-        
-        cercle = tk.Label(dispo_frame, text="●", font=("Arial", 12), bg=bg_color, fg=couleur)
-        cercle.pack(side="left", padx=(0, 5))
-        
-        status_label = tk.Label(dispo_frame, text=texte, font=("Arial", 9), bg=bg_color)
-        status_label.pack(side="left")
-        
-        for widget in [item_frame, content_frame, nom_label, dispo_frame, cercle, status_label]:
-            widget.bind("<Button-1>", lambda e, n=nom: self.selectionner_prof(n))
-        
-        return {'nom_label': nom_label, 'item_frame': item_frame}
-    
-    def selectionner_prof(self, nom):
-        if self.prof_selectionne and self.prof_selectionne in self.prof_widgets:
-            old_widgets = self.prof_widgets[self.prof_selectionne]
-            old_widgets['nom_label'].config(font=("Arial", 10))
-            old_widgets['item_frame'].config(relief="flat" if self.prof_selectionne != "TOUS" else "raised")
-        
-        self.prof_selectionne = nom
-        self.selection_label.config(text=f"Professeur sélectionné : {nom}")
-        
-        widgets = self.prof_widgets[nom]
-        widgets['nom_label'].config(font=("Arial", 10, "bold"))
-        widgets['item_frame'].config(relief="solid", bd=3)
-        
-        self.scroll_vers_selection(nom)
-        print(f"[SÉLECTION] {nom}")
-    
-    def afficher_notification(self, message, duree=3000, couleur="#00008b"):
-        """Affiche une notification temporaire"""
-        self.notif_label.config(text=message, fg=couleur)
-        self.root.after(duree, lambda: self.notif_label.config(text=""))
-    
-    def clear_placeholder(self, event):
-        """Efface le placeholder au focus"""
-        contenu = self.message_text.get("1.0", "end-1c")
-        if contenu == "Écrire un message...":
-            self.message_text.delete("1.0", "end")
-            self.message_text.config(fg="black")
-    
-    def envoyer_au_prof(self):
-        """Envoie le message au professeur sélectionné via MQTT"""
-        message = self.message_text.get("1.0", "end-1c").strip()
-        
-        if not message or message == "Écrire un message...":
-            self.afficher_notification("⚠️ Veuillez écrire un message", duree=2000, couleur="#ff4500")
-            return
-        
-        if not self.prof_selectionne:
-            self.afficher_notification("⚠️ Aucun professeur sélectionné", duree=2000, couleur="#ff4500")
-            return
-        
-        # Préparer le payload MQTT
-        topic = f"fisheye/{self.client_id}/message/sent"
-        payload = {
-            "message": message
-        }
-        
-        if self.prof_selectionne == "TOUS":
-            payload["to"] = "all"
-            payload["recipients"] = list(self.professeurs.keys())
-            notif_text = f"✓ Message envoyé à TOUS les professeurs"
-        else:
-            payload["teacherId"] = self.professeurs[self.prof_selectionne].get("id")
-            notif_text = f"✓ Message envoyé à {self.prof_selectionne}"
-            
-            # Publier aussi l'événement de bouton pressé pour ce professeur
-            teacher_id = self.professeurs[self.prof_selectionne].get("id")
-            if teacher_id:
-                self.publier_button_pressed(teacher_id)
-        
-        # Publier le message
-        if publish_mqtt(self.mqtt_client, topic, payload, qos=1):
-            self.afficher_notification(notif_text, duree=3000, couleur="#00ff00")
-            self.message_text.delete("1.0", "end")
-            self.message_text.insert("1.0", "Écrire un message...")
-            print(f"[MESSAGE] Envoyé à {self.prof_selectionne}: {message}")
-        else:
-            self.afficher_notification("✗ Erreur d'envoi du message", duree=3000, couleur="#ff0000")
+        self.mqtt_client.loop_stop()
+        self.mqtt_client.disconnect()
+        self.root.destroy()
 
 
 # ===================== MAIN =====================
