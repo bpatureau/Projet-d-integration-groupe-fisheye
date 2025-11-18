@@ -971,17 +971,33 @@ class SonnetteApp:
         """Handler pour fermeture propre"""
         print("[INFO] Fermeture de l'application...")
         
-        # Publier status offline
-        topic = f"fisheye/{self.client_id}/status"
-        payload = "offline"
-        publish_mqtt(self.mqtt_client, topic, payload, qos=1, retain=True, wait=True)
+        try:
+            # Publier status offline avec timeout
+            topic = f"fisheye/{self.client_id}/status"
+            payload = "offline"
+            publish_mqtt(self.mqtt_client, topic, payload, qos=1, retain=True)
+            
+            # Attendre max 2 secondes pour les messages non confirmés
+            timeout = time.time() + 2
+            while unacked_publish and time.time() < timeout:
+                time.sleep(0.1)
+            
+            # Arrêter le client MQTT
+            self.mqtt_client.loop_stop()
+            self.mqtt_client.disconnect()
+        except Exception as e:
+            print(f"[ERREUR] Lors de la fermeture MQTT: {e}")
         
-        # Attendre que tous les messages soient envoyés
-        while unacked_publish:
-            time.sleep(0.1)
+        try:
+            # Fermer le port série si ouvert
+            if arduino and arduino.is_open:
+                arduino.close()
+                print("[INFO] Port série fermé")
+        except Exception as e:
+            print(f"[ERREUR] Lors de la fermeture Arduino: {e}")
         
-        self.mqtt_client.loop_stop()
-        self.mqtt_client.disconnect()
+        # Forcer la destruction de la fenêtre
+        self.root.quit()
         self.root.destroy()
 
 
