@@ -57,7 +57,7 @@ class MQTTDispatcher {
    */
   private async handleDoorbellButtonPressed(
     topic: string,
-    payload: Buffer
+    payload: Buffer,
   ): Promise<void> {
     const mqttClientId = extractClientIdFromTopic(topic);
     if (!mqttClientId) {
@@ -74,7 +74,7 @@ class MQTTDispatcher {
     const doorbell = await doorbellService.findByMqttClientId(mqttClientId);
     await deviceActionService.handleDoorbellButtonPressed(
       doorbell.id,
-      targetTeacherId
+      targetTeacherId,
     );
   }
 
@@ -83,7 +83,7 @@ class MQTTDispatcher {
    */
   private async handleDoorOpened(
     topic: string,
-    _payload: Buffer
+    _payload: Buffer,
   ): Promise<void> {
     const mqttClientId = extractClientIdFromTopic(topic);
     if (!mqttClientId) {
@@ -100,7 +100,7 @@ class MQTTDispatcher {
    */
   private async handleMessageSend(
     topic: string,
-    payload: Buffer
+    payload: Buffer,
   ): Promise<void> {
     const mqttClientId = extractClientIdFromTopic(topic);
     if (!mqttClientId) {
@@ -128,7 +128,7 @@ class MQTTDispatcher {
       doorbell.id,
       text,
       targetTeacherId,
-      undefined
+      undefined,
     );
   }
 
@@ -137,7 +137,7 @@ class MQTTDispatcher {
    */
   private async handleTeacherSelected(
     topic: string,
-    payload: Buffer
+    payload: Buffer,
   ): Promise<void> {
     const mqttClientId = extractClientIdFromTopic(topic);
     if (!mqttClientId) {
@@ -191,7 +191,7 @@ class MQTTDispatcher {
       await deviceActionService.handleStatus(
         "doorbell",
         doorbell.deviceId,
-        isOnline
+        isOnline,
       );
       return;
     } catch {}
@@ -207,7 +207,7 @@ class MQTTDispatcher {
       await deviceActionService.handleStatus(
         "buzzer",
         buzzerDevice.deviceId,
-        isOnline
+        isOnline,
       );
       return;
     } catch {}
@@ -226,7 +226,7 @@ class MQTTDispatcher {
    */
   private async handleTeachersRequest(
     topic: string,
-    _payload: Buffer
+    _payload: Buffer,
   ): Promise<void> {
     const mqttClientId = extractClientIdFromTopic(topic);
     if (!mqttClientId) {
@@ -243,7 +243,7 @@ class MQTTDispatcher {
    */
   private async handlePresenceUpdate(
     topic: string,
-    payload: Buffer
+    payload: Buffer,
   ): Promise<void> {
     const mqttClientId = extractClientIdFromTopic(topic);
     if (!mqttClientId) {
@@ -273,7 +273,7 @@ class MQTTDispatcher {
       panel.id,
       teacherId,
       status,
-      until
+      until,
     );
   }
 
@@ -282,7 +282,7 @@ class MQTTDispatcher {
    */
   private async handleBellActivateAck(
     topic: string,
-    payload: Buffer
+    payload: Buffer,
   ): Promise<void> {
     const mqttClientId = extractClientIdFromTopic(topic);
     if (!mqttClientId) {
@@ -310,7 +310,7 @@ class MQTTDispatcher {
    */
   private async handleBuzzActivateAck(
     topic: string,
-    payload: Buffer
+    payload: Buffer,
   ): Promise<void> {
     const mqttClientId = extractClientIdFromTopic(topic);
     if (!mqttClientId) {
@@ -338,7 +338,7 @@ class MQTTDispatcher {
    */
   private async handleDisplayUpdateAck(
     topic: string,
-    payload: Buffer
+    payload: Buffer,
   ): Promise<void> {
     const mqttClientId = extractClientIdFromTopic(topic);
     if (!mqttClientId) {
