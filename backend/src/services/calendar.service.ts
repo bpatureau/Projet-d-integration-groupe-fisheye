@@ -133,33 +133,57 @@ class CalendarService {
     return null;
   }
 
-  private async upsertSchedule(schedule: ScheduleData): Promise<boolean> {
-    await prismaService.client.schedule.upsert({
-      where: { eventId: schedule.eventId },
-      update: {
-        teacherEmail: schedule.teacherEmail,
-        summary: schedule.summary,
-        description: schedule.description,
-        startTime: schedule.startTime,
-        endTime: schedule.endTime,
-        allDay: schedule.allDay,
-        lastSync: schedule.lastSync,
-      },
-      create: {
-        calendarId: schedule.calendarId,
-        locationId: schedule.locationId,
-        eventId: schedule.eventId,
-        teacherEmail: schedule.teacherEmail,
-        summary: schedule.summary,
-        description: schedule.description,
-        startTime: schedule.startTime,
-        endTime: schedule.endTime,
-        allDay: schedule.allDay,
-        lastSync: schedule.lastSync,
+  private async upsertSchedule(data: ScheduleData): Promise<boolean> {
+    // Vérifier si l'événement existe déjà et s'il a changé
+    const existing = await prismaService.client.schedule.findUnique({
+      where: { eventId: data.eventId },
+    });
+
+    if (existing) {
+      // Compare les champs pertinents pour voir s'il y a un changement
+      const hasChanged =
+        existing.startTime.getTime() !== data.startTime.getTime() ||
+        existing.endTime.getTime() !== data.endTime.getTime() ||
+        existing.summary !== data.summary ||
+        existing.description !== (data.description || null) ||
+        existing.teacherEmail !== data.teacherEmail;
+
+      if (!hasChanged) {
+        return false; // Pas de mise à jour nécessaire
+      }
+
+      // Mise à jour
+      await prismaService.client.schedule.update({
+        where: { eventId: data.eventId },
+        data: {
+          teacherEmail: data.teacherEmail,
+          summary: data.summary,
+          description: data.description,
+          startTime: data.startTime,
+          endTime: data.endTime,
+          allDay: data.allDay,
+          lastSync: data.lastSync,
+        },
+      });
+      return true;
+    }
+
+    // Création
+    await prismaService.client.schedule.create({
+      data: {
+        calendarId: data.calendarId,
+        locationId: data.locationId,
+        eventId: data.eventId,
+        teacherEmail: data.teacherEmail,
+        summary: data.summary,
+        description: data.description,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        allDay: data.allDay,
+        lastSync: data.lastSync,
       },
     });
 
-    // Return true to indicate schedule was processed
     return true;
   }
 

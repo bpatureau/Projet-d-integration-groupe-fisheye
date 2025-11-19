@@ -10,6 +10,7 @@ import mqttService from "./mqtt.service";
 class NotificationService {
   /**
    * Notifie les enseignants lors d'une sonnerie (sonnette + Teams + buzzers)
+   * Exécute les notifications en parallèle de manière non-bloquante
    */
   async notifyTeachersOfRing(
     visit: Visit & { doorbell: Doorbell; location: Location },
@@ -21,8 +22,12 @@ class NotificationService {
     });
 
     const notifiedTeachers: NotifiedTeacher[] = [];
+    const notificationPromises: Promise<unknown>[] = [];
 
-    await this.activateDoorbellBell(visit.doorbell.mqttClientId);
+    // 1. Activer la sonnette physique (toujours)
+    notificationPromises.push(
+      this.activateDoorbellBell(visit.doorbell.mqttClientId),
+    );
 
     for (const teacher of teachers) {
       const channels: string[] = ["doorbell"];
@@ -31,26 +36,30 @@ class NotificationService {
         buzzerEnabled: true,
       };
 
+      // 2. Activer le buzzer (si activé)
       if (prefs.buzzerEnabled) {
-        const activated = await this.activateBuzzer(teacher.id);
-        if (activated) {
-          channels.push("buzzer");
-        }
+        notificationPromises.push(
+          this.activateBuzzer(teacher.id).then((activated) => {
+            if (activated) channels.push("buzzer");
+          }),
+        );
       }
 
+      // 3. Notifier Teams (si activé)
       if (
         prefs.notifyOnTeams &&
         teacher.teamsEmail &&
         visit.location.teamsWebhookUrl
       ) {
-        const sent = await this.sendTeamsNotification(
-          visit.location.teamsWebhookUrl,
-          visit.location,
-          [teacher],
+        notificationPromises.push(
+          this.sendTeamsNotification(
+            visit.location.teamsWebhookUrl,
+            visit.location,
+            [teacher],
+          ).then((sent) => {
+            if (sent) channels.push("teams");
+          }),
         );
-        if (sent) {
-          channels.push("teams");
-        }
       }
 
       notifiedTeachers.push({
@@ -62,12 +71,46 @@ class NotificationService {
       });
     }
 
-    logger.info(`Notified ${teachers.length} teachers`, {
+    // Attendre que toutes les notifications soient traitées (succès ou échec)
+    // Cela évite de bloquer la réponse HTTP si Teams est lent
+    Promise.allSettled(notificationPromises).then((results) => {
+      const rejected = results.filter((r) => r.status === "rejected");
+      if (rejected.length > 0) {
+        logger.warn(
+          `${rejected.length} notification actions failed for visit ${visit.id}`,
+        );
+      }
+    });
+
+    logger.info(`Notifications dispatched for ${teachers.length} teachers`, {
       visitId: visit.id,
-      channels: notifiedTeachers.map((nt) => nt.notificationChannels),
     });
 
     return notifiedTeachers;
+  }
+
+  /**
+   * Notifie la sonnette qu'une visite a été manquée (timeout ou rejet)
+   * Permet d'afficher un message "Professeur absent" sur l'écran
+   */
+  async notifyDoorbellOfMiss(
+    visit: Visit & { doorbell: Doorbell },
+  ): Promise<void> {
+    const topic = getOutboundTopics(visit.doorbell.mqttClientId).visitMissed;
+    const payload: MQTTPayloads.VisitMissed = { visitId: visit.id };
+
+    try {
+      await mqttService.publish(topic, payload, { qos: 1 });
+      logger.info("Doorbell notified of missed visit", {
+        visitId: visit.id,
+        mqttClientId: visit.doorbell.mqttClientId,
+      });
+    } catch (error) {
+      logger.error("Failed to notify doorbell of missed visit", {
+        visitId: visit.id,
+        error,
+      });
+    }
   }
 
   private async activateDoorbellBell(mqttClientId: string): Promise<boolean> {
@@ -93,7 +136,7 @@ class NotificationService {
       });
 
       if (!buzzer || !buzzer.isOnline) {
-        logger.warn("Buzzer not found or offline", { teacherId });
+        // Pas de log warn ici pour ne pas spammer si le prof n'a pas de buzzer
         return false;
       }
 
@@ -140,7 +183,7 @@ class NotificationService {
     };
 
     try {
-      await axios.post(webhookUrl, message);
+      await axios.post(webhookUrl, message, { timeout: 5000 }); // Timeout 5s
       logger.info("Teams notification sent", {
         location: location.name,
         teachers: teachers.length,

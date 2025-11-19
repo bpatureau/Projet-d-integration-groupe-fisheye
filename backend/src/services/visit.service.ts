@@ -4,6 +4,7 @@ import type { VisitStats } from "../types";
 import { NotFoundError } from "../utils/errors";
 import logger from "../utils/logger";
 import prismaService from "../utils/prisma";
+import notificationService from "./notification.service";
 
 class VisitService {
   /**
@@ -189,6 +190,9 @@ class VisitService {
       },
     });
 
+    // Notifie la sonnette que la visite est manquée
+    await notificationService.notifyDoorbellOfMiss(visit);
+
     logger.info("Visit marked as missed", { visitId });
     return visit;
   }
@@ -199,23 +203,53 @@ class VisitService {
   async autoMissExpiredVisits(): Promise<number> {
     const now = new Date();
 
-    const result = await prismaService.client.visit.updateMany({
+    // Trouve d'abord les visites à expirer pour pouvoir les notifier
+    const expiredVisits = await prismaService.client.visit.findMany({
       where: {
         status: "pending",
         autoMissAt: {
           lte: now,
         },
       },
+      include: {
+        doorbell: true,
+        location: true,
+        targetTeacher: true,
+        answeredBy: true,
+      },
+    });
+
+    if (expiredVisits.length === 0) {
+      return 0;
+    }
+
+    // Met à jour en masse
+    await prismaService.client.visit.updateMany({
+      where: {
+        id: { in: expiredVisits.map((v) => v.id) },
+      },
       data: {
         status: "missed",
       },
     });
 
-    if (result.count > 0) {
-      logger.info("Auto-missed expired visits", { count: result.count });
+    // Notifie chaque sonnette
+    for (const visit of expiredVisits) {
+      await notificationService.notifyDoorbellOfMiss(visit).catch((err) => {
+        logger.error("Failed to notify missed visit during auto-miss", {
+          visitId: visit.id,
+          error: err,
+        });
+      });
     }
 
-    return result.count;
+    if (expiredVisits.length > 0) {
+      logger.info("Auto-missed expired visits", {
+        count: expiredVisits.length,
+      });
+    }
+
+    return expiredVisits.length;
   }
 
   /**

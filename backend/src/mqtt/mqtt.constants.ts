@@ -37,6 +37,7 @@ export const MQTT_TOPICS_INBOUND = {
 export const MQTT_TOPICS_OUTBOUND = {
   // Sonnette
   BELL_ACTIVATE: "bell/activate",
+  VISIT_MISSED: "visit/missed",
 
   // Buzzer
   BUZZ_ACTIVATE: "buzz/activate",
@@ -83,6 +84,7 @@ export function getInboundTopics(clientId: string) {
 export function getOutboundTopics(clientId: string) {
   return {
     bellActivate: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_OUTBOUND.BELL_ACTIVATE}`,
+    visitMissed: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_OUTBOUND.VISIT_MISSED}`,
     buzzActivate: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_OUTBOUND.BUZZ_ACTIVATE}`,
     displayUpdate: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_OUTBOUND.DISPLAY_UPDATE}`,
     teachersList: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_OUTBOUND.TEACHERS_LIST}`,
@@ -169,6 +171,10 @@ export namespace MQTTPayloads {
 
   export interface BellActivate {
     duration: number;
+  }
+
+  export interface VisitMissed {
+    visitId: string;
   }
 
   export interface BuzzActivate {

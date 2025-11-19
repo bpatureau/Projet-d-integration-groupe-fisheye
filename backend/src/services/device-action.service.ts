@@ -31,7 +31,7 @@ class DeviceActionService {
    */
   async handleDoorbellButtonPressed(
     doorbellId: string,
-    targetTeacherId?: string,
+    targetTeacherId?: string
   ): Promise<Visit> {
     const doorbell = await prismaService.client.doorbell.findUnique({
       where: { id: doorbellId },
@@ -71,20 +71,21 @@ class DeviceActionService {
     });
 
     const presentTeachers = await presenceService.getOnlyPresentTeachers(
-      doorbell.locationId,
+      doorbell.locationId
     );
 
     let teachersToNotify: Teacher[] = presentTeachers;
     if (validatedTargetTeacherId) {
       // Notifie uniquement l'enseignant ciblé s'il est présent
       teachersToNotify = presentTeachers.filter(
-        (t) => t.id === validatedTargetTeacherId,
+        (t) => t.id === validatedTargetTeacherId
       );
       if (teachersToNotify.length === 0) {
         logger.warn("Target teacher not present", {
           targetTeacherId: validatedTargetTeacherId,
           locationId: doorbell.locationId,
         });
+        // Optionnel: Notifier tous les profs si le ciblé est absent ?
       }
     }
 
@@ -110,7 +111,7 @@ class DeviceActionService {
 
   async handleDoorbellButtonPressedByDeviceId(
     deviceId: string,
-    targetTeacherId?: string,
+    targetTeacherId?: string
   ): Promise<Visit> {
     const doorbell = await doorbellService.findByDeviceId(deviceId);
     return this.handleDoorbellButtonPressed(doorbell.id, targetTeacherId);
@@ -151,7 +152,7 @@ class DeviceActionService {
    */
   async handleTeacherSelected(
     panelId: string,
-    teacherId: string,
+    teacherId: string
   ): Promise<void> {
     const panel = await prismaService.client.ledPanel.findUnique({
       where: { id: panelId },
@@ -189,66 +190,68 @@ class DeviceActionService {
 
   async handleTeacherSelectedByDeviceId(
     deviceId: string,
-    teacherId: string,
+    teacherId: string
   ): Promise<void> {
     const panel = await panelService.findByDeviceId(deviceId);
     return this.handleTeacherSelected(panel.id, teacherId);
   }
 
   /**
-   * Génère la grille d'emploi du temps pour le panneau LED (5×4)
-   * 5 jours (Lun-Ven) × 4 blocs horaires (8h-10h, 10h-12h, 14h-16h, 16h-18h)
+   * Génère la grille d'emploi du temps pour le panneau LED
+   * Utilise la configuration définie dans devices.config.ts
    */
   private async generateWeekScheduleGrid(
-    teacher: Teacher,
+    teacher: Teacher
   ): Promise<boolean[][]> {
+    const config = DEVICE_CONFIGS.ledPanel.schedule;
+    // Initialisation de la grille vide
+    const grid: boolean[][] = Array.from({ length: config.days }, () =>
+      Array(config.timeBlocks.length).fill(false)
+    );
+
     if (!teacher.gmailEmail) {
-      return Array(5).fill(Array(4).fill(false));
+      return grid;
     }
 
-    const _config = DEVICE_CONFIGS.ledPanel;
     const now = new Date();
 
+    // Calcul du Lundi de la semaine courante
+    // Note: Cela dépend de la Timezone du serveur. Idéalement, le serveur est en UTC+1 (BE)
     const startOfWeek = new Date(now);
-    const day = startOfWeek.getDay();
-    const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+    const day = startOfWeek.getDay(); // 0 = Dimanche, 1 = Lundi...
+    const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1); // Ajuste au Lundi
     startOfWeek.setDate(diff);
     startOfWeek.setHours(0, 0, 0, 0);
 
     const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 5);
+    endOfWeek.setDate(startOfWeek.getDate() + 5); // Vendredi soir inclus
 
     const schedules = await calendarService.getTeacherSchedule(
       teacher.gmailEmail,
       startOfWeek,
-      endOfWeek,
+      endOfWeek
     );
 
-    const grid: boolean[][] = Array.from({ length: 5 }, () =>
-      Array(4).fill(false),
-    );
-
-    const timeBlocks = [
-      { start: 8, end: 10 },
-      { start: 10, end: 12 },
-      { start: 14, end: 16 },
-      { start: 16, end: 18 },
-    ];
-
-    for (let dayIndex = 0; dayIndex < 5; dayIndex++) {
+    for (let dayIndex = 0; dayIndex < config.days; dayIndex++) {
       const dayStart = new Date(startOfWeek);
       dayStart.setDate(startOfWeek.getDate() + dayIndex);
 
-      for (let blockIndex = 0; blockIndex < 4; blockIndex++) {
-        const block = timeBlocks[blockIndex];
+      for (
+        let blockIndex = 0;
+        blockIndex < config.timeBlocks.length;
+        blockIndex++
+      ) {
+        const block = config.timeBlocks[blockIndex];
         const blockStart = new Date(dayStart);
         blockStart.setHours(block.start, 0, 0, 0);
         const blockEnd = new Date(dayStart);
         blockEnd.setHours(block.end, 0, 0, 0);
 
+        // Vérifie si un cours chevauche ce bloc horaire
         const hasEvent = schedules.some((schedule) => {
           const scheduleStart = new Date(schedule.startTime);
           const scheduleEnd = new Date(schedule.endTime);
+          // Logique d'intersection d'intervalles
           return scheduleStart < blockEnd && scheduleEnd > blockStart;
         });
 
@@ -267,7 +270,7 @@ class DeviceActionService {
     doorbellId: string,
     text: string,
     targetTeacherId?: string,
-    targetLocationId?: string,
+    targetLocationId?: string
   ): Promise<Message> {
     const doorbell = await prismaService.client.doorbell.findUnique({
       where: { id: doorbellId },
@@ -310,14 +313,14 @@ class DeviceActionService {
     deviceId: string,
     text: string,
     targetTeacherId?: string,
-    targetLocationId?: string,
+    targetLocationId?: string
   ): Promise<Message> {
     const doorbell = await doorbellService.findByDeviceId(deviceId);
     return this.handleDoorbellMessage(
       doorbell.id,
       text,
       targetTeacherId,
-      targetLocationId,
+      targetLocationId
     );
   }
 
@@ -401,7 +404,7 @@ class DeviceActionService {
    */
   async handleStatus(
     deviceType: "doorbell" | "buzzer" | "panel",
-    deviceId: string,
+    deviceId: string
   ): Promise<void> {
     let device: Doorbell | Buzzer | LedPanel | null = null;
 
@@ -431,7 +434,7 @@ class DeviceActionService {
    */
   async handleTeachersRequest(
     panelId: string,
-    locationId: string,
+    locationId: string
   ): Promise<void> {
     const panel = await prismaService.client.ledPanel.findUnique({
       where: { id: panelId },
@@ -451,8 +454,9 @@ class DeviceActionService {
     const teachers = teacherLocations.map((tl) => tl.teacher);
 
     // Récupère les informations de présence pour chaque enseignant
-    const presentTeachers =
-      await presenceService.getPresentTeachersInLocation(locationId);
+    const presentTeachers = await presenceService.getPresentTeachersInLocation(
+      locationId
+    );
 
     // Crée la liste des enseignants avec leur statut de présence
     const teachersList = teachers.map((teacher) => {
@@ -463,14 +467,19 @@ class DeviceActionService {
         email: teacher.email,
         isPresent: presenceInfo?.isPresent || false,
         presenceSource: presenceInfo?.presenceSource || "unavailable",
-        manualStatus: presenceInfo?.manualStatus,
+        manualStatus: presenceInfo?.manualStatus
+          ? {
+              status: presenceInfo.manualStatus.status,
+              until: presenceInfo.manualStatus.until?.toISOString(),
+            }
+          : undefined,
       };
     });
 
     // Envoie la liste au panel via MQTT
     await notificationService.publishTeachersList(
       panel.mqttClientId,
-      teachersList,
+      teachersList
     );
 
     logger.info("Teachers list sent to panel", {
@@ -488,7 +497,7 @@ class DeviceActionService {
     panelId: string,
     teacherId: string,
     status: "present" | "absent" | "dnd",
-    until?: string,
+    until?: string
   ): Promise<void> {
     const panel = await prismaService.client.ledPanel.findUnique({
       where: { id: panelId },
