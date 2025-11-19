@@ -9,24 +9,24 @@ import os
 import paho.mqtt.client as mqtt
 import uuid
 
-# ===================== PALETTE DE COULEURS MODERNE =====================
+# ===================== PALETTE DE COULEURS MODERNE=====================
 COLORS = {
-    'primary': '#87CEEB',      # Bleu ciel
-    'primary_dark': '#4A90A4', # Bleu ciel foncé
-    'primary_light': '#E0F4FF', # Bleu ciel très clair
-    'secondary': '#5AB9EA',     # Bleu vif
-    'accent': '#3498DB',        # Bleu moderne
-    'success': '#2ECC71',       # Vert succès
-    'warning': '#F39C12',       # Orange
-    'danger': '#E74C3C',        # Rouge
-    'white': '#FFFFFF',
-    'light_gray': '#F8F9FA',
-    'medium_gray': '#E9ECEF',
-    'border_light': '#DEE2E6',  # Bordure claire
-    'text_dark': '#2C3E50',
-    'text_light': '#7F8C8D',
-    'online': '#2ECC71',
-    'offline': '#E74C3C',
+    'primary': '#0F4C81',
+    'primary_dark': '#0A3B66',  
+    'primary_light': '#E0F2F7', 
+    'secondary': '#4A90E2',      
+    'accent': '#78C2F2',         
+    'success': '#28A745',       
+    'warning': '#FFC107',       
+    'danger': '#DC3545',         
+    'white': '#FFFFFF',          
+    'light_gray': '#F5F5F5',     
+    'medium_gray': '#D0D0D0',    
+    'border_light': '#A8DDEB',   
+    'text_dark': '#212529',     
+    'text_light': '#6C757D', 
+    'online': '#28A745',
+    'offline': '#DC3545',
 }
 
 # ===================== GESTION CONFIGURATION =====================
@@ -166,7 +166,7 @@ def publish_mqtt(client, topic, payload, qos=1, retain=False, wait=False):
             msg.wait_for_publish()
         
         print(f"[MQTT] → {topic}")
-        print(f"        {payload_str}")
+        print(f"     {payload_str}")
         return True
     except Exception as e:
         print(f"[MQTT] ✗ Erreur de publication: {e}")
@@ -221,6 +221,7 @@ class ModernCard(tk.Frame):
     """Carte moderne avec bordure subtile"""
     def __init__(self, parent, **kwargs):
         super().__init__(parent, bg=COLORS['white'], relief="flat", bd=0, **kwargs)
+        # Bordure subtile en bleu clair pour l'esthétique "dégradé abstrait"
         self.configure(highlightbackground=COLORS['border_light'], highlightthickness=1)
 
 # ===================== APPLICATION TKINTER =====================
@@ -245,6 +246,8 @@ class SonnetteApp:
         self.prof_index = 0
         self.prof_widgets = {}
         self.canvas = None
+
+        self.door_status = 0
         
         # Référence au client MQTT
         self.mqtt_client = mqttc
@@ -265,7 +268,7 @@ class SonnetteApp:
         if self.prof_noms:
             self.selectionner_prof(self.prof_noms[self.prof_index])
         
-        # AUTO-FOCUS sur la zone de texte
+        # Focus sur la zone de texte
         self.root.after(100, self.activer_focus_message)
         
         # Thread pour le joystick
@@ -299,7 +302,7 @@ class SonnetteApp:
         
         title = tk.Label(
             title_frame, 
-            text="🔔 Sonnette Intelligente",
+            text="🔔 Sonnette",
             font=self.font_title, 
             bg=COLORS['white'], 
             fg=COLORS['text_dark']
@@ -398,8 +401,8 @@ class SonnetteApp:
             anchor="w"
         ).pack(anchor="w", pady=(0, 8))
         
-        # Frame pour la zone de texte avec bordure
-        text_frame = tk.Frame(text_container, bg=COLORS['primary'], bd=2)
+        # Frame pour la zone de texte avec bordure (ajusté pour le nouveau thème)
+        text_frame = tk.Frame(text_container, bg=COLORS['white'], highlightbackground=COLORS['medium_gray'], highlightthickness=1)
         text_frame.pack(fill="both", expand=True)
         
         self.message_text = tk.Text(
@@ -412,14 +415,14 @@ class SonnetteApp:
             pady=15,
             bg=COLORS['white'],
             fg=COLORS['text_dark'],
-            insertbackground=COLORS['primary']
+            insertbackground=COLORS['secondary'] # Curseur bleu vif
         )
         self.message_text.pack(fill="both", expand=True)
         self.message_text.insert("1.0", "")
         self.message_text.bind("<FocusIn>", self.clear_placeholder)
         
         # Instructions
-        instruction_card = tk.Frame(body, bg=COLORS['primary_light'], bd=0)
+        instruction_card = tk.Frame(body, bg=COLORS['primary_light'], bd=0, highlightbackground=COLORS['border_light'], highlightthickness=1)
         instruction_card.pack(fill="x", pady=15)
         
         instruction_content = tk.Frame(instruction_card, bg=COLORS['primary_light'])
@@ -495,7 +498,10 @@ class SonnetteApp:
         scrollbar = tk.Scrollbar(
             list_container,
             orient="vertical",
-            command=self.canvas.yview
+            command=self.canvas.yview,
+            troughcolor=COLORS['light_gray'],
+            bg=COLORS['medium_gray'],
+            activebackground=COLORS['medium_gray']
         )
         
         self.profs_list_frame = tk.Frame(self.canvas, bg=COLORS['white'])
@@ -520,12 +526,14 @@ class SonnetteApp:
         scrollbar.pack(side="right", fill="y")
     
     def create_prof_item_tous(self):
-        """Crée l'item 'TOUS'"""
+        """Crée l'item 'TOUS' avec un fond principal bleu"""
         item_frame = tk.Frame(
             self.profs_list_frame,
             bg=COLORS['primary'],
             cursor="hand2",
-            bd=0
+            bd=0,
+            highlightbackground=COLORS['primary_dark'],
+            highlightthickness=2 # Bordure foncée pour l'effet spécial
         )
         item_frame.pack(fill="x", padx=10, pady=8)
         
@@ -635,24 +643,43 @@ class SonnetteApp:
     
     def selectionner_prof(self, nom):
         """Sélectionne un professeur"""
-        # Désélectionner l'ancien
+        # Désélectionner l'ancien (ajusté pour le nouveau thème)
         if self.prof_selectionne and self.prof_selectionne in self.prof_widgets:
             old_widgets = self.prof_widgets[self.prof_selectionne]
             if old_widgets.get('is_tous'):
-                old_widgets['item_frame'].config(bg=COLORS['primary'])
+                # Ramener à la couleur primaire normale
+                old_widgets['item_frame'].config(bg=COLORS['primary'], highlightbackground=COLORS['primary_dark'], highlightthickness=2)
+                for widget in old_widgets['item_frame'].winfo_children():
+                    if isinstance(widget, tk.Frame):
+                        widget.config(bg=COLORS['primary'])
+                        for child in widget.winfo_children():
+                            if isinstance(child, tk.Frame):
+                                child.config(bg=COLORS['primary'])
+                                for grand_child in child.winfo_children():
+                                    if grand_child.winfo_class() == 'Label':
+                                        grand_child.config(bg=COLORS['primary'])
+                            elif child.winfo_class() == 'Label':
+                                child.config(bg=COLORS['primary'])
             else:
+                # Ramener au blanc et bordure gris clair
                 old_widgets['item_frame'].config(
                     bg=COLORS['white'],
-                    highlightbackground=COLORS['medium_gray']
+                    highlightbackground=COLORS['medium_gray'],
+                    highlightthickness=1
                 )
+                for widget in old_widgets['item_frame'].winfo_children():
+                    if isinstance(widget, tk.Frame):
+                        widget.config(bg=COLORS['white'])
+                        for child in widget.winfo_children():
+                            if child.winfo_class() == 'Label':
+                                child.config(bg=COLORS['white'])
         
-        # Sélectionner le nouveau
         self.prof_selectionne = nom
         
         if nom == "TOUS":
             self.selection_label.config(
                 text=f"📢 Envoi à tous les professeurs ({len(self.professeurs)})",
-                fg=COLORS['primary']
+                fg=COLORS['primary_light'] # Utiliser le bleu foncé pour la sélection spéciale
             )
         else:
             self.selection_label.config(
@@ -662,12 +689,33 @@ class SonnetteApp:
         
         widgets = self.prof_widgets[nom]
         if widgets.get('is_tous'):
-            widgets['item_frame'].config(bg=COLORS['primary_dark'])
+            # Sélection TOUS : Bleu foncé (primary_dark) avec bordure primaire
+            widgets['item_frame'].config(bg=COLORS['primary_dark'], highlightbackground=COLORS['primary'], highlightthickness=2)
+            for widget in widgets['item_frame'].winfo_children():
+                if isinstance(widget, tk.Frame):
+                    widget.config(bg=COLORS['primary_dark'])
+                    for child in widget.winfo_children():
+                        if isinstance(child, tk.Frame):
+                            child.config(bg=COLORS['primary_dark'])
+                            for grand_child in child.winfo_children():
+                                if grand_child.winfo_class() == 'Label':
+                                    grand_child.config(bg=COLORS['primary_dark'])
+                        elif child.winfo_class() == 'Label':
+                            child.config(bg=COLORS['primary_dark'])
         else:
+            # Sélection individuelle : Bleu très clair (primary_light) avec bordure bleu profond
             widgets['item_frame'].config(
                 bg=COLORS['primary_light'],
-                highlightbackground=COLORS['primary']
+                highlightbackground=COLORS['primary'],
+                highlightthickness=2 # Bordure plus marquée pour la sélection
             )
+            for widget in widgets['item_frame'].winfo_children():
+                if isinstance(widget, tk.Frame):
+                    widget.config(bg=COLORS['primary_light'])
+                    for child in widget.winfo_children():
+                        if child.winfo_class() == 'Label':
+                            child.config(bg=COLORS['primary_light'])
+
         
         self.scroll_vers_selection(nom)
         print(f"[SÉLECTION] {nom}")
@@ -820,7 +868,7 @@ class SonnetteApp:
         
         while True:
             try:
-                if arduino.in_waiting > 0:
+                if arduino and arduino.in_waiting > 0:
                     ligne = arduino.readline().decode('utf-8').strip()
                     arduino.flushInput()
                     
@@ -828,11 +876,15 @@ class SonnetteApp:
                         continue
                     
                     try:
-                        x, y, bouton = ligne.split(',')
-                        x, y, bouton = int(x), int(y), int(bouton)
+                        # On s'attend à 4 valeurs (X, Y, Bouton Joystick, Bouton Sonnette)
+                        x, y, bouton_joystick, bouton_sonnette = ligne.split(',')
+                        x, y, bouton_joystick, bouton_sonnette = int(x), int(y), int(bouton_joystick), int(bouton_sonnette)
                     except ValueError:
+                        print(f"[ERREUR JOYSTICK] Format de données incorrect: {ligne}. Assurez-vous d'envoyer 'X,Y,BoutonJoystick,BoutonSonnette'.")
+                        time.sleep(0.1)
                         continue
                     
+                    # LOGIQUE JOYSTICK (Navigation) - Gère la sélection des professeurs.
                     if time.time() - dernier_temps > delai:
                         if x < 512 - seuil:
                             self.root.after(0, self.deplacer_selection, "gauche")
@@ -841,11 +893,24 @@ class SonnetteApp:
                             self.root.after(0, self.deplacer_selection, "droite")
                             dernier_temps = time.time()
                     
-                    if bouton:
+                    # bouton joystick
+                    if bouton_joystick:
                         self.root.after(0, self.envoyer_au_prof)
-                        time.sleep(0.5)
+                        time.sleep(0.5) # Anti-rebond
+                        
+                    # bouton sonette
+                    if bouton_sonnette:
+                        
+                        self.root.after(0, self.publier_button_pressed)
+                        
+                        # Notification UI
+                        self.root.after(0, lambda: self.afficher_notification(f"Ca sonne !", 2000, COLORS['accent']))
+                        
+                        time.sleep(0.5) # Anti-rebond
+                        
+                time.sleep(0.01)
             except Exception as e:
-                print("[ERREUR JOYSTICK]", e)
+                print(f"[ERREUR JOYSTICK GRAVE] {e}")
                 time.sleep(1)
     
     def deplacer_selection(self, direction):
@@ -996,7 +1061,7 @@ class SonnetteApp:
         except Exception as e:
             print(f"[ERREUR] Lors de la fermeture Arduino: {e}")
         
-        # Forcer la destruction de la fenêtre
+        # Forcer la fermeture de la fenêtre
         self.root.quit()
         self.root.destroy()
 
