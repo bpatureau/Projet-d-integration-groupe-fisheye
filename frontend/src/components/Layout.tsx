@@ -17,6 +17,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import SettingsIcon from '@mui/icons-material/Settings';
 import LogoutIcon from '@mui/icons-material/Logout';
+import DevicesIcon from '@mui/icons-material/Build';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 
@@ -30,7 +31,8 @@ export function Layout() {
 
     const menuItems = [
         { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-        { text: 'Intégrations', icon: <SettingsIcon />, path: '/integrations' }
+        { text: 'Intégrations', icon: <SettingsIcon />, path: '/integrations' },
+        { text: 'Devices', icon: <DevicesIcon />, path: '/Devices' }
     ];
 
     const handleLogout = () => {
