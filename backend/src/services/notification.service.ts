@@ -136,7 +136,6 @@ class NotificationService {
       });
 
       if (!buzzer || !buzzer.isOnline) {
-        // Pas de log warn ici pour ne pas spammer si le prof n'a pas de buzzer
         return false;
       }
 
@@ -197,14 +196,16 @@ class NotificationService {
 
   /**
    * Publie une mise à jour d'affichage vers un panneau LED via MQTT
+   * Utilise RETAINED pour que le panneau affiche l'info même après reconnexion
    */
   async publishPanelDisplay(
     mqttClientId: string,
     data: MQTTPayloads.DisplayUpdate,
   ): Promise<void> {
     const topic = getOutboundTopics(mqttClientId).displayUpdate;
-    await mqttService.publish(topic, data, { qos: 0 });
-    logger.info("Panel display published", { mqttClientId });
+    // QoS 0 suffisant car Retained = true assure la dispo à la reconnexion
+    await mqttService.publish(topic, data, { qos: 0, retained: true });
+    logger.info("Panel display published (retained)", { mqttClientId });
   }
 
   /**
@@ -225,6 +226,7 @@ class NotificationService {
 
   /**
    * Diffuse un changement de présence à tous les panels en ligne
+   * Utilise RETAINED pour maintenir l'état synchronisé
    */
   async broadcastPresenceChange(
     data: MQTTPayloads.PresenceChanged,
@@ -233,7 +235,7 @@ class NotificationService {
       where: { isOnline: true },
     });
 
-    logger.info("Broadcasting presence change to panels", {
+    logger.info("Broadcasting presence change to panels (retained)", {
       teacherId: data.teacherId,
       teacherName: data.teacherName,
       status: data.status,
@@ -242,13 +244,16 @@ class NotificationService {
 
     const publishPromises = panels.map((panel) => {
       const topic = getOutboundTopics(panel.mqttClientId).presenceChanged;
-      return mqttService.publish(topic, data, { qos: 1 }).catch((error) => {
-        logger.error("Failed to broadcast presence change to panel", {
-          panelId: panel.id,
-          mqttClientId: panel.mqttClientId,
-          error,
+      // Retained = true pour que l'état persiste
+      return mqttService
+        .publish(topic, data, { qos: 1, retained: true })
+        .catch((error) => {
+          logger.error("Failed to broadcast presence change to panel", {
+            panelId: panel.id,
+            mqttClientId: panel.mqttClientId,
+            error,
+          });
         });
-      });
     });
 
     await Promise.all(publishPromises);

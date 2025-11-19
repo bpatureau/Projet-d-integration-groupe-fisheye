@@ -31,7 +31,7 @@ class DeviceActionService {
    */
   async handleDoorbellButtonPressed(
     doorbellId: string,
-    targetTeacherId?: string
+    targetTeacherId?: string,
   ): Promise<Visit> {
     const doorbell = await prismaService.client.doorbell.findUnique({
       where: { id: doorbellId },
@@ -71,14 +71,14 @@ class DeviceActionService {
     });
 
     const presentTeachers = await presenceService.getOnlyPresentTeachers(
-      doorbell.locationId
+      doorbell.locationId,
     );
 
     let teachersToNotify: Teacher[] = presentTeachers;
     if (validatedTargetTeacherId) {
       // Notifie uniquement l'enseignant ciblé s'il est présent
       teachersToNotify = presentTeachers.filter(
-        (t) => t.id === validatedTargetTeacherId
+        (t) => t.id === validatedTargetTeacherId,
       );
       if (teachersToNotify.length === 0) {
         logger.warn("Target teacher not present", {
@@ -111,7 +111,7 @@ class DeviceActionService {
 
   async handleDoorbellButtonPressedByDeviceId(
     deviceId: string,
-    targetTeacherId?: string
+    targetTeacherId?: string,
   ): Promise<Visit> {
     const doorbell = await doorbellService.findByDeviceId(deviceId);
     return this.handleDoorbellButtonPressed(doorbell.id, targetTeacherId);
@@ -152,7 +152,7 @@ class DeviceActionService {
    */
   async handleTeacherSelected(
     panelId: string,
-    teacherId: string
+    teacherId: string,
   ): Promise<void> {
     const panel = await prismaService.client.ledPanel.findUnique({
       where: { id: panelId },
@@ -190,7 +190,7 @@ class DeviceActionService {
 
   async handleTeacherSelectedByDeviceId(
     deviceId: string,
-    teacherId: string
+    teacherId: string,
   ): Promise<void> {
     const panel = await panelService.findByDeviceId(deviceId);
     return this.handleTeacherSelected(panel.id, teacherId);
@@ -201,12 +201,12 @@ class DeviceActionService {
    * Utilise la configuration définie dans devices.config.ts
    */
   private async generateWeekScheduleGrid(
-    teacher: Teacher
+    teacher: Teacher,
   ): Promise<boolean[][]> {
     const config = DEVICE_CONFIGS.ledPanel.schedule;
     // Initialisation de la grille vide
     const grid: boolean[][] = Array.from({ length: config.days }, () =>
-      Array(config.timeBlocks.length).fill(false)
+      Array(config.timeBlocks.length).fill(false),
     );
 
     if (!teacher.gmailEmail) {
@@ -216,7 +216,6 @@ class DeviceActionService {
     const now = new Date();
 
     // Calcul du Lundi de la semaine courante
-    // Note: Cela dépend de la Timezone du serveur. Idéalement, le serveur est en UTC+1 (BE)
     const startOfWeek = new Date(now);
     const day = startOfWeek.getDay(); // 0 = Dimanche, 1 = Lundi...
     const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1); // Ajuste au Lundi
@@ -229,7 +228,7 @@ class DeviceActionService {
     const schedules = await calendarService.getTeacherSchedule(
       teacher.gmailEmail,
       startOfWeek,
-      endOfWeek
+      endOfWeek,
     );
 
     for (let dayIndex = 0; dayIndex < config.days; dayIndex++) {
@@ -270,7 +269,7 @@ class DeviceActionService {
     doorbellId: string,
     text: string,
     targetTeacherId?: string,
-    targetLocationId?: string
+    targetLocationId?: string,
   ): Promise<Message> {
     const doorbell = await prismaService.client.doorbell.findUnique({
       where: { id: doorbellId },
@@ -313,14 +312,14 @@ class DeviceActionService {
     deviceId: string,
     text: string,
     targetTeacherId?: string,
-    targetLocationId?: string
+    targetLocationId?: string,
   ): Promise<Message> {
     const doorbell = await doorbellService.findByDeviceId(deviceId);
     return this.handleDoorbellMessage(
       doorbell.id,
       text,
       targetTeacherId,
-      targetLocationId
+      targetLocationId,
     );
   }
 
@@ -400,32 +399,39 @@ class DeviceActionService {
   }
 
   /**
-   * Gère le status d'un appareil (met à jour son statut en ligne)
+   * Gère le status d'un appareil (met à jour son statut en ligne/hors ligne)
+   * Supporte désormais la détection de déconnexion via LWT (isOnline = false)
    */
   async handleStatus(
     deviceType: "doorbell" | "buzzer" | "panel",
-    deviceId: string
+    deviceId: string,
+    isOnline: boolean = true,
   ): Promise<void> {
     let device: Doorbell | Buzzer | LedPanel | null = null;
 
     switch (deviceType) {
       case "doorbell":
         device = await doorbellService.findByDeviceId(deviceId);
-        await doorbellService.updateOnlineStatus(device.id, true);
+        await doorbellService.updateOnlineStatus(device.id, isOnline);
         break;
       case "buzzer":
         device = await buzzerService.findByDeviceId(deviceId);
-        await buzzerService.updateOnlineStatus(device.id, true);
+        await buzzerService.updateOnlineStatus(device.id, isOnline);
         break;
       case "panel":
         device = await panelService.findByDeviceId(deviceId);
-        await panelService.updateOnlineStatus(device.id, true);
+        await panelService.updateOnlineStatus(device.id, isOnline);
         break;
       default:
         throw new ValidationError(`Unknown device type: ${deviceType}`);
     }
 
-    logger.debug("Device status received", { deviceType, deviceId });
+    // Si l'appareil passe hors ligne, on loggue un warning, sinon debug
+    if (!isOnline) {
+      logger.warn("Device went offline (LWT)", { deviceType, deviceId });
+    } else {
+      logger.debug("Device status update", { deviceType, deviceId, isOnline });
+    }
   }
 
   /**
@@ -434,7 +440,7 @@ class DeviceActionService {
    */
   async handleTeachersRequest(
     panelId: string,
-    locationId: string
+    locationId: string,
   ): Promise<void> {
     const panel = await prismaService.client.ledPanel.findUnique({
       where: { id: panelId },
@@ -454,9 +460,8 @@ class DeviceActionService {
     const teachers = teacherLocations.map((tl) => tl.teacher);
 
     // Récupère les informations de présence pour chaque enseignant
-    const presentTeachers = await presenceService.getPresentTeachersInLocation(
-      locationId
-    );
+    const presentTeachers =
+      await presenceService.getPresentTeachersInLocation(locationId);
 
     // Crée la liste des enseignants avec leur statut de présence
     const teachersList = teachers.map((teacher) => {
@@ -479,7 +484,7 @@ class DeviceActionService {
     // Envoie la liste au panel via MQTT
     await notificationService.publishTeachersList(
       panel.mqttClientId,
-      teachersList
+      teachersList,
     );
 
     logger.info("Teachers list sent to panel", {
@@ -497,7 +502,7 @@ class DeviceActionService {
     panelId: string,
     teacherId: string,
     status: "present" | "absent" | "dnd",
-    until?: string
+    until?: string,
   ): Promise<void> {
     const panel = await prismaService.client.ledPanel.findUnique({
       where: { id: panelId },

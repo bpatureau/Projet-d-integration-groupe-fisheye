@@ -15,18 +15,6 @@ import {
 /**
  * Distributeur de messages MQTT
  * Route les messages MQTT des appareils vers les gestionnaires appropriés
- *
- * Structure des topics:
- * - fisheye/{clientId}/button/pressed - Bouton sonnette appuyé
- * - fisheye/{clientId}/door/opened - Porte ouverte
- * - fisheye/{clientId}/message/send - Envoi de message texte
- * - fisheye/{clientId}/teacher/selected - Sélection enseignant sur panneau
- * - fisheye/{clientId}/status - Status de l'appareil (heartbeat)
- * - fisheye/{clientId}/teachers/request - Demande liste des enseignants
- * - fisheye/{clientId}/presence/update - Mise à jour présence
- * - fisheye/{clientId}/bell/activate/ack - Confirmation activation sonnette
- * - fisheye/{clientId}/buzz/activate/ack - Confirmation activation buzzer
- * - fisheye/{clientId}/display/update/ack - Confirmation mise à jour affichage
  */
 class MQTTDispatcher {
   initialize(): void {
@@ -66,12 +54,10 @@ class MQTTDispatcher {
 
   /**
    * Gère l'appui sur le bouton de sonnette
-   * Topic: fisheye/{clientId}/button/pressed
-   * Payload: { targetTeacherId?: "uuid" }
    */
   private async handleDoorbellButtonPressed(
     topic: string,
-    payload: Buffer,
+    payload: Buffer
   ): Promise<void> {
     const mqttClientId = extractClientIdFromTopic(topic);
     if (!mqttClientId) {
@@ -88,17 +74,16 @@ class MQTTDispatcher {
     const doorbell = await doorbellService.findByMqttClientId(mqttClientId);
     await deviceActionService.handleDoorbellButtonPressed(
       doorbell.id,
-      targetTeacherId,
+      targetTeacherId
     );
   }
 
   /**
    * Gère l'ouverture de porte
-   * Topic: fisheye/{clientId}/door/opened
    */
   private async handleDoorOpened(
     topic: string,
-    _payload: Buffer,
+    _payload: Buffer
   ): Promise<void> {
     const mqttClientId = extractClientIdFromTopic(topic);
     if (!mqttClientId) {
@@ -112,13 +97,10 @@ class MQTTDispatcher {
 
   /**
    * Gère l'envoi d'un message texte depuis la sonnette
-   * Topic: fisheye/{clientId}/message/send
-   * Payload: { text: string, targetTeacherId?: "uuid" }
-   * Note: Le message est toujours envoyé au lieu (location) de la sonnette
    */
   private async handleMessageSend(
     topic: string,
-    payload: Buffer,
+    payload: Buffer
   ): Promise<void> {
     const mqttClientId = extractClientIdFromTopic(topic);
     if (!mqttClientId) {
@@ -142,23 +124,20 @@ class MQTTDispatcher {
     }
 
     const doorbell = await doorbellService.findByMqttClientId(mqttClientId);
-    // Le message est toujours envoyé au lieu de la sonnette (pas de targetLocationId)
     await deviceActionService.handleDoorbellMessage(
       doorbell.id,
       text,
       targetTeacherId,
-      undefined, // targetLocationId n'est pas utilisé
+      undefined
     );
   }
 
   /**
    * Gère la sélection d'enseignant sur le panneau LED
-   * Topic: fisheye/{clientId}/teacher/selected
-   * Payload: { teacherId: "uuid" }
    */
   private async handleTeacherSelected(
     topic: string,
-    payload: Buffer,
+    payload: Buffer
   ): Promise<void> {
     const mqttClientId = extractClientIdFromTopic(topic);
     if (!mqttClientId) {
@@ -183,45 +162,71 @@ class MQTTDispatcher {
   }
 
   /**
-   * Gère le status d'un appareil
+   * Gère le status d'un appareil (Heartbeat ou LWT)
    * Topic: fisheye/{clientId}/status
+   * Payload: { online: boolean, ... }
    */
-  private async handleStatus(topic: string, _payload: Buffer): Promise<void> {
+  private async handleStatus(topic: string, payload: Buffer): Promise<void> {
     const mqttClientId = extractClientIdFromTopic(topic);
     if (!mqttClientId) {
       logger.warn("Invalid topic format for status", { topic });
       return;
     }
 
+    // Parsing du payload pour détecter un statut hors ligne (LWT)
+    let isOnline = true;
+    try {
+      if (payload.length > 0) {
+        const data: MQTTPayloads.DeviceStatus = JSON.parse(payload.toString());
+        if (data.online === false) {
+          isOnline = false;
+        }
+      }
+    } catch {
+      // Si le payload n'est pas du JSON valide, on assume online (heartbeat vide)
+    }
+
     try {
       const doorbell = await doorbellService.findByMqttClientId(mqttClientId);
-      await deviceActionService.handleStatus("doorbell", doorbell.deviceId);
+      await deviceActionService.handleStatus(
+        "doorbell",
+        doorbell.deviceId,
+        isOnline
+      );
       return;
     } catch {}
 
     try {
       const panel = await panelService.findByMqttClientId(mqttClientId);
-      await deviceActionService.handleStatus("panel", panel.deviceId);
+      await deviceActionService.handleStatus("panel", panel.deviceId, isOnline);
       return;
     } catch {}
 
     try {
       const buzzerDevice = await buzzerService.findByMqttClientId(mqttClientId);
-      await deviceActionService.handleStatus("buzzer", buzzerDevice.deviceId);
+      await deviceActionService.handleStatus(
+        "buzzer",
+        buzzerDevice.deviceId,
+        isOnline
+      );
       return;
     } catch {}
 
-    logger.warn("Status from unknown device", { mqttClientId });
+    // Ignorer le statut propre du backend pour éviter les logs d'avertissement
+    if (
+      !mqttClientId.includes("backend") &&
+      mqttClientId !== "fisheye-backend"
+    ) {
+      logger.warn("Status from unknown device", { mqttClientId });
+    }
   }
 
   /**
    * Gère la demande de liste des enseignants par un panel
-   * Topic: fisheye/{clientId}/teachers/request
-   * Payload: {} (pas de payload - utilise la location du panneau)
    */
   private async handleTeachersRequest(
     topic: string,
-    _payload: Buffer,
+    _payload: Buffer
   ): Promise<void> {
     const mqttClientId = extractClientIdFromTopic(topic);
     if (!mqttClientId) {
@@ -235,12 +240,10 @@ class MQTTDispatcher {
 
   /**
    * Gère la mise à jour de présence d'un enseignant par un panel
-   * Topic: fisheye/{clientId}/presence/update
-   * Payload: { teacherId: "uuid", status: "present" | "absent" | "dnd", until?: timestamp }
    */
   private async handlePresenceUpdate(
     topic: string,
-    payload: Buffer,
+    payload: Buffer
   ): Promise<void> {
     const mqttClientId = extractClientIdFromTopic(topic);
     if (!mqttClientId) {
@@ -270,18 +273,16 @@ class MQTTDispatcher {
       panel.id,
       teacherId,
       status,
-      until,
+      until
     );
   }
 
   /**
    * Gère la confirmation d'activation de la sonnette
-   * Topic: fisheye/{clientId}/bell/activate/ack
-   * Payload: { success: boolean, error?: string }
    */
   private async handleBellActivateAck(
     topic: string,
-    payload: Buffer,
+    payload: Buffer
   ): Promise<void> {
     const mqttClientId = extractClientIdFromTopic(topic);
     if (!mqttClientId) {
@@ -306,12 +307,10 @@ class MQTTDispatcher {
 
   /**
    * Gère la confirmation d'activation du buzzer
-   * Topic: fisheye/{clientId}/buzz/activate/ack
-   * Payload: { success: boolean, error?: string }
    */
   private async handleBuzzActivateAck(
     topic: string,
-    payload: Buffer,
+    payload: Buffer
   ): Promise<void> {
     const mqttClientId = extractClientIdFromTopic(topic);
     if (!mqttClientId) {
@@ -336,12 +335,10 @@ class MQTTDispatcher {
 
   /**
    * Gère la confirmation de mise à jour de l'affichage
-   * Topic: fisheye/{clientId}/display/update/ack
-   * Payload: { success: boolean, error?: string }
    */
   private async handleDisplayUpdateAck(
     topic: string,
-    payload: Buffer,
+    payload: Buffer
   ): Promise<void> {
     const mqttClientId = extractClientIdFromTopic(topic);
     if (!mqttClientId) {

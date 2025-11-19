@@ -156,6 +156,7 @@ export namespace MQTTPayloads {
   }
 
   export interface DeviceStatus {
+    online?: boolean;
     timestamp?: string;
     uptime?: number;
     batteryLevel?: number;
