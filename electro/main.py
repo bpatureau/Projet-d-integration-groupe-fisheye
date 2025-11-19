@@ -1,7 +1,7 @@
 import requests
 from gpiozero import Button, LED
 from signal import pause
-from mqtt import HomeAssistantDoorClient
+from mqtt_ha import HomeAssistantDoorClient
 import sys
 
 
