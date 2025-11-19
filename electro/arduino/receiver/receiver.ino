@@ -38,9 +38,12 @@ void onReceive(uint8_t *mac, uint8_t *data, uint8_t len) {
     message_t ack;
     memcpy(&msg, data, sizeof(msg));
 
+    Serial.print("DEBUG CMD ");
+    Serial.println(msg.cmd);
+
     bool buttonPressed = digitalRead(BUTTON_MASTER);
 
-    if (!buttonPressed && msg.cmd == 1) {
+    if (buttonPressed && msg.cmd == 1) {
         Serial.println("MASTER : porte ouverte → sonette interdite");
 
         // Envoi ACK
@@ -51,7 +54,9 @@ void onReceive(uint8_t *mac, uint8_t *data, uint8_t len) {
         return;
     }
 
-    if (buttonPressed && msg.cmd == 1 && msg.arg > 0) {
+    if (!buttonPressed && msg.cmd == 1 && msg.arg > 0) {
+
+      Serial.println("DEBUG CMD 1 AND BUTTON PRESSED");
 
 
 
@@ -64,10 +69,12 @@ void onReceive(uint8_t *mac, uint8_t *data, uint8_t len) {
 
         esp_now_send(slaveAddr, (uint8_t*)&ack, sizeof(ack));
         return;
+    }
   
 
     if (msg.cmd == 2){
-      digitalWrite(LED_MASTER, LOW);
+      Serial.println("DEBUG CMD 2");
+      led_time = 0;
 
       // Envoi ACK
         ack.cmd = 5;
@@ -81,8 +88,8 @@ void onReceive(uint8_t *mac, uint8_t *data, uint8_t len) {
     ack.cmd = 6;
     ack.arg = 0;
     esp_now_send(slaveAddr, (uint8_t*)&ack, sizeof(ack));
-    }
 }
+
 
 // ──────────────────────────────────────────
 //   Envoi état bouton au SLAVE (avec retry)
@@ -93,12 +100,12 @@ void sendButtonStatus(bool pressed) {
     message_t msg;
 
     if(pressed){
-      msg.cmd = 4;  
+      msg.cmd = 3;  
       msg.arg = 0; 
     }
 
     else{
-      msg.cmd = 3;  
+      msg.cmd = 4;  
       msg.arg = 0; 
     }
     
@@ -108,7 +115,7 @@ void sendButtonStatus(bool pressed) {
 
 
     Serial.print("État bouton envoyé au SLAVE : ");
-    Serial.println(pressed ? "PRESSÉ" : "RELÂCHÉ");
+    Serial.println(pressed ? "RELACHE" : "PRESSE");
 }
 
 void setup() {
@@ -168,14 +175,21 @@ void loop() {
 
           lastButtonState = currentButtonState;
     }
+
+    //Serial.print("DEDUG led_time=");
+    //Serial.println(led_time);
   
     if(led_time == 0){
       digitalWrite(LED_MASTER, LOW);
     }
     if(currentButtonState){
-      digitalWrite(LED_MASTER, LOW);
+      //digitalWrite(LED_MASTER, LOW);
+      led_time = 0;
     }
 
     led_time -= 10;
+    if (led_time < 0){
+      led_time=0;
+    }
     delay(10);
 }

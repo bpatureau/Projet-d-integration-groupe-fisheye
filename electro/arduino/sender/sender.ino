@@ -29,21 +29,19 @@ void onReceive(uint8_t *mac, uint8_t *data, uint8_t len) {
     message_t msg;
     memcpy(&msg, data, sizeof(msg));
 
-    // Si c'est un message d'état du bouton (cmd=2)
+    // Si c'est un message d'état du bouton
     if (msg.cmd == 3) {
-        Serial.print("État bouton MASTER : OPEN");
+        Serial.println("DOOR OPEN");
         return;
     }
 
     if (msg.cmd == 4) {
-        Serial.print("État bouton MASTER : CLOSE");
+        Serial.println("DOOR CLOSE");
         return;
     }
 
-    Serial.print("ACK reçu. CMD = ");
-    Serial.println(msg.cmd);
-    Serial.print("ACK reçu. FLAG = ");
-    Serial.println(msg.ack);
+    Serial.printf("ACK %d %d\n", msg.cmd, msg.arg);
+
 }
 
 // ──────────────────────────────────────────
@@ -70,7 +68,7 @@ void setup() {
     WiFi.disconnect();
 
     if (esp_now_init() != 0) {
-        Serial.println("SLAVE : erreur ESP-NOW");
+        Serial.println("ESP ERROR");
         return;
     }
 
@@ -78,7 +76,7 @@ void setup() {
     esp_now_add_peer(masterAddr, ESP_NOW_ROLE_COMBO, 1, NULL, 0);
     esp_now_register_recv_cb(onReceive);
 
-    Serial.println("SLAVE prêt !");
+    Serial.println("ESP READY");
 }
 
 // ──────────────────────────────────────────
@@ -89,33 +87,38 @@ void loop() {
     if (Serial.available()) {
 
         String input = Serial.readStringUntil('\n');
+
+        Serial.print("DEBUG ");
+        Serial.println(input);
+
         input.trim();
 
         // ─────────── ALLUMAGE AVEC DURÉE ───────────
-        if (input.startsWith("allumer_sonnette")) {
+        if (input.startsWith("TURN_ON")) {
+            Serial.println("DEBUG CMD 1");
 
             int arg = 0;
 
             if (input.indexOf('(') > 0) {
                 arg = input.substring(input.indexOf('(')+1, input.indexOf(')')).toInt();
+
+                sendCommand(1, arg);
             }
             else{
-              Serial.println("no arg")
+              Serial.println("MISSING ARG");
             }
 
         }
 
         // ─────────── EXTINCTION SIMPLE ───────────
-        else if (input == "eteindre_sonnette") {
+        else if (input == "TURN_OFF") {
+            Serial.println("DEBUG CMD 2");
             sendCommand(2, 0);
         }
 
 
         else {
-            Serial.println("Commande inconnue.");
-            Serial.println("Commandes disponibles:");
-            Serial.println("  - allumer_sonnette(X) : allumer X secondes");
-            Serial.println("  - eteindre_sonnette : éteindre");
+            Serial.println("UNKN CMD");
         }
     }
 
