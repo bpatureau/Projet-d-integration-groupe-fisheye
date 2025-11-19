@@ -22,6 +22,28 @@ export interface VisitEvent {
     teacherNames: string[];
 }
 
+export interface Location {
+    id: string;
+    name: string;
+    description: string;
+    calendarId: string;
+    teamsWebhookUrl: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface Doorbell {
+    id: string;
+    deviceId: string;
+    mqttClientId: string;
+    locationId: string;
+    hasDoorSensor: boolean;
+    isOnline: boolean;
+    lastSeen: string;
+    createdAt: string;
+    updatedAt: string;
+    location: Location;
+}
 export const api = {
     // ===== AUTH =====
     login: async (username: string, password: string): Promise<LoginResponse> => {
@@ -70,4 +92,23 @@ export const api = {
         if (!res.ok) throw new Error('Erreur lors de la récupération du calendrier');
         return res.json();
     },
+
+    // ===== Devices ======
+    getDoorbells: async (): Promise<Doorbell[]> => {
+    const token = localStorage.getItem('auth_token');
+
+    const res = await fetch(`${API_URL}/api/doorbells`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+        throw new Error('Erreur lors de la récupération des sonnettes');
+    }
+
+    const data = await res.json();
+
+    // ⚠️ On renvoie uniquement le tableau contenu dans data.buzzers
+    console.log(data.doorbells)
+    return data.doorbells;
+    },
+
 };
