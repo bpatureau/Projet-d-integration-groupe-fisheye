@@ -679,7 +679,7 @@ class SonnetteApp:
         if nom == "TOUS":
             self.selection_label.config(
                 text=f"📢 Envoi à tous les professeurs ({len(self.professeurs)})",
-                fg=COLORS['primary_light'] # Utiliser le bleu foncé pour la sélection spéciale
+                fg=COLORS['primary_light']
             )
         else:
             self.selection_label.config(
@@ -689,7 +689,6 @@ class SonnetteApp:
         
         widgets = self.prof_widgets[nom]
         if widgets.get('is_tous'):
-            # Sélection TOUS : Bleu foncé (primary_dark) avec bordure primaire
             widgets['item_frame'].config(bg=COLORS['primary_dark'], highlightbackground=COLORS['primary'], highlightthickness=2)
             for widget in widgets['item_frame'].winfo_children():
                 if isinstance(widget, tk.Frame):
@@ -703,11 +702,10 @@ class SonnetteApp:
                         elif child.winfo_class() == 'Label':
                             child.config(bg=COLORS['primary_dark'])
         else:
-            # Sélection individuelle : Bleu très clair (primary_light) avec bordure bleu profond
             widgets['item_frame'].config(
                 bg=COLORS['primary_light'],
                 highlightbackground=COLORS['primary'],
-                highlightthickness=2 # Bordure plus marquée pour la sélection
+                highlightthickness=2
             )
             for widget in widgets['item_frame'].winfo_children():
                 if isinstance(widget, tk.Frame):
@@ -884,7 +882,7 @@ class SonnetteApp:
                         time.sleep(0.1)
                         continue
                     
-                    # LOGIQUE JOYSTICK (Navigation) - Gère la sélection des professeurs.
+                    # Navigation
                     if time.time() - dernier_temps > delai:
                         if x < 512 - seuil:
                             self.root.after(0, self.deplacer_selection, "gauche")
