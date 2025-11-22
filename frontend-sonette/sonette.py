@@ -845,8 +845,8 @@ class SonnetteApp:
     
     def publier_button_pressed(self, teacher_id=None):
         """Publier un événement de bouton pressé"""
-        topic = f"fisheye/{self.client_id}/button/pressed"
-        payload = {}
+        topic = f"fisheye/{self.client_id}/button"
+        payload = "pressed"
         
         if teacher_id:
             payload["targetTeacherId"] = teacher_id
