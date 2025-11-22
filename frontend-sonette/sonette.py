@@ -33,8 +33,10 @@ COLORS = {
 def charger_config():
     """Charge la configuration depuis config.json"""
     config_defaut = {
-        "serial_port": "COM4",
-        "baudrate": 9600,
+        "serial_port_arduino": "COM4",
+        "baudrate_arduino": 9600,
+        "serial_port_esp": "COM3",
+        "baudrate_esp": 115200,
         "timeout": 1,
         "joystick_threshold": 300,
         "joystick_delay": 0.4,
@@ -42,7 +44,8 @@ def charger_config():
         "mqtt_user": "user1",
         "mqtt_password": "user1",
         "mqtt_port": 1883,
-        "mqtt_client_id": f"fisheye_{uuid.uuid4().hex[:8]}"
+        "mqtt_client_id": f"fisheye_{uuid.uuid4().hex[:8]}",
+        "full_screen": False
     }
     
     try:
@@ -104,12 +107,21 @@ def sauvegarder_professeurs(professeurs):
 config = charger_config()
 
 try:
-    arduino = serial.Serial(config['serial_port'], config['baudrate'], timeout=config['timeout'])
+    arduino = serial.Serial(config['serial_port_arduino'], config['baudrate_arduino'], timeout=config['timeout'])
     arduino.flushInput()
-    print(f"[INFO] Arduino connecté sur {config['serial_port']}")
+    print(f"[INFO] Arduino connecté sur {config['serial_port_arduino']}")
 except Exception as e:
     print(f"[ERREUR] Impossible d'ouvrir le port série : {e}")
     arduino = None
+
+try:
+    #print(config["serial_port_esp"], config['baudrate_esp'], timeout=config['timeout'])
+    esp = serial.Serial(config["serial_port_esp"], config['baudrate_esp'], timeout=config['timeout'])
+    esp.flush()
+    print(f"[INFO] Esp connecté sur {config['serial_port_esp']}")
+except Exception as e:
+    print(f"[ERREUR] Impossible d'ouvrir le port série : {e}")
+    esp = None
 
 # ===================== MQTT CLIENT =====================
 unacked_publish = set()
@@ -231,7 +243,8 @@ class SonnetteApp:
         self.root.title("Sonnette Intelligente")
         
         # Mode plein écran
-        self.root.attributes('-fullscreen', True)
+        if config.get("full_screen"):
+            self.root.attributes('-fullscreen', True)
         self.root.configure(bg=COLORS['light_gray'])
         
         # Touches de contrôle
@@ -900,6 +913,7 @@ class SonnetteApp:
                     if bouton_sonnette:
                         
                         self.root.after(0, self.publier_button_pressed)
+                        self.root.after(0, lambda : self.send_esp('turn_on'))
                         
                         # Notification UI
                         self.root.after(0, lambda: self.afficher_notification(f"Ca sonne !", 2000, COLORS['accent']))
@@ -969,6 +983,12 @@ class SonnetteApp:
                 duree=3000, 
                 couleur=COLORS['danger']
             )
+
+    def send_esp(self, cmd):
+        if cmd == "turn_on":
+            esp.write(b'TURN_ON(5)')
+        elif cmd == "turn_off":
+            esp.write(b'TURN_OFF')
     
     def mettre_a_jour_disponibilite(self, nom, disponible):
         """Met à jour la disponibilité d'un professeur"""
