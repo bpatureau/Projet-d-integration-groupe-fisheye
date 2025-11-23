@@ -74,23 +74,23 @@ def charger_professeurs():
         "M. Van Dormael": {"disponible": True, "id": str(uuid.uuid4())}
     }
     
-    try:
-        if os.path.exists("professeurs.json"):
-            with open("professeurs.json", "r", encoding="utf-8") as f:
-                profs = json.load(f)
-                for nom, info in profs.items():
-                    if "id" not in info:
-                        info["id"] = str(uuid.uuid4())
-                print(f"[INFO] {len(profs)} professeurs chargés depuis professeurs.json")
-                return profs
-        else:
-            with open("professeurs.json", "w", encoding="utf-8") as f:
-                json.dump(profs_defaut, f, indent=4, ensure_ascii=False)
-            print("[INFO] Fichier professeurs.json créé avec les valeurs par défaut")
-            return profs_defaut
-    except Exception as e:
-        print(f"[ERREUR] Impossible de charger les professeurs : {e}")
-        return profs_defaut
+    #try:
+    #    if os.path.exists("professeurs.json"):
+    #        with open("professeurs.json", "r", encoding="utf-8") as f:
+    #            profs = json.load(f)
+    #            for nom, info in profs.items():
+    #                if "id" not in info:
+    #                    info["id"] = str(uuid.uuid4())
+    #            print(f"[INFO] {len(profs)} professeurs chargés depuis professeurs.json")
+    #            return profs
+    #    else:
+    #        with open("professeurs.json", "w", encoding="utf-8") as f:
+    #            json.dump(profs_defaut, f, indent=4, ensure_ascii=False)
+    #        print("[INFO] Fichier professeurs.json créé avec les valeurs par défaut")
+    #        return profs_defaut
+    #except Exception as e:
+    #    print(f"[ERREUR] Impossible de charger les professeurs : {e}")
+    #    return profs_defaut
 
 def sauvegarder_professeurs(professeurs):
     """Sauvegarde les professeurs dans professeurs.json"""
@@ -251,10 +251,6 @@ class SonnetteApp:
         self.root.bind('<Escape>', self.quitter_fullscreen)
         self.root.bind('<F11>', self.toggle_fullscreen)
         
-        # Charger les professeurs
-        self.professeurs = charger_professeurs()
-        self.prof_noms = ["TOUS"] + list(self.professeurs.keys())
-        
         self.prof_selectionne = None
         self.prof_index = 0
         self.prof_widgets = {}
@@ -265,6 +261,10 @@ class SonnetteApp:
         # Référence au client MQTT
         self.mqtt_client = mqttc
         self.client_id = config.get("mqtt_client_id")
+
+        # Charger les professeurs
+        self.professeurs = charger_professeurs()
+        self.prof_noms = ["TOUS"] + list(self.professeurs.keys())
         
         # Configuration des polices modernes
         self.setup_fonts()
@@ -734,8 +734,8 @@ class SonnetteApp:
         # Publier la sélection MQTT
         if nom != "TOUS" and nom in self.professeurs:
             teacher_id = self.professeurs[nom].get("id")
-            if teacher_id:
-                self.publier_teacher_selected(teacher_id)
+        #    if teacher_id:
+        #        self.publier_teacher_selected(teacher_id)
     
     def scroll_vers_selection(self, nom):
         """Scroll automatiquement vers le professeur sélectionné"""
@@ -797,7 +797,8 @@ class SonnetteApp:
             (f"fisheye/{self.client_id}/bell/activate", 1),
             (f"fisheye/{self.client_id}/buzz/activate", 1),
             (f"fisheye/{self.client_id}/display/update", 1),
-            ("fisheye/broadcast/#", 0)
+            #("fisheye/broadcast/#", 0),
+            (f"fisheye/{self.client_id}/teacher/request", 1)
         ]
         
         for topic, qos in topics:
@@ -848,8 +849,8 @@ class SonnetteApp:
         topic = f"fisheye/{self.client_id}/button"
         payload = "pressed"
         
-        if teacher_id:
-            payload["targetTeacherId"] = teacher_id
+        #if teacher_id:
+        #    payload["targetTeacherId"] = teacher_id
         
         publish_mqtt(self.mqtt_client, topic, payload, qos=1)
     
@@ -956,20 +957,20 @@ class SonnetteApp:
             return
         
         # Préparer le payload MQTT
-        topic = f"fisheye/{self.client_id}/message/sent"
-        payload = {"message": message}
+        topic = f"fisheye/{self.client_id}/message/send"
+        payload = {"text": message}
         
         if self.prof_selectionne == "TOUS":
-            payload["to"] = "all"
-            payload["recipients"] = list(self.professeurs.keys())
+            #payload["to"] = "all"
+            #payload["recipients"] = list(self.professeurs.keys())
             notif_text = f"✓ Message envoyé à TOUS les professeurs"
         else:
-            payload["teacherId"] = self.professeurs[self.prof_selectionne].get("id")
+            payload["targetTeacherId"] = self.professeurs[self.prof_selectionne].get("id")
             notif_text = f"✓ Message envoyé à {self.prof_selectionne}"
             
             teacher_id = self.professeurs[self.prof_selectionne].get("id")
-            if teacher_id:
-                self.publier_button_pressed(teacher_id)
+            #if teacher_id:
+            #    self.publier_button_pressed(teacher_id)
         
         # Publier le message
         if publish_mqtt(self.mqtt_client, topic, payload, qos=1):
