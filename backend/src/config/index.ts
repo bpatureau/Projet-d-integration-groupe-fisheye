@@ -1,7 +1,6 @@
-import dotenv from "dotenv";
+import "dotenv/config";
 import { validateEnvOrExit } from "../utils/env-validator";
 
-dotenv.config();
 validateEnvOrExit();
 
 interface Config {
@@ -47,7 +46,7 @@ const config: Config = {
     ttl: process.env.JWT_TTL || "168h",
   },
   mqtt: {
-    broker: process.env.MQTT_BROKER || "tcp://localhost:1883",
+    broker: process.env.MQTT_BROKER || "mqtts://localhost:8883",
     clientId: process.env.MQTT_CLIENT_ID || "fisheye-backend",
     username: process.env.MQTT_USERNAME,
     password: process.env.MQTT_PASSWORD,

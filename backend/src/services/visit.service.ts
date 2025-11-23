@@ -1,4 +1,8 @@
-import type { Prisma, Visit, VisitStatus } from "@prisma/client";
+import type {
+  Prisma,
+  Visit,
+  VisitStatus,
+} from "../../prisma/generated/client.js";
 import config from "../config";
 import type { VisitStats } from "../types";
 import { NotFoundError } from "../utils/errors";

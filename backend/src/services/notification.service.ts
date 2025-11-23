@@ -1,5 +1,10 @@
-import type { Doorbell, Location, Teacher, Visit } from "@prisma/client";
 import axios from "axios";
+import type {
+  Doorbell,
+  Location,
+  Teacher,
+  Visit,
+} from "../../prisma/generated/client.js";
 import { DEVICE_CONFIGS } from "../config/devices.config";
 import { getOutboundTopics, type MQTTPayloads } from "../mqtt/mqtt.constants";
 import type { NotifiedTeacher, TeacherPreferences } from "../types";

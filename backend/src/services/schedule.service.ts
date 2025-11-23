@@ -1,4 +1,4 @@
-import type { Schedule } from "@prisma/client";
+import type { Schedule } from "../../prisma/generated/client.js";
 import logger from "../utils/logger";
 import calendarService from "./calendar.service";
 import deviceActionService from "./device-action.service";

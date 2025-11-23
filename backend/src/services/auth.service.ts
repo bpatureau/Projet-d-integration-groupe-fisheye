@@ -1,6 +1,6 @@
-import type { Teacher } from "@prisma/client";
 import jwt, { type JwtPayload } from "jsonwebtoken";
 import type { StringValue } from "ms";
+import type { Teacher } from "../../prisma/generated/client.js";
 import config from "../config";
 import { NotFoundError, UnauthorizedError } from "../utils/errors";
 import logger from "../utils/logger";

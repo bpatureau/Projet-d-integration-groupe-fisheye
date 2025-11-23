@@ -1,4 +1,4 @@
-import { Prisma, type Teacher } from "@prisma/client";
+import { Prisma, type Teacher } from "../../prisma/generated/client.js";
 import type { ManualStatus, TeacherPreferences } from "../types";
 import { ConflictError, NotFoundError } from "../utils/errors";
 import logger from "../utils/logger";

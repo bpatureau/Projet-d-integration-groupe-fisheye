@@ -1,6 +1,6 @@
 import fs from "node:fs";
-import type { Schedule } from "@prisma/client";
 import { type calendar_v3, google } from "googleapis";
+import type { Schedule } from "../../prisma/generated/client.js";
 import config from "../config";
 import logger from "../utils/logger";
 import prismaService from "../utils/prisma";

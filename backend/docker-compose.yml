@@ -20,14 +20,17 @@ services:
       - fisheye-network
 
   mqtt:
-    image: eclipse-mosquitto:2
+    build: ./mosquitto
     container_name: fisheye-mqtt
     restart: unless-stopped
+    environment:
+      MQTT_USERNAME: ${MQTT_USERNAME:-admin}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-password}
     ports:
-      - "1883:1883"
+      - "8883:8883"
       - "9001:9001"
     volumes:
-      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/certs:/mosquitto/certs
       - mqtt_data:/mosquitto/data
       - mqtt_logs:/mosquitto/log
     networks:

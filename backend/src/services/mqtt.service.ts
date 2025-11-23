@@ -17,6 +17,7 @@ class MQTTService {
         connectTimeout: 30000,
         reconnectPeriod: 5000,
         clean: true,
+        rejectUnauthorized: false,
       });
 
       this.client.on("connect", () => {

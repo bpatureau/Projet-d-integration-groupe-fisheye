@@ -1,5 +1,5 @@
-import type { Teacher as PrismaTeacher } from "@prisma/client";
 import type { Request } from "express";
+import type { Teacher as PrismaTeacher } from "../../prisma/generated/client.js";
 
 // ========================================
 // RE-EXPORT PRISMA TYPES
@@ -15,7 +15,7 @@ export type {
   TeacherLocation,
   Visit,
   VisitStatus,
-} from "@prisma/client";
+} from "../../prisma/generated/client.js";
 
 // ========================================
 // CUSTOM TYPES

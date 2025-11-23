@@ -6,7 +6,7 @@ import type {
   Prisma,
   Teacher,
   Visit,
-} from "@prisma/client";
+} from "../../prisma/generated/client.js";
 import { DEVICE_CONFIGS } from "../config/devices.config";
 import { NotFoundError, ValidationError } from "../utils/errors";
 import logger from "../utils/logger";

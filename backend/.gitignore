@@ -4,3 +4,6 @@ node_modules/
 dist/
 credentials/
 logs/
+prisma/generated/
+mosquitto/certs/
+mosquitto/config/passwd

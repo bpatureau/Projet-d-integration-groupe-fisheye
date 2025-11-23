@@ -1,4 +1,4 @@
-import type { Location } from "@prisma/client";
+import type { Location } from "../../prisma/generated/client.js";
 import { ConflictError, NotFoundError } from "../utils/errors";
 import logger from "../utils/logger";
 import prismaService from "../utils/prisma";

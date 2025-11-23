@@ -1,4 +1,4 @@
-import type { Teacher } from "@prisma/client";
+import type { Teacher } from "../../prisma/generated/client.js";
 import type { ManualStatus, PresentTeacher } from "../types";
 import prismaService from "../utils/prisma";
 import calendarService from "./calendar.service";

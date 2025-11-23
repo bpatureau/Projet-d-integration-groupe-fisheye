@@ -1,4 +1,4 @@
-import type { Message, Prisma } from "@prisma/client";
+import type { Message, Prisma } from "../../prisma/generated/client.js";
 import { NotFoundError } from "../utils/errors";
 import logger from "../utils/logger";
 import prismaService from "../utils/prisma";

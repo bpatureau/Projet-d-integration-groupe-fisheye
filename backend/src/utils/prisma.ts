@@ -1,11 +1,19 @@
-import { PrismaClient } from "@prisma/client";
+import "dotenv/config";
+import { PrismaPg } from "@prisma/adapter-pg";
+import pg from "pg";
+import { PrismaClient } from "../../prisma/generated/client.js";
 import logger from "./logger";
+
+const connectionString = `${process.env.DATABASE_URL}`;
+const pool = new pg.Pool({ connectionString });
+const adapter = new PrismaPg(pool);
 
 class PrismaService {
   private prisma: PrismaClient;
 
   constructor() {
     this.prisma = new PrismaClient({
+      adapter,
       log: [
         {
           emit: "event",

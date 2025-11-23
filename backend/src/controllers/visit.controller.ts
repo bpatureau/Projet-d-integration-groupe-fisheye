@@ -1,5 +1,5 @@
-import type { VisitStatus } from "@prisma/client";
 import type { Request, Response } from "express";
+import type { VisitStatus } from "../../prisma/generated/client.js";
 import { asyncHandler } from "../middleware/error.middleware";
 import visitService from "../services/visit.service";
 
