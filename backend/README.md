@@ -2,77 +2,60 @@
 
 ## Prérequis
 
-- Node.js (>= 22+) et npm
+- Node.js (v22+)
+- Docker & Docker Compose
 
-## Installation
+## Démarrage rapide
 
-```bash
-cd backend
-npm install
-```
+Suivez ces étapes dans l'ordre pour lancer le projet localement.
 
-## Configuration
+1. **Installation des dépendances**
 
-- Fournir les variables d'environnement nécessaires (ex: fichier `.env`) et le fichier de crédentiel `credentials/service-account.json` si utilisé.
+   ```bash
+   npm install
+   ```
 
-### Configuration MQTT (Sécurisé)
+2. **Configuration de l'environnement**
+   Copiez le fichier d'exemple pour créer votre configuration locale.
 
-Le broker MQTT est entièrement conteneurisé et sécurisé par défaut (MQTTS sur le port 8883).
+   ```bash
+   cp .env.example .env
+   ```
 
-**Configuration automatique :**
+   _Assurez-vous que les variables dans `.env` sont correctes._
 
-Au démarrage via Docker Compose, le conteneur :
+3. **Lancement de l'infrastructure**
+   Démarre la base de données PostgreSQL et le broker MQTT.
 
-1. Génère automatiquement un fichier de mots de passe basé sur les variables d'environnement `MQTT_USERNAME` et `MQTT_PASSWORD` (défaut: `admin` / `password`).
-2. Génère automatiquement des certificats SSL auto-signés si aucun certificat n'est présent dans `mosquitto/certs/`.
+   ```bash
+   docker compose up -d
+   ```
 
-**Utilisation de certificats de production :**
+4. **Initialisation de la base de données**
+   Génère le client, applique les migrations et remplit la base avec des données de test.
 
-Pour utiliser vos propres certificats (ex: Let's Encrypt) :
+   ```bash
+   npx prisma generate
+   npx prisma migrate dev
+   npm run prisma:seed
+   ```
 
-1. Placez vos fichiers `ca.crt`, `server.crt` et `server.key` dans le dossier `backend/mosquitto/certs/`.
-2. Redémarrez le conteneur MQTT.
+5. **Démarrage du serveur**
+   Lance le serveur en mode développement (watch).
 
-## Démarrage
+   ```bash
+   npm run dev
+   ```
 
-- Développement (mode watch) :
+## Commandes utiles
 
-```bash
-npm run dev
-```
+| Commande               | Description                                                                        |
+| ---------------------- | ---------------------------------------------------------------------------------- |
+| `npx prisma studio`    | Ouvre une interface web pour visualiser la base de données.                        |
+| `npm run prisma:reset` | **Attention** : Supprime la BDD, re-migre et re-seed (utile pour repartir à zéro). |
+| `npm run build`        | Compile le projet pour la production.                                              |
+| `npm start`            | Lance le serveur compilé (production).                                             |
 
-- Production :
+## Note sur MQTT
 
-```bash
-npm run build
-npm start
-```
-
-- Docker :
-
-```bash
-docker compose up -d --build
-```
-
-## Base de données
-
-### Commandes Prisma de base
-
-```bash
-npm run prisma:generate  # Générer le client Prisma
-npm run prisma:migrate   # Appliquer les migrations
-npm run prisma:seed      # Seed de la base de données
-npm run prisma:studio    # Ouvrir l'interface Prisma Studio
-```
-
-### Seeding de la base de données
-
-```bash
-npm run prisma:reset
-```
-
-Cette commande va :
-
-- Supprimer toutes les données existantes
-- Réappliquer toutes les migrations
-- Créer automatiquement des données de démo
+Le broker MQTT est géré par Docker. Il se configure automatiquement au premier lancement (génération des certificats SSL dans `mosquitto/certs/` et des utilisateurs).
