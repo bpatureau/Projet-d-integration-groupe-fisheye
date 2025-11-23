@@ -2,6 +2,7 @@ import axios from "axios";
 import type {
   Doorbell,
   Location,
+  Message,
   Teacher,
   Visit,
 } from "../../prisma/generated/client.js";
@@ -93,6 +94,92 @@ class NotificationService {
 
     return notifiedTeachers;
   }
+
+  /**
+   * Notifie les enseignants lors de la réception d'un message
+   */
+  async notifyTeachersOfMessage(
+    message: Message & {
+      visit?: Visit | null;
+      targetTeacher?: Teacher | null;
+      targetLocation?: Location | null;
+    },
+  ): Promise<void> {
+    const teachersToNotify: Teacher[] = [];
+
+    // Si un prof spécifique est ciblé
+    if (message.targetTeacher) {
+      teachersToNotify.push(message.targetTeacher);
+    }
+
+    if (teachersToNotify.length === 0) {
+      return;
+    }
+
+    const notificationPromises: Promise<unknown>[] = [];
+
+    for (const teacher of teachersToNotify) {
+      const prefs = (teacher.preferences as unknown as TeacherPreferences) || {
+        notifyOnTeams: true,
+      };
+
+      if (
+        prefs.notifyOnTeams &&
+        teacher.teamsEmail &&
+        message.targetLocation?.teamsWebhookUrl
+      ) {
+        notificationPromises.push(
+          this.sendTeamsMessageNotification(
+            message.targetLocation.teamsWebhookUrl,
+            message.targetLocation,
+            teacher,
+            message.text,
+          ),
+        );
+      }
+    }
+
+    await Promise.allSettled(notificationPromises);
+  }
+
+  private async sendTeamsMessageNotification(
+    webhookUrl: string,
+    location: Location,
+    teacher: Teacher,
+    text: string,
+  ): Promise<boolean> {
+    const message = {
+      "@type": "MessageCard",
+      "@context": "http://schema.org/extensions",
+      summary: "Nouveau message reçu",
+      sections: [
+        {
+          activityTitle: `📨 Message - ${location.name}`,
+          activitySubtitle: `Pour: ${teacher.name}`,
+          facts: [
+            { name: "Message", value: text },
+            { name: "Heure", value: new Date().toLocaleTimeString("fr-FR") },
+          ],
+        },
+      ],
+    };
+
+    try {
+      await axios.post(webhookUrl, message, { timeout: 5000 });
+      logger.info("Teams message notification sent", {
+        location: location.name,
+        teacher: teacher.name,
+      });
+      return true;
+    } catch (error) {
+      logger.error("Failed to send Teams message notification", { error });
+      return false;
+    }
+  }
+
+  /**
+   * Notifie les enseignants lors de la réception d'un message
+   */
 
   /**
    * Notifie la sonnette qu'une visite a été manquée (timeout ou rejet)

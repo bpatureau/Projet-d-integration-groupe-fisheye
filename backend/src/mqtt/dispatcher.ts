@@ -224,7 +224,7 @@ class MQTTDispatcher {
   }
 
   /**
-   * Gère la demande de liste des enseignants par un panel
+   * Gère la demande de liste des enseignants (Panel ou Doorbell)
    */
   private async handleTeachersRequest(
     topic: string,
@@ -236,8 +236,27 @@ class MQTTDispatcher {
       return;
     }
 
-    const panel = await panelService.findByMqttClientId(mqttClientId);
-    await deviceActionService.handleTeachersRequest(panel.id, panel.locationId);
+    // Essayer de trouver un Panel
+    try {
+      const panel = await panelService.findByMqttClientId(mqttClientId);
+      await deviceActionService.triggerLocationRefresh(
+        panel.locationId,
+        panel.id,
+      );
+      return;
+    } catch {}
+
+    // Essayer de trouver une Doorbell
+    try {
+      const doorbell = await doorbellService.findByMqttClientId(mqttClientId);
+      await deviceActionService.triggerLocationRefresh(
+        doorbell.locationId,
+        doorbell.id,
+      );
+      return;
+    } catch {}
+
+    logger.warn("Teachers request from unknown device", { mqttClientId });
   }
 
   /**

@@ -1,7 +1,6 @@
 import { Router } from "express";
 import * as authController from "../controllers/auth.controller";
 import * as buzzerController from "../controllers/buzzer.controller";
-import * as deviceActionController from "../controllers/device-action.controller";
 import * as doorbellController from "../controllers/doorbell.controller";
 import * as healthController from "../controllers/health.controller";
 import * as locationController from "../controllers/location.controller";
@@ -29,32 +28,6 @@ router.post(
   "/auth/login",
   validateBody(schemas.loginSchema),
   authController.login,
-);
-
-// Actions des appareils (appelées via MQTT ou HTTP)
-router.post(
-  "/device-actions/doorbell/:deviceId/button-pressed",
-  validateBody(schemas.buttonPressedSchema),
-  deviceActionController.buttonPressed,
-);
-router.post(
-  "/device-actions/doorbell/:deviceId/door-opened",
-  deviceActionController.doorOpened,
-);
-router.post(
-  "/device-actions/doorbell/:deviceId/message",
-  validateBody(schemas.createMessageSchema),
-  deviceActionController.doorbellMessage,
-);
-router.post(
-  "/device-actions/panel/:deviceId/teacher-selected",
-  validateBody(schemas.teacherSelectedSchema),
-  deviceActionController.teacherSelected,
-);
-router.post(
-  "/device-actions/:type/:deviceId/status",
-  validateBody(schemas.statusSchema),
-  deviceActionController.status,
 );
 
 // ========================================

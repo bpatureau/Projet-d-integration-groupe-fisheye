@@ -90,32 +90,22 @@ class DeviceActionService {
       }
     }
 
-    if (teachersToNotify.length > 0) {
-      const visitWithRelations = {
-        ...visit,
-        doorbell,
-        location: doorbell.location,
-      };
+    const visitWithRelations = {
+      ...visit,
+      doorbell,
+      location: doorbell.location,
+    };
 
-      notificationService
-        .notifyTeachersOfRing(visitWithRelations, teachersToNotify)
-        .catch((error) => {
-          logger.error("Failed to send notifications", {
-            error,
-            visitId: visit.id,
-          });
+    notificationService
+      .notifyTeachersOfRing(visitWithRelations, teachersToNotify)
+      .catch((error) => {
+        logger.error("Failed to send notifications", {
+          error,
+          visitId: visit.id,
         });
-    }
+      });
 
     return visit;
-  }
-
-  async handleDoorbellButtonPressedByDeviceId(
-    deviceId: string,
-    targetTeacherId?: string,
-  ): Promise<Visit> {
-    const doorbell = await doorbellService.findByDeviceId(deviceId);
-    return this.handleDoorbellButtonPressed(doorbell.id, targetTeacherId);
   }
 
   /**
@@ -140,11 +130,6 @@ class DeviceActionService {
     });
 
     return updatedVisit;
-  }
-
-  async handleDoorOpenedByDeviceId(deviceId: string): Promise<Visit | null> {
-    const doorbell = await doorbellService.findByDeviceId(deviceId);
-    return this.handleDoorOpened(doorbell.id);
   }
 
   /**
@@ -187,14 +172,6 @@ class DeviceActionService {
       teacherId: teacher.id,
       teacherName: teacher.name,
     });
-  }
-
-  async handleTeacherSelectedByDeviceId(
-    deviceId: string,
-    teacherId: string,
-  ): Promise<void> {
-    const panel = await panelService.findByDeviceId(deviceId);
-    return this.handleTeacherSelected(panel.id, teacherId);
   }
 
   /**
@@ -306,22 +283,11 @@ class DeviceActionService {
       targetLocationId: finalTargetLocationId,
     });
 
-    return message;
-  }
+    // Notifie les enseignants concernés
+    const messageWithRelations = await messageService.findById(message.id);
+    await notificationService.notifyTeachersOfMessage(messageWithRelations);
 
-  async handleDoorbellMessageByDeviceId(
-    deviceId: string,
-    text: string,
-    targetTeacherId?: string,
-    targetLocationId?: string,
-  ): Promise<Message> {
-    const doorbell = await doorbellService.findByDeviceId(deviceId);
-    return this.handleDoorbellMessage(
-      doorbell.id,
-      text,
-      targetTeacherId,
-      targetLocationId,
-    );
+    return message;
   }
 
   /**
@@ -436,28 +402,20 @@ class DeviceActionService {
   }
 
   /**
-   * Gère la demande de liste des enseignants par un panel
-   * Renvoie la liste des enseignants d'un lieu au panel via MQTT
+   * Déclenche le rafraîchissement des données (liste des profs) pour un local
+   * Peut être appelé par un panneau LED ou une sonnette
    */
-  async handleTeachersRequest(
-    panelId: string,
+  async triggerLocationRefresh(
     locationId: string,
+    requestingDeviceId?: string,
   ): Promise<void> {
-    const panel = await prismaService.client.ledPanel.findUnique({
-      where: { id: panelId },
-    });
-
-    if (!panel) {
-      throw new NotFoundError("LED Panel not found");
-    }
-
-    logger.info("Teachers request received from panel", {
-      panelId,
+    logger.info("Location refresh requested", {
       locationId,
+      requestingDeviceId,
     });
 
     // Déclenche un rafraîchissement global pour le local
-    // Cela enverra la liste à ce panel (et aux autres) via Retained message
+    // Cela enverra la liste à tous les appareils du local (y compris celui qui a demandé)
     await this.refreshLocationDevices(locationId);
   }
 
