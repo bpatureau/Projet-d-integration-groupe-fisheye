@@ -26,25 +26,27 @@ class MQTTDispatcher {
     try {
       logger.debug("MQTT message received", { topic });
 
-      if (matchesTopic(topic, MQTT_TOPICS_INBOUND.BUTTON_PRESSED)) {
+      if (matchesTopic(topic, MQTT_TOPICS_INBOUND.EVENT_BUTTON)) {
         await this.handleDoorbellButtonPressed(topic, payload);
-      } else if (matchesTopic(topic, MQTT_TOPICS_INBOUND.DOOR_OPENED)) {
+      } else if (matchesTopic(topic, MQTT_TOPICS_INBOUND.EVENT_DOOR)) {
         await this.handleDoorOpened(topic, payload);
-      } else if (matchesTopic(topic, MQTT_TOPICS_INBOUND.MESSAGE_SEND)) {
+      } else if (matchesTopic(topic, MQTT_TOPICS_INBOUND.EVENT_MESSAGE)) {
         await this.handleMessageSend(topic, payload);
-      } else if (matchesTopic(topic, MQTT_TOPICS_INBOUND.TEACHER_SELECTED)) {
+      } else if (matchesTopic(topic, MQTT_TOPICS_INBOUND.EVENT_SELECT)) {
         await this.handleTeacherSelected(topic, payload);
-      } else if (matchesTopic(topic, MQTT_TOPICS_INBOUND.STATUS)) {
+      } else if (matchesTopic(topic, MQTT_TOPICS_INBOUND.STATE_STATUS)) {
         await this.handleStatus(topic, payload);
-      } else if (matchesTopic(topic, MQTT_TOPICS_INBOUND.TEACHERS_REQUEST)) {
+      } else if (
+        matchesTopic(topic, MQTT_TOPICS_INBOUND.EVENT_REQUEST_TEACHERS)
+      ) {
         await this.handleTeachersRequest(topic, payload);
-      } else if (matchesTopic(topic, MQTT_TOPICS_INBOUND.PRESENCE_UPDATE)) {
+      } else if (matchesTopic(topic, MQTT_TOPICS_INBOUND.EVENT_PRESENCE)) {
         await this.handlePresenceUpdate(topic, payload);
-      } else if (matchesTopic(topic, MQTT_TOPICS_INBOUND.BELL_ACTIVATE_ACK)) {
+      } else if (matchesTopic(topic, MQTT_TOPICS_INBOUND.ACK_RING)) {
         await this.handleBellActivateAck(topic, payload);
-      } else if (matchesTopic(topic, MQTT_TOPICS_INBOUND.BUZZ_ACTIVATE_ACK)) {
+      } else if (matchesTopic(topic, MQTT_TOPICS_INBOUND.ACK_BUZZ)) {
         await this.handleBuzzActivateAck(topic, payload);
-      } else if (matchesTopic(topic, MQTT_TOPICS_INBOUND.DISPLAY_UPDATE_ACK)) {
+      } else if (matchesTopic(topic, MQTT_TOPICS_INBOUND.ACK_DISPLAY)) {
         await this.handleDisplayUpdateAck(topic, payload);
       }
     } catch (error) {

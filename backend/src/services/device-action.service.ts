@@ -8,6 +8,7 @@ import type {
   Visit,
 } from "../../prisma/generated/client.js";
 import { DEVICE_CONFIGS } from "../config/devices.config";
+import type { MQTTPayloads } from "../mqtt/mqtt.constants.js";
 import { NotFoundError, ValidationError } from "../utils/errors";
 import logger from "../utils/logger";
 import prismaService from "../utils/prisma";
@@ -450,48 +451,14 @@ class DeviceActionService {
       throw new NotFoundError("LED Panel not found");
     }
 
-    // Récupère tous les enseignants associés à ce lieu avec leurs présences
-    const teacherLocations =
-      await prismaService.client.teacherLocation.findMany({
-        where: { locationId },
-        include: { teacher: true },
-      });
-
-    const teachers = teacherLocations.map((tl) => tl.teacher);
-
-    // Récupère les informations de présence pour chaque enseignant
-    const presentTeachers =
-      await presenceService.getPresentTeachersInLocation(locationId);
-
-    // Crée la liste des enseignants avec leur statut de présence
-    const teachersList = teachers.map((teacher) => {
-      const presenceInfo = presentTeachers.find((pt) => pt.id === teacher.id);
-      return {
-        id: teacher.id,
-        name: teacher.name,
-        email: teacher.email,
-        isPresent: presenceInfo?.isPresent || false,
-        presenceSource: presenceInfo?.presenceSource || "unavailable",
-        manualStatus: presenceInfo?.manualStatus
-          ? {
-              status: presenceInfo.manualStatus.status,
-              until: presenceInfo.manualStatus.until?.toISOString(),
-            }
-          : undefined,
-      };
-    });
-
-    // Envoie la liste au panel via MQTT
-    await notificationService.publishTeachersList(
-      panel.mqttClientId,
-      teachersList,
-    );
-
-    logger.info("Teachers list sent to panel", {
+    logger.info("Teachers request received from panel", {
       panelId,
       locationId,
-      teacherCount: teachersList.length,
     });
+
+    // Déclenche un rafraîchissement global pour le local
+    // Cela enverra la liste à ce panel (et aux autres) via Retained message
+    await this.refreshLocationDevices(locationId);
   }
 
   /**
@@ -544,14 +511,99 @@ class DeviceActionService {
       until,
     });
 
-    // Diffuse le changement de présence à tous les panels
-    await notificationService.broadcastPresenceChange({
-      teacherId,
-      teacherName: teacher.name,
-      status,
-      until,
-      source: "panel",
+    // Rafraîchit tous les appareils du local avec la nouvelle liste
+    await this.refreshLocationDevices(panel.locationId);
+  }
+
+  /**
+   * Génère le payload de la liste des enseignants pour un local donné
+   */
+  private async getTeachersListPayload(
+    locationId: string,
+  ): Promise<MQTTPayloads.TeacherInfo[]> {
+    // Récupère tous les enseignants associés à ce lieu
+    const teacherLocations =
+      await prismaService.client.teacherLocation.findMany({
+        where: { locationId },
+        include: { teacher: true },
+      });
+
+    const teachers = teacherLocations.map((tl) => tl.teacher);
+
+    // Récupère les informations de présence pour chaque enseignant
+    const presentTeachers =
+      await presenceService.getPresentTeachersInLocation(locationId);
+
+    // Crée la liste des enseignants avec leur statut de présence
+    return teachers.map((teacher) => {
+      const presenceInfo = presentTeachers.find((pt) => pt.id === teacher.id);
+      return {
+        id: teacher.id,
+        name: teacher.name,
+        email: teacher.email,
+        isPresent: presenceInfo?.isPresent || false,
+        presenceSource: presenceInfo?.presenceSource || "unavailable",
+        manualStatus: presenceInfo?.manualStatus
+          ? {
+              status: presenceInfo.manualStatus.status,
+              until: presenceInfo.manualStatus.until?.toISOString(),
+            }
+          : undefined,
+      };
     });
+  }
+
+  /**
+   * Rafraîchit les données (liste des profs) sur tous les appareils d'un local
+   * Utilise des messages RETAINED pour que les appareils soient toujours à jour
+   */
+  async refreshLocationDevices(locationId: string): Promise<void> {
+    logger.info("Refreshing devices for location", { locationId });
+
+    const teachersList = await this.getTeachersListPayload(locationId);
+
+    // 1. Récupérer tous les panneaux LED du local (en ligne)
+    const panels = await prismaService.client.ledPanel.findMany({
+      where: { locationId, isOnline: true },
+    });
+
+    // 2. Récupérer toutes les sonnettes du local (en ligne)
+    // Note: Les sonnettes peuvent aussi afficher la liste des profs
+    const doorbells = await prismaService.client.doorbell.findMany({
+      where: { locationId, isOnline: true },
+    });
+
+    const devices = [
+      ...panels.map((p) => ({
+        id: p.id,
+        mqttClientId: p.mqttClientId,
+        type: "panel",
+      })),
+      ...doorbells.map((d) => ({
+        id: d.id,
+        mqttClientId: d.mqttClientId,
+        type: "doorbell",
+      })),
+    ];
+
+    logger.info(
+      `Found ${devices.length} devices to refresh in location ${locationId}`,
+    );
+
+    // 3. Publier la liste mise à jour vers chaque appareil
+    const publishPromises = devices.map((device) => {
+      return notificationService
+        .publishTeachersList(device.mqttClientId, teachersList)
+        .catch((error) => {
+          logger.error("Failed to publish teachers list to device", {
+            deviceId: device.id,
+            mqttClientId: device.mqttClientId,
+            error,
+          });
+        });
+    });
+
+    await Promise.all(publishPromises);
   }
 }
 

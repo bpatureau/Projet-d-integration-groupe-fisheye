@@ -208,13 +208,14 @@ class NotificationService {
     data: MQTTPayloads.DisplayUpdate,
   ): Promise<void> {
     const topic = getOutboundTopics(mqttClientId).displayUpdate;
-    // QoS 0 suffisant car Retained = true assure la dispo à la reconnexion
-    await mqttService.publish(topic, data, { qos: 0, retained: true });
+    // QoS 1 + Retained = true assure la dispo à la reconnexion et la fiabilité
+    await mqttService.publish(topic, data, { qos: 1, retained: true });
     logger.info("Panel display published (retained)", { mqttClientId });
   }
 
   /**
    * Publie la liste des enseignants vers un panneau LED via MQTT
+   * Utilise RETAINED pour que le panneau reçoive la liste à la connexion
    */
   async publishTeachersList(
     mqttClientId: string,
@@ -222,46 +223,12 @@ class NotificationService {
   ): Promise<void> {
     const topic = getOutboundTopics(mqttClientId).teachersList;
     const payload: MQTTPayloads.TeachersList = { teachers };
-    await mqttService.publish(topic, payload, { qos: 1 });
-    logger.info("Teachers list published to panel", {
+    // QoS 1 + Retained = true
+    await mqttService.publish(topic, payload, { qos: 1, retained: true });
+    logger.info("Teachers list published to panel (retained)", {
       mqttClientId,
       teacherCount: teachers.length,
     });
-  }
-
-  /**
-   * Diffuse un changement de présence à tous les panels en ligne
-   * Utilise RETAINED pour maintenir l'état synchronisé
-   */
-  async broadcastPresenceChange(
-    data: MQTTPayloads.PresenceChanged,
-  ): Promise<void> {
-    const panels = await prismaService.client.ledPanel.findMany({
-      where: { isOnline: true },
-    });
-
-    logger.info("Broadcasting presence change to panels (retained)", {
-      teacherId: data.teacherId,
-      teacherName: data.teacherName,
-      status: data.status,
-      panelCount: panels.length,
-    });
-
-    const publishPromises = panels.map((panel) => {
-      const topic = getOutboundTopics(panel.mqttClientId).presenceChanged;
-      // Retained = true pour que l'état persiste
-      return mqttService
-        .publish(topic, data, { qos: 1, retained: true })
-        .catch((error) => {
-          logger.error("Failed to broadcast presence change to panel", {
-            panelId: panel.id,
-            mqttClientId: panel.mqttClientId,
-            error,
-          });
-        });
-    });
-
-    await Promise.all(publishPromises);
   }
 }
 

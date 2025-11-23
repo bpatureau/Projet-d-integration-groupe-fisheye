@@ -41,6 +41,15 @@ class ScheduleService {
         });
     }
 
+    // Rafraîchit la liste des enseignants sur tous les appareils du local
+    // (car les changements d'horaire peuvent affecter la présence affichée)
+    deviceActionService.refreshLocationDevices(locationId).catch((error) => {
+      logger.error("Failed to refresh location devices after schedule sync", {
+        locationId,
+        error,
+      });
+    });
+
     return schedules.length;
   }
 

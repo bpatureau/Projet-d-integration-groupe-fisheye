@@ -4,7 +4,7 @@ import { ConflictError, NotFoundError } from "../utils/errors";
 import logger from "../utils/logger";
 import { hashPassword } from "../utils/password";
 import prismaService from "../utils/prisma";
-import notificationService from "./notification.service";
+import deviceActionService from "./device-action.service";
 
 class TeacherService {
   async create(data: {
@@ -163,7 +163,7 @@ class TeacherService {
    * Définit un statut de présence manuel pour un enseignant
    */
   async setManualStatus(id: string, status: ManualStatus): Promise<Teacher> {
-    const existingTeacher = await this.findById(id);
+    await this.findById(id);
 
     const teacher = await prismaService.client.teacher.update({
       where: { id },
@@ -175,24 +175,23 @@ class TeacherService {
       status: status.status,
     });
 
-    // Diffuse le changement de présence à tous les panels via MQTT
-    notificationService
-      .broadcastPresenceChange({
-        teacherId: id,
-        teacherName: existingTeacher.name,
-        status: status.status,
-        until:
-          status.until instanceof Date
-            ? status.until.toISOString()
-            : status.until,
-        source: "api",
-      })
-      .catch((error) => {
-        logger.error("Failed to broadcast presence change", {
-          teacherId: id,
-          error,
+    // Récupère les lieux associés à l'enseignant
+    const locations = await this.getLocations(id);
+
+    // Rafraîchit les appareils de chaque lieu
+    for (const location of locations) {
+      await deviceActionService
+        .refreshLocationDevices(location.id)
+        .catch((error) => {
+          logger.error(
+            "Failed to refresh location devices after status change",
+            {
+              locationId: location.id,
+              error,
+            },
+          );
         });
-      });
+    }
 
     return teacher;
   }
@@ -201,7 +200,7 @@ class TeacherService {
    * Supprime le statut de présence manuel d'un enseignant
    */
   async clearManualStatus(id: string): Promise<Teacher> {
-    const existingTeacher = await this.findById(id);
+    await this.findById(id);
 
     const teacher = await prismaService.client.teacher.update({
       where: { id },
@@ -210,20 +209,23 @@ class TeacherService {
 
     logger.info("Teacher manual status cleared", { teacherId: id });
 
-    // Diffuse le changement (on met "absent" comme statut par défaut quand on clear)
-    notificationService
-      .broadcastPresenceChange({
-        teacherId: id,
-        teacherName: existingTeacher.name,
-        status: "absent",
-        source: "api",
-      })
-      .catch((error) => {
-        logger.error("Failed to broadcast presence change", {
-          teacherId: id,
-          error,
+    // Récupère les lieux associés à l'enseignant
+    const locations = await this.getLocations(id);
+
+    // Rafraîchit les appareils de chaque lieu
+    for (const location of locations) {
+      await deviceActionService
+        .refreshLocationDevices(location.id)
+        .catch((error) => {
+          logger.error(
+            "Failed to refresh location devices after status clear",
+            {
+              locationId: location.id,
+              error,
+            },
+          );
         });
-      });
+    }
 
     return teacher;
   }

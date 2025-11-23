@@ -12,45 +12,40 @@ export const MQTT_NAMESPACE = "fisheye";
  * Topics MQTT pour la communication Device → Backend (subscribed)
  */
 export const MQTT_TOPICS_INBOUND = {
-  // Sonnette
-  BUTTON_PRESSED: "button/pressed",
-  DOOR_OPENED: "door/opened",
-  MESSAGE_SEND: "message/send",
+  // Events
+  EVENT_BUTTON: "event/button",
+  EVENT_DOOR: "event/door",
+  EVENT_MESSAGE: "event/message",
+  EVENT_SELECT: "event/select",
+  EVENT_PRESENCE: "event/presence",
+  EVENT_REQUEST_TEACHERS: "event/request_teachers",
 
-  // Panneau LED
-  TEACHER_SELECTED: "teacher/selected",
-  TEACHERS_REQUEST: "teachers/request",
-  PRESENCE_UPDATE: "presence/update",
-
-  // Tous les appareils
-  STATUS: "status",
+  // State
+  STATE_STATUS: "state/status",
 
   // Acknowledgments (Device → Backend)
-  BELL_ACTIVATE_ACK: "bell/activate/ack",
-  BUZZ_ACTIVATE_ACK: "buzz/activate/ack",
-  DISPLAY_UPDATE_ACK: "display/update/ack",
+  ACK_RING: "event/ack_ring",
+  ACK_BUZZ: "event/ack_buzz",
+  ACK_DISPLAY: "event/ack_display",
 } as const;
 
 /**
  * Topics MQTT pour la communication Backend → Device (published)
  */
 export const MQTT_TOPICS_OUTBOUND = {
-  // Sonnette
-  BELL_ACTIVATE: "bell/activate",
-  VISIT_MISSED: "visit/missed",
+  // Cmds
+  CMD_RING: "cmd/ring",
+  CMD_BUZZ: "cmd/buzz",
+  CMD_MISSED: "cmd/missed",
 
-  // Buzzer
-  BUZZ_ACTIVATE: "buzz/activate",
-
-  // Panneau LED
-  DISPLAY_UPDATE: "display/update",
-  TEACHERS_LIST: "teachers/list",
-  PRESENCE_CHANGED: "presence/changed",
+  // Data
+  DATA_TEACHERS: "data/teachers",
+  DATA_SCHEDULE: "data/schedule",
 } as const;
 
 /**
  * Constructeur de topics MQTT
- * Génère les topics complets au format: fisheye/{clientId}/{action}
+ * Génère les topics complets au format: fisheye/{clientId}/{cat}/{action}
  */
 
 /**
@@ -65,16 +60,16 @@ export function getWildcardTopic(): string {
  */
 export function getInboundTopics(clientId: string) {
   return {
-    buttonPressed: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.BUTTON_PRESSED}`,
-    doorOpened: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.DOOR_OPENED}`,
-    messageSend: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.MESSAGE_SEND}`,
-    teacherSelected: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.TEACHER_SELECTED}`,
-    teachersRequest: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.TEACHERS_REQUEST}`,
-    presenceUpdate: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.PRESENCE_UPDATE}`,
-    status: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.STATUS}`,
-    bellActivateAck: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.BELL_ACTIVATE_ACK}`,
-    buzzActivateAck: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.BUZZ_ACTIVATE_ACK}`,
-    displayUpdateAck: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.DISPLAY_UPDATE_ACK}`,
+    buttonPressed: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.EVENT_BUTTON}`,
+    doorOpened: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.EVENT_DOOR}`,
+    messageSend: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.EVENT_MESSAGE}`,
+    teacherSelected: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.EVENT_SELECT}`,
+    teachersRequest: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.EVENT_REQUEST_TEACHERS}`,
+    presenceUpdate: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.EVENT_PRESENCE}`,
+    status: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.STATE_STATUS}`,
+    bellActivateAck: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.ACK_RING}`,
+    buzzActivateAck: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.ACK_BUZZ}`,
+    displayUpdateAck: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.ACK_DISPLAY}`,
   };
 }
 
@@ -83,23 +78,22 @@ export function getInboundTopics(clientId: string) {
  */
 export function getOutboundTopics(clientId: string) {
   return {
-    bellActivate: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_OUTBOUND.BELL_ACTIVATE}`,
-    visitMissed: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_OUTBOUND.VISIT_MISSED}`,
-    buzzActivate: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_OUTBOUND.BUZZ_ACTIVATE}`,
-    displayUpdate: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_OUTBOUND.DISPLAY_UPDATE}`,
-    teachersList: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_OUTBOUND.TEACHERS_LIST}`,
-    presenceChanged: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_OUTBOUND.PRESENCE_CHANGED}`,
+    bellActivate: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_OUTBOUND.CMD_RING}`,
+    visitMissed: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_OUTBOUND.CMD_MISSED}`,
+    buzzActivate: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_OUTBOUND.CMD_BUZZ}`,
+    displayUpdate: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_OUTBOUND.DATA_SCHEDULE}`,
+    teachersList: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_OUTBOUND.DATA_TEACHERS}`,
   };
 }
 
 /**
  * Extrait le clientId d'un topic MQTT complet
- * @param topic Topic au format fisheye/{clientId}/action
+ * @param topic Topic au format fisheye/{clientId}/{cat}/{action}
  * @returns clientId ou null si le format est invalide
  */
 export function extractClientIdFromTopic(topic: string): string | null {
   const parts = topic.split("/");
-  if (parts.length < 3 || parts[0] !== MQTT_NAMESPACE) {
+  if (parts.length < 4 || parts[0] !== MQTT_NAMESPACE) {
     return null;
   }
   return parts[1];
@@ -107,12 +101,12 @@ export function extractClientIdFromTopic(topic: string): string | null {
 
 /**
  * Extrait l'action d'un topic MQTT complet
- * @param topic Topic au format fisheye/{clientId}/action/sous-action
- * @returns action complète (ex: "bell/activate")
+ * @param topic Topic au format fisheye/{clientId}/{cat}/{action}
+ * @returns action complète (ex: "event/button")
  */
 export function extractActionFromTopic(topic: string): string | null {
   const parts = topic.split("/");
-  if (parts.length < 3 || parts[0] !== MQTT_NAMESPACE) {
+  if (parts.length < 4 || parts[0] !== MQTT_NAMESPACE) {
     return null;
   }
   // Retourne tout après le clientId
