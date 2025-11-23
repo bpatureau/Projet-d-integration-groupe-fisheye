@@ -1,7 +1,9 @@
-import type { LedPanel } from "../../prisma/generated/client.js";
+import type { LedPanel, Teacher } from "../../prisma/generated/client.js";
+import { DEVICE_CONFIGS } from "../config/devices.config";
 import { ConflictError, NotFoundError } from "../utils/errors";
 import logger from "../utils/logger";
 import prismaService from "../utils/prisma";
+import calendarService from "./calendar.service";
 
 class PanelService {
   async create(data: {
@@ -135,6 +137,69 @@ class PanelService {
     });
 
     logger.info("LED Panel deleted", { panelId: id });
+  }
+
+  /**
+   * Génère la grille d'emploi du temps pour le panneau LED
+   * Utilise la configuration définie dans devices.config.ts
+   */
+  async generateWeekScheduleGrid(teacher: Teacher): Promise<boolean[][]> {
+    const config = DEVICE_CONFIGS.ledPanel.schedule;
+    // Initialisation de la grille vide
+    const grid: boolean[][] = Array.from({ length: config.days }, () =>
+      Array(config.timeBlocks.length).fill(false),
+    );
+
+    if (!teacher.gmailEmail) {
+      return grid;
+    }
+
+    const now = new Date();
+
+    // Calcul du Lundi de la semaine courante
+    const startOfWeek = new Date(now);
+    const day = startOfWeek.getDay(); // 0 = Dimanche, 1 = Lundi...
+    const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1); // Ajuste au Lundi
+    startOfWeek.setDate(diff);
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 5); // Vendredi soir inclus
+
+    const schedules = await calendarService.getTeacherSchedule(
+      teacher.gmailEmail,
+      startOfWeek,
+      endOfWeek,
+    );
+
+    for (let dayIndex = 0; dayIndex < config.days; dayIndex++) {
+      const dayStart = new Date(startOfWeek);
+      dayStart.setDate(startOfWeek.getDate() + dayIndex);
+
+      for (
+        let blockIndex = 0;
+        blockIndex < config.timeBlocks.length;
+        blockIndex++
+      ) {
+        const block = config.timeBlocks[blockIndex];
+        const blockStart = new Date(dayStart);
+        blockStart.setHours(block.start, 0, 0, 0);
+        const blockEnd = new Date(dayStart);
+        blockEnd.setHours(block.end, 0, 0, 0);
+
+        // Vérifie si un cours chevauche ce bloc horaire
+        const hasEvent = schedules.some((schedule) => {
+          const scheduleStart = new Date(schedule.startTime);
+          const scheduleEnd = new Date(schedule.endTime);
+          // Logique d'intersection d'intervalles
+          return scheduleStart < blockEnd && scheduleEnd > blockStart;
+        });
+
+        grid[dayIndex][blockIndex] = hasEvent;
+      }
+    }
+
+    return grid;
   }
 }
 

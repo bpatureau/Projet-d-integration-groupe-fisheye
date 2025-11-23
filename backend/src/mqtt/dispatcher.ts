@@ -17,6 +17,8 @@ import {
  * Route les messages MQTT des appareils vers les gestionnaires appropriés
  */
 class MQTTDispatcher {
+  private deviceTypeCache = new Map<string, "doorbell" | "panel" | "buzzer">();
+
   initialize(): void {
     mqttService.subscribe(getWildcardTopic(), this.routeMessage.bind(this));
     logger.info("MQTT dispatcher initialized");
@@ -190,27 +192,22 @@ class MQTTDispatcher {
 
     try {
       const doorbell = await doorbellService.findByMqttClientId(mqttClientId);
-      await deviceActionService.handleStatus(
-        "doorbell",
-        doorbell.deviceId,
-        isOnline,
-      );
+      await deviceActionService.handleStatus("doorbell", doorbell, isOnline);
+      this.deviceTypeCache.set(mqttClientId, "doorbell");
       return;
     } catch {}
 
     try {
       const panel = await panelService.findByMqttClientId(mqttClientId);
-      await deviceActionService.handleStatus("panel", panel.deviceId, isOnline);
+      await deviceActionService.handleStatus("panel", panel, isOnline);
+      this.deviceTypeCache.set(mqttClientId, "panel");
       return;
     } catch {}
 
     try {
       const buzzerDevice = await buzzerService.findByMqttClientId(mqttClientId);
-      await deviceActionService.handleStatus(
-        "buzzer",
-        buzzerDevice.deviceId,
-        isOnline,
-      );
+      await deviceActionService.handleStatus("buzzer", buzzerDevice, isOnline);
+      this.deviceTypeCache.set(mqttClientId, "buzzer");
       return;
     } catch {}
 
@@ -236,6 +233,31 @@ class MQTTDispatcher {
       return;
     }
 
+    // Vérifier le cache d'abord
+    const cachedType = this.deviceTypeCache.get(mqttClientId);
+    if (cachedType) {
+      if (cachedType === "panel") {
+        try {
+          const panel = await panelService.findByMqttClientId(mqttClientId);
+          await deviceActionService.triggerLocationRefresh(
+            panel.locationId,
+            panel.id,
+          );
+          return;
+        } catch {}
+      } else if (cachedType === "doorbell") {
+        try {
+          const doorbell =
+            await doorbellService.findByMqttClientId(mqttClientId);
+          await deviceActionService.triggerLocationRefresh(
+            doorbell.locationId,
+            doorbell.id,
+          );
+          return;
+        } catch {}
+      }
+    }
+
     // Essayer de trouver un Panel
     try {
       const panel = await panelService.findByMqttClientId(mqttClientId);
@@ -243,6 +265,7 @@ class MQTTDispatcher {
         panel.locationId,
         panel.id,
       );
+      this.deviceTypeCache.set(mqttClientId, "panel");
       return;
     } catch {}
 
@@ -253,6 +276,7 @@ class MQTTDispatcher {
         doorbell.locationId,
         doorbell.id,
       );
+      this.deviceTypeCache.set(mqttClientId, "doorbell");
       return;
     } catch {}
 

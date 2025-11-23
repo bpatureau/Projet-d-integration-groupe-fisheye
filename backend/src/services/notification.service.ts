@@ -35,6 +35,18 @@ class NotificationService {
       this.activateDoorbellBell(visit.doorbell.mqttClientId),
     );
 
+    // 2. Récupérer tous les buzzers des enseignants concernés en une seule requête
+    const teacherIds = teachers.map((t) => t.id);
+    const buzzers = await prismaService.client.buzzer.findMany({
+      where: {
+        teacherId: { in: teacherIds },
+        isOnline: true,
+      },
+    });
+
+    // Créer une map pour accès rapide
+    const buzzerMap = new Map(buzzers.map((b) => [b.teacherId, b]));
+
     for (const teacher of teachers) {
       const channels: string[] = ["doorbell"];
       const prefs = (teacher.preferences as unknown as TeacherPreferences) || {
@@ -42,13 +54,16 @@ class NotificationService {
         buzzerEnabled: true,
       };
 
-      // 2. Activer le buzzer (si activé)
+      // 3. Activer le buzzer (si activé et disponible)
       if (prefs.buzzerEnabled) {
-        notificationPromises.push(
-          this.activateBuzzer(teacher.id).then((activated) => {
-            if (activated) channels.push("buzzer");
-          }),
-        );
+        const buzzer = buzzerMap.get(teacher.id);
+        if (buzzer) {
+          notificationPromises.push(
+            this.activateBuzzer(buzzer).then((activated) => {
+              if (activated) channels.push("buzzer");
+            }),
+          );
+        }
       }
 
       // 3. Notifier Teams (si activé)
@@ -221,16 +236,10 @@ class NotificationService {
     }
   }
 
-  private async activateBuzzer(teacherId: string): Promise<boolean> {
+  private async activateBuzzer(
+    buzzer: { mqttClientId: string } & { teacherId: string },
+  ): Promise<boolean> {
     try {
-      const buzzer = await prismaService.client.buzzer.findUnique({
-        where: { teacherId },
-      });
-
-      if (!buzzer || !buzzer.isOnline) {
-        return false;
-      }
-
       const topic = getOutboundTopics(buzzer.mqttClientId).buzzActivate;
       const duration = DEVICE_CONFIGS.buzzer.buzzDuration;
       const payload: MQTTPayloads.BuzzActivate = { duration };
@@ -238,13 +247,16 @@ class NotificationService {
       await mqttService.publish(topic, payload, { qos: 1 });
 
       logger.info("Buzzer activated", {
-        teacherId,
+        teacherId: buzzer.teacherId,
         mqttClientId: buzzer.mqttClientId,
         duration,
       });
       return true;
     } catch (error) {
-      logger.error("Failed to activate buzzer", { error, teacherId });
+      logger.error("Failed to activate buzzer", {
+        error,
+        teacherId: buzzer.teacherId,
+      });
       return false;
     }
   }

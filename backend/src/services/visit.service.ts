@@ -136,7 +136,10 @@ class VisitService {
     }
 
     const updated = await prismaService.client.visit.update({
-      where: { id: visitId },
+      where: {
+        id: visitId,
+        status: "pending",
+      },
       data: {
         status: "answered",
         answeredById,
@@ -159,7 +162,10 @@ class VisitService {
    */
   async markDoorOpened(visitId: string): Promise<Visit> {
     const visit = await prismaService.client.visit.update({
-      where: { id: visitId },
+      where: {
+        id: visitId,
+        status: "pending",
+      },
       data: {
         doorOpened: true,
         doorOpenedAt: new Date(),
@@ -237,15 +243,17 @@ class VisitService {
       },
     });
 
-    // Notifie chaque sonnette
-    for (const visit of expiredVisits) {
-      await notificationService.notifyDoorbellOfMiss(visit).catch((err) => {
+    // Notifie chaque sonnette en parallèle
+    const notificationPromises = expiredVisits.map((visit) =>
+      notificationService.notifyDoorbellOfMiss(visit).catch((err) => {
         logger.error("Failed to notify missed visit during auto-miss", {
           visitId: visit.id,
           error: err,
         });
-      });
-    }
+      }),
+    );
+
+    await Promise.allSettled(notificationPromises);
 
     if (expiredVisits.length > 0) {
       logger.info("Auto-missed expired visits", {

@@ -26,36 +26,8 @@ class PresenceService {
 
     // Détermine la présence de chaque enseignant
     const presentTeachers: PresentTeacher[] = teachers.map((teacher) => {
-      let isPresent = false;
-      let presenceSource: "calendar" | "manual" | "unavailable" = "unavailable";
-      let manualStatus: ManualStatus | undefined;
-
-      // Vérifie d'abord le statut manuel (prioritaire sur le calendrier)
-      if (teacher.manualStatus) {
-        const status = teacher.manualStatus as unknown as ManualStatus;
-        if (status.until) {
-          const until = new Date(status.until);
-          if (until > now) {
-            // Le statut manuel est encore valide
-            isPresent = status.status === "present";
-            presenceSource = "manual";
-            manualStatus = status;
-          }
-        } else {
-          // Pas d'expiration, toujours valide
-          isPresent = status.status === "present";
-          presenceSource = "manual";
-          manualStatus = status;
-        }
-      }
-
-      // Repli sur le calendrier si pas de statut manuel
-      if (presenceSource === "unavailable" && teacher.gmailEmail) {
-        if (calendarPresentEmails.includes(teacher.gmailEmail)) {
-          isPresent = true;
-          presenceSource = "calendar";
-        }
-      }
+      const { isPresent, presenceSource, manualStatus } =
+        this.determinePresence(teacher, calendarPresentEmails, now);
 
       return {
         id: teacher.id,
@@ -74,22 +46,71 @@ class PresenceService {
     locationId: string,
     now: Date = new Date(),
   ): Promise<Teacher[]> {
-    const presentTeachers = await this.getPresentTeachersInLocation(
-      locationId,
-      now,
-    );
+    // Récupère tous les enseignants associés à ce lieu (avec leurs données complètes)
+    const teacherLocations =
+      await prismaService.client.teacherLocation.findMany({
+        where: { locationId },
+        include: { teacher: true },
+      });
 
-    const presentIds = presentTeachers
-      .filter((pt) => pt.isPresent)
-      .map((pt) => pt.id);
+    const teachers = teacherLocations.map((tl) => tl.teacher);
 
-    return prismaService.client.teacher.findMany({
-      where: {
-        id: {
-          in: presentIds,
-        },
-      },
+    // Récupère la présence basée sur le calendrier
+    const calendarPresentEmails =
+      await calendarService.getPresentTeacherEmails(now);
+
+    // Filtre pour ne garder que les présents
+    return teachers.filter((teacher) => {
+      const { isPresent } = this.determinePresence(
+        teacher,
+        calendarPresentEmails,
+        now,
+      );
+      return isPresent;
     });
+  }
+
+  private determinePresence(
+    teacher: Teacher,
+    calendarPresentEmails: string[],
+    now: Date,
+  ): {
+    isPresent: boolean;
+    presenceSource: "calendar" | "manual" | "unavailable";
+    manualStatus?: ManualStatus;
+  } {
+    let isPresent = false;
+    let presenceSource: "calendar" | "manual" | "unavailable" = "unavailable";
+    let manualStatus: ManualStatus | undefined;
+
+    // Vérifie d'abord le statut manuel (prioritaire sur le calendrier)
+    if (teacher.manualStatus) {
+      const status = teacher.manualStatus as unknown as ManualStatus;
+      if (status.until) {
+        const until = new Date(status.until);
+        if (until > now) {
+          // Le statut manuel est encore valide
+          isPresent = status.status === "present";
+          presenceSource = "manual";
+          manualStatus = status;
+        }
+      } else {
+        // Pas d'expiration, toujours valide
+        isPresent = status.status === "present";
+        presenceSource = "manual";
+        manualStatus = status;
+      }
+    }
+
+    // Repli sur le calendrier si pas de statut manuel
+    if (presenceSource === "unavailable" && teacher.gmailEmail) {
+      if (calendarPresentEmails.includes(teacher.gmailEmail)) {
+        isPresent = true;
+        presenceSource = "calendar";
+      }
+    }
+
+    return { isPresent, presenceSource, manualStatus };
   }
 
   /**

@@ -64,6 +64,7 @@ class CalendarService {
     const timeMax = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
     const updatedTeacherEmails = new Set<string>();
+    const processedEventIds = new Set<string>();
 
     try {
       const response = await this.calendar.events.list({
@@ -103,6 +104,25 @@ class CalendarService {
         if (wasUpdated) {
           updatedTeacherEmails.add(teacherEmail);
         }
+        processedEventIds.add(event.id);
+      }
+
+      // Cleanup: Supprimer les événements qui ne sont plus dans le calendrier
+      // (seulement ceux dans la plage de temps synchronisée)
+      const deleted = await prismaService.client.schedule.deleteMany({
+        where: {
+          calendarId,
+          eventId: { notIn: Array.from(processedEventIds) },
+          startTime: { gte: timeMin },
+          endTime: { lte: timeMax },
+        },
+      });
+
+      if (deleted.count > 0) {
+        logger.info(
+          `Deleted ${deleted.count} stale schedules for calendar ${calendarId}`,
+          { component: "calendar" },
+        );
       }
 
       logger.info(`Synced ${events.length} events for calendar ${calendarId}`, {

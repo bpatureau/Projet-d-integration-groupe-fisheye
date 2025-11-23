@@ -7,13 +7,11 @@ import type {
   Teacher,
   Visit,
 } from "../../prisma/generated/client.js";
-import { DEVICE_CONFIGS } from "../config/devices.config";
 import type { MQTTPayloads } from "../mqtt/mqtt.constants.js";
 import { NotFoundError, ValidationError } from "../utils/errors";
 import logger from "../utils/logger";
 import prismaService from "../utils/prisma";
 import buzzerService from "./buzzer.service";
-import calendarService from "./calendar.service";
 import doorbellService from "./doorbell.service";
 import messageService from "./message.service";
 import notificationService from "./notification.service";
@@ -159,7 +157,7 @@ class DeviceActionService {
 
     await panelService.updateSelectedTeacher(panel.id, teacher.id);
 
-    const weekSchedule = await this.generateWeekScheduleGrid(teacher);
+    const weekSchedule = await panelService.generateWeekScheduleGrid(teacher);
 
     await notificationService.publishPanelDisplay(panel.mqttClientId, {
       teacherName: teacher.name,
@@ -172,71 +170,6 @@ class DeviceActionService {
       teacherId: teacher.id,
       teacherName: teacher.name,
     });
-  }
-
-  /**
-   * Génère la grille d'emploi du temps pour le panneau LED
-   * Utilise la configuration définie dans devices.config.ts
-   */
-  private async generateWeekScheduleGrid(
-    teacher: Teacher,
-  ): Promise<boolean[][]> {
-    const config = DEVICE_CONFIGS.ledPanel.schedule;
-    // Initialisation de la grille vide
-    const grid: boolean[][] = Array.from({ length: config.days }, () =>
-      Array(config.timeBlocks.length).fill(false),
-    );
-
-    if (!teacher.gmailEmail) {
-      return grid;
-    }
-
-    const now = new Date();
-
-    // Calcul du Lundi de la semaine courante
-    const startOfWeek = new Date(now);
-    const day = startOfWeek.getDay(); // 0 = Dimanche, 1 = Lundi...
-    const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1); // Ajuste au Lundi
-    startOfWeek.setDate(diff);
-    startOfWeek.setHours(0, 0, 0, 0);
-
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 5); // Vendredi soir inclus
-
-    const schedules = await calendarService.getTeacherSchedule(
-      teacher.gmailEmail,
-      startOfWeek,
-      endOfWeek,
-    );
-
-    for (let dayIndex = 0; dayIndex < config.days; dayIndex++) {
-      const dayStart = new Date(startOfWeek);
-      dayStart.setDate(startOfWeek.getDate() + dayIndex);
-
-      for (
-        let blockIndex = 0;
-        blockIndex < config.timeBlocks.length;
-        blockIndex++
-      ) {
-        const block = config.timeBlocks[blockIndex];
-        const blockStart = new Date(dayStart);
-        blockStart.setHours(block.start, 0, 0, 0);
-        const blockEnd = new Date(dayStart);
-        blockEnd.setHours(block.end, 0, 0, 0);
-
-        // Vérifie si un cours chevauche ce bloc horaire
-        const hasEvent = schedules.some((schedule) => {
-          const scheduleStart = new Date(schedule.startTime);
-          const scheduleEnd = new Date(schedule.endTime);
-          // Logique d'intersection d'intervalles
-          return scheduleStart < blockEnd && scheduleEnd > blockStart;
-        });
-
-        grid[dayIndex][blockIndex] = hasEvent;
-      }
-    }
-
-    return grid;
   }
 
   /**
@@ -338,7 +271,7 @@ class DeviceActionService {
       });
 
       // Génère la grille d'emploi du temps
-      const weekSchedule = await this.generateWeekScheduleGrid(teacher);
+      const weekSchedule = await panelService.generateWeekScheduleGrid(teacher);
 
       // Envoie la mise à jour à chaque panneau
       for (const panel of panels) {
@@ -371,22 +304,17 @@ class DeviceActionService {
    */
   async handleStatus(
     deviceType: "doorbell" | "buzzer" | "panel",
-    deviceId: string,
+    device: Doorbell | Buzzer | LedPanel,
     isOnline: boolean = true,
   ): Promise<void> {
-    let device: Doorbell | Buzzer | LedPanel | null = null;
-
     switch (deviceType) {
       case "doorbell":
-        device = await doorbellService.findByDeviceId(deviceId);
         await doorbellService.updateOnlineStatus(device.id, isOnline);
         break;
       case "buzzer":
-        device = await buzzerService.findByDeviceId(deviceId);
         await buzzerService.updateOnlineStatus(device.id, isOnline);
         break;
       case "panel":
-        device = await panelService.findByDeviceId(deviceId);
         await panelService.updateOnlineStatus(device.id, isOnline);
         break;
       default:
@@ -395,9 +323,16 @@ class DeviceActionService {
 
     // Si l'appareil passe hors ligne, on loggue un warning, sinon debug
     if (!isOnline) {
-      logger.warn("Device went offline (LWT)", { deviceType, deviceId });
+      logger.warn("Device went offline (LWT)", {
+        deviceType,
+        deviceId: device.deviceId,
+      });
     } else {
-      logger.debug("Device status update", { deviceType, deviceId, isOnline });
+      logger.debug("Device status update", {
+        deviceType,
+        deviceId: device.deviceId,
+        isOnline,
+      });
     }
   }
 
