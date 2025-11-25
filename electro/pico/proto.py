@@ -5,6 +5,19 @@ import ssd1306
 import time
 from random import randint
 import neopixel
+import network
+
+# Connect to Wi-Fi (Replace with your SSID & password)
+wifi = network.WLAN(network.STA_IF)
+wifi.active(True)
+wifi.connect(wifi_SSID, wifi_password)
+while not wifi.isconnected():
+    time.sleep(1)
+
+# --- 1. Sync RTC to UTC via NTP ---
+ntptime.host = "pool.ntp.org"
+ntptime.settime()  # sets RTC to UTC
+time.sleep(1)  # give RTC a moment to update
 
 
 def fetch_data():
