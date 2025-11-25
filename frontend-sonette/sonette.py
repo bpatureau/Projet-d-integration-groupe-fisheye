@@ -65,7 +65,7 @@ def charger_config():
         print(f"[ERREUR] Impossible de charger la config : {e}")
         return config_defaut
 
-def charger_professeurs():
+def charger_professeurs(payload):
     """Charge la liste des professeurs depuis professeurs.json"""
     profs_defaut = {
         "Mme Vroman": {"disponible": True, "id": str(uuid.uuid4())},
@@ -73,6 +73,10 @@ def charger_professeurs():
         "M. De Smet": {"disponible": True, "id": str(uuid.uuid4())},
         "M. Van Dormael": {"disponible": True, "id": str(uuid.uuid4())}
     }
+
+    print(payload)
+
+    return profs_defaut
     
     #try:
     #    if os.path.exists("professeurs.json"):
@@ -262,9 +266,11 @@ class SonnetteApp:
         self.mqtt_client = mqttc
         self.client_id = config.get("mqtt_client_id")
 
-        # Charger les professeurs
-        self.professeurs = charger_professeurs()
-        self.prof_noms = ["TOUS"] + list(self.professeurs.keys())
+        # Charger les professeurs -> via mqtt
+        self.professeurs = {}
+        self.prof_noms = []
+        # self.professeurs = charger_professeurs()
+        # self.prof_noms = ["TOUS"] + list(self.professeurs.keys())
         
         # Configuration des polices modernes
         self.setup_fonts()
@@ -798,7 +804,8 @@ class SonnetteApp:
             (f"fisheye/{self.client_id}/buzz/activate", 1),
             (f"fisheye/{self.client_id}/display/update", 1),
             #("fisheye/broadcast/#", 0),
-            (f"fisheye/{self.client_id}/teacher/request", 1)
+            (f"fisheye/{self.client_id}/data/teachers", 1),
+            (f"fisheye/{self.client_id}/cmd/ring", 1)
         ]
         
         for topic, qos in topics:
@@ -838,6 +845,14 @@ class SonnetteApp:
                     duree=3000,
                     couleur=COLORS['secondary']
                 ))
+
+            elif "data/teacher" in topic:
+                profs = {}
+                for teacher in payload["teachers"]:
+                    profs[teacher["name"]] = {"disponible" : teacher["isPresent"], "id" : teacher["id"]}
+                self.professeurs = profs
+                self.prof_noms = ["TOUS"] + list(self.professeurs.keys())
+                self.recharger_professeurs()
         
         except json.JSONDecodeError:
             print(f"[MQTT] Message non-JSON reçu: {msg.payload.decode()}")
@@ -1021,7 +1036,7 @@ class SonnetteApp:
     
     def recharger_professeurs(self):
         """Recharge la liste des professeurs"""
-        self.professeurs = charger_professeurs()
+        # self.professeurs = charger_professeurs()
         self.prof_noms = ["TOUS"] + list(self.professeurs.keys())
         
         for widget in self.profs_list_frame.winfo_children():
