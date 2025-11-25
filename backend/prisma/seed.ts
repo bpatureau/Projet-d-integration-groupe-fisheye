@@ -119,7 +119,7 @@ const seedData: SeedData = {
 };
 
 async function main() {
-  console.log("🌱 Starting database seeding...\n");
+  console.log("Starting database seeding...\n");
 
   // Check if database is already seeded
   const existingTeachers = await prisma.teacher.count();
@@ -127,16 +127,16 @@ async function main() {
   const existingDoorbells = await prisma.doorbell.count();
 
   if (existingTeachers > 1 || existingLocations > 0 || existingDoorbells > 0) {
-    console.log("⚠️  Database already contains data. Skipping seed.");
+    console.log("Database already contains data. Skipping seed.");
     console.log(
-      `   Teachers: ${existingTeachers}, Locations: ${existingLocations}, Doorbells: ${existingDoorbells}`,
+      `Teachers: ${existingTeachers}, Locations: ${existingLocations}, Doorbells: ${existingDoorbells}`,
     );
-    console.log("\n💡 To re-seed, run: npm run prisma:reset\n");
+    console.log("\nTo re-seed, run: npm run prisma:reset\n");
     return;
   }
 
   // Create locations
-  console.log("📍 Creating locations...");
+  console.log("Creating locations...");
   const locationMap = new Map<string, string>();
 
   for (const locationData of seedData.locations) {
@@ -144,11 +144,11 @@ async function main() {
       data: locationData,
     });
     locationMap.set(locationData.name, location.id);
-    console.log(`   ✓ Created location: ${locationData.name}`);
+    console.log(`Created location: ${locationData.name}`);
   }
 
   // Create teachers
-  console.log("\n👨‍🏫 Creating teachers...");
+  console.log("\nCreating teachers...");
   const teacherMap = new Map<string, string>();
 
   for (const teacherData of seedData.teachers) {
@@ -173,19 +173,19 @@ async function main() {
     });
     teacherMap.set(teacherData.username, teacher.id);
     console.log(
-      `   ✓ Created teacher: ${teacherData.name} (${teacherData.username})`,
+      `Created teacher: ${teacherData.name} (${teacherData.username})`,
     );
   }
 
   // Assign teachers to locations
-  console.log("\n🔗 Assigning teachers to locations...");
+  console.log("\nAssigning teachers to locations...");
   for (const assignment of seedData.teacherLocationAssignments) {
     const teacherId = teacherMap.get(assignment.teacherUsername);
     const locationId = locationMap.get(assignment.locationName);
 
     if (!teacherId || !locationId) {
       console.log(
-        `   ⚠️  Skipping invalid assignment: ${assignment.teacherUsername} → ${assignment.locationName}`,
+        `Skipping invalid assignment: ${assignment.teacherUsername} -> ${assignment.locationName}`,
       );
       continue;
     }
@@ -197,18 +197,18 @@ async function main() {
       },
     });
     console.log(
-      `   ✓ Assigned ${assignment.teacherUsername} to ${assignment.locationName}`,
+      `Assigned ${assignment.teacherUsername} to ${assignment.locationName}`,
     );
   }
 
   // Create doorbells
-  console.log("\n🔔 Creating doorbells...");
+  console.log("\nCreating doorbells...");
   for (const doorbellData of seedData.devices.doorbells) {
     const locationId = locationMap.get(doorbellData.locationName);
 
     if (!locationId) {
       console.log(
-        `   ⚠️  Skipping doorbell for unknown location: ${doorbellData.locationName}`,
+        `Skipping doorbell for unknown location: ${doorbellData.locationName}`,
       );
       continue;
     }
@@ -218,22 +218,21 @@ async function main() {
         deviceId: doorbellData.deviceId,
         mqttClientId: doorbellData.mqttClientId,
         locationId,
-        hasDoorSensor: doorbellData.hasDoorSensor,
       },
     });
     console.log(
-      `   ✓ Created doorbell: ${doorbellData.deviceId} at ${doorbellData.locationName}`,
+      `Created doorbell: ${doorbellData.deviceId} at ${doorbellData.locationName}`,
     );
   }
 
   // Create buzzers
-  console.log("\n📳 Creating buzzers...");
+  console.log("\nCreating buzzers...");
   for (const buzzerData of seedData.devices.buzzers) {
     const teacherId = teacherMap.get(buzzerData.teacherUsername);
 
     if (!teacherId) {
       console.log(
-        `   ⚠️  Skipping buzzer for unknown teacher: ${buzzerData.teacherUsername}`,
+        `Skipping buzzer for unknown teacher: ${buzzerData.teacherUsername}`,
       );
       continue;
     }
@@ -246,18 +245,18 @@ async function main() {
       },
     });
     console.log(
-      `   ✓ Created buzzer: ${buzzerData.deviceId} for ${buzzerData.teacherUsername}`,
+      `Created buzzer: ${buzzerData.deviceId} for ${buzzerData.teacherUsername}`,
     );
   }
 
   // Create LED panels
-  console.log("\n💡 Creating LED panels...");
+  console.log("\nCreating LED panels...");
   for (const panelData of seedData.devices.ledPanels) {
     const locationId = locationMap.get(panelData.locationName);
 
     if (!locationId) {
       console.log(
-        `   ⚠️  Skipping LED panel for unknown location: ${panelData.locationName}`,
+        `Skipping LED panel for unknown location: ${panelData.locationName}`,
       );
       continue;
     }
@@ -270,26 +269,26 @@ async function main() {
       },
     });
     console.log(
-      `   ✓ Created LED panel: ${panelData.deviceId} at ${panelData.locationName}`,
+      `Created LED panel: ${panelData.deviceId} at ${panelData.locationName}`,
     );
   }
 
-  console.log("\n✅ Database seeding completed successfully!");
-  console.log("\n📋 Summary:");
-  console.log(`   Locations: ${seedData.locations.length}`);
-  console.log(`   Teachers: ${seedData.teachers.length}`);
-  console.log(`   Doorbells: ${seedData.devices.doorbells.length}`);
-  console.log(`   Buzzers: ${seedData.devices.buzzers.length}`);
-  console.log(`   LED Panels: ${seedData.devices.ledPanels.length}`);
-  console.log("\n🔐 Demo credentials:");
+  console.log("\nDatabase seeding completed successfully!");
+  console.log("\nSummary:");
+  console.log(`Locations: ${seedData.locations.length}`);
+  console.log(`Teachers: ${seedData.teachers.length}`);
+  console.log(`Doorbells: ${seedData.devices.doorbells.length}`);
+  console.log(`Buzzers: ${seedData.devices.buzzers.length}`);
+  console.log(`LED Panels: ${seedData.devices.ledPanels.length}`);
+  console.log("\nDemo credentials:");
   console.log(
-    `   ${seedData.teachers[0].username} / ${seedData.teachers[0].password}`,
+    `${seedData.teachers[0].username} / ${seedData.teachers[0].password}`,
   );
 }
 
 main()
   .catch((e) => {
-    console.error("❌ Error during seeding:");
+    console.error("Error during seeding:");
     console.error(e);
     process.exit(1);
   })
