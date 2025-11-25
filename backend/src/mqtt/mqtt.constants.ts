@@ -21,7 +21,7 @@ export const MQTT_TOPICS_INBOUND = {
   EVENT_REQUEST_TEACHERS: "event/request_teachers",
 
   // State
-  STATE_STATUS: "state/status",
+  STATE_STATUS: "status",
 
   // Acknowledgments (Device → Backend)
   ACK_RING: "event/ack_ring",
@@ -93,7 +93,7 @@ export function getOutboundTopics(clientId: string) {
  */
 export function extractClientIdFromTopic(topic: string): string | null {
   const parts = topic.split("/");
-  if (parts.length < 4 || parts[0] !== MQTT_NAMESPACE) {
+  if (parts.length < 3 || parts[0] !== MQTT_NAMESPACE) {
     return null;
   }
   return parts[1];
@@ -106,7 +106,7 @@ export function extractClientIdFromTopic(topic: string): string | null {
  */
 export function extractActionFromTopic(topic: string): string | null {
   const parts = topic.split("/");
-  if (parts.length < 4 || parts[0] !== MQTT_NAMESPACE) {
+  if (parts.length < 3 || parts[0] !== MQTT_NAMESPACE) {
     return null;
   }
   // Retourne tout après le clientId

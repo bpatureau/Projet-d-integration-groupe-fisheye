@@ -7,6 +7,7 @@ import { errorHandler, notFoundHandler } from "./middleware/error.middleware";
 import mqttDispatcher from "./mqtt/dispatcher";
 import routes from "./routes";
 import visitAutoMissScheduler from "./schedulers/visit-auto-miss.scheduler";
+import presenceUpdateScheduler from "./schedulers/presence-update.scheduler";
 import calendarService from "./services/calendar.service";
 import mqttService from "./services/mqtt.service";
 import logger from "./utils/logger";
@@ -72,6 +73,9 @@ class Server {
       logger.info("Starting visit auto-miss scheduler...");
       visitAutoMissScheduler.start();
 
+      logger.info("Starting presence update scheduler...");
+      presenceUpdateScheduler.start();
+
       logger.info("All services initialized successfully");
     } catch (error) {
       logger.error("Failed to initialize services", { error });
@@ -130,6 +134,7 @@ class Server {
 
       logger.info("Stopping schedulers...");
       visitAutoMissScheduler.stop();
+      presenceUpdateScheduler.stop();
 
       logger.info("Disconnecting from MQTT...");
       await mqttService.disconnect();

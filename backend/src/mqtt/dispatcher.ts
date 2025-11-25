@@ -73,7 +73,7 @@ class MQTTDispatcher {
     try {
       const data: MQTTPayloads.ButtonPressed = JSON.parse(payload.toString());
       targetTeacherId = data.targetTeacherId;
-    } catch {}
+    } catch { }
 
     const doorbell = await doorbellService.findByMqttClientId(mqttClientId);
     await deviceActionService.handleDoorbellButtonPressed(
@@ -179,15 +179,25 @@ class MQTTDispatcher {
 
     // Parsing du payload pour détecter un statut hors ligne (LWT)
     let isOnline = true;
-    try {
-      if (payload.length > 0) {
-        const data: MQTTPayloads.DeviceStatus = JSON.parse(payload.toString());
-        if (data.online === false) {
-          isOnline = false;
+    const payloadStr = payload.toString().trim();
+
+    // Support du format texte simple "online" / "offline"
+    if (payloadStr === "offline") {
+      isOnline = false;
+    } else if (payloadStr === "online") {
+      isOnline = true;
+    } else {
+      // Support du format JSON legacy
+      try {
+        if (payload.length > 0) {
+          const data: MQTTPayloads.DeviceStatus = JSON.parse(payloadStr);
+          if (data.online === false) {
+            isOnline = false;
+          }
         }
+      } catch {
+        // Si le payload n'est pas du JSON valide et n'est pas "offline", on assume online (heartbeat vide)
       }
-    } catch {
-      // Si le payload n'est pas du JSON valide, on assume online (heartbeat vide)
     }
 
     try {
@@ -195,21 +205,21 @@ class MQTTDispatcher {
       await deviceActionService.handleStatus("doorbell", doorbell, isOnline);
       this.deviceTypeCache.set(mqttClientId, "doorbell");
       return;
-    } catch {}
+    } catch { }
 
     try {
       const panel = await panelService.findByMqttClientId(mqttClientId);
       await deviceActionService.handleStatus("panel", panel, isOnline);
       this.deviceTypeCache.set(mqttClientId, "panel");
       return;
-    } catch {}
+    } catch { }
 
     try {
       const buzzerDevice = await buzzerService.findByMqttClientId(mqttClientId);
       await deviceActionService.handleStatus("buzzer", buzzerDevice, isOnline);
       this.deviceTypeCache.set(mqttClientId, "buzzer");
       return;
-    } catch {}
+    } catch { }
 
     // Ignorer le statut propre du backend pour éviter les logs d'avertissement
     if (
@@ -244,7 +254,7 @@ class MQTTDispatcher {
             panel.id,
           );
           return;
-        } catch {}
+        } catch { }
       } else if (cachedType === "doorbell") {
         try {
           const doorbell =
@@ -254,7 +264,7 @@ class MQTTDispatcher {
             doorbell.id,
           );
           return;
-        } catch {}
+        } catch { }
       }
     }
 
@@ -267,7 +277,7 @@ class MQTTDispatcher {
       );
       this.deviceTypeCache.set(mqttClientId, "panel");
       return;
-    } catch {}
+    } catch { }
 
     // Essayer de trouver une Doorbell
     try {
@@ -278,7 +288,7 @@ class MQTTDispatcher {
       );
       this.deviceTypeCache.set(mqttClientId, "doorbell");
       return;
-    } catch {}
+    } catch { }
 
     logger.warn("Teachers request from unknown device", { mqttClientId });
   }

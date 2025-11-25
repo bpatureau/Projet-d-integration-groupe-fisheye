@@ -2,6 +2,7 @@ import type { Location } from "../../prisma/generated/client.js";
 import { ConflictError, NotFoundError } from "../utils/errors";
 import logger from "../utils/logger";
 import prismaService from "../utils/prisma";
+import deviceActionService from "./device-action.service";
 
 class LocationService {
   async create(data: {
@@ -105,6 +106,14 @@ class LocationService {
     });
 
     logger.info("Teacher added to location", { teacherId, locationId });
+
+    // Rafraîchit les appareils du local
+    await deviceActionService.refreshLocationDevices(locationId).catch((error: unknown) => {
+      logger.error("Failed to refresh location devices after adding teacher", {
+        locationId,
+        error,
+      });
+    });
   }
 
   /**
@@ -135,6 +144,14 @@ class LocationService {
     });
 
     logger.info("Teacher removed from location", { teacherId, locationId });
+
+    // Rafraîchit les appareils du local
+    await deviceActionService.refreshLocationDevices(locationId).catch((error: unknown) => {
+      logger.error("Failed to refresh location devices after removing teacher", {
+        locationId,
+        error,
+      });
+    });
   }
 }
 

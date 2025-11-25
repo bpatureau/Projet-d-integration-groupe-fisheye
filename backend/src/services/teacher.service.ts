@@ -117,6 +117,25 @@ class TeacherService {
     });
 
     logger.info("Teacher updated", { teacherId: id });
+
+    // Si le nom ou l'email a changé, on doit mettre à jour les appareils
+    if (data.name || data.email) {
+      const locations = await this.getLocations(id);
+      for (const location of locations) {
+        await deviceActionService
+          .refreshLocationDevices(location.id)
+          .catch((error: unknown) => {
+            logger.error(
+              "Failed to refresh location devices after teacher update",
+              {
+                locationId: location.id,
+                error,
+              },
+            );
+          });
+      }
+    }
+
     return teacher;
   }
 

@@ -321,14 +321,22 @@ class DeviceActionService {
         throw new ValidationError(`Unknown device type: ${deviceType}`);
     }
 
-    // Si l'appareil passe hors ligne, on loggue un warning, sinon debug
-    if (!isOnline) {
-      logger.warn("Device went offline (LWT)", {
-        deviceType,
-        deviceId: device.deviceId,
-      });
+    // Loggue les changements d'état
+    if (device.isOnline !== isOnline) {
+      if (isOnline) {
+        logger.info("Device came online", {
+          deviceType,
+          deviceId: device.deviceId,
+        });
+      } else {
+        logger.warn("Device went offline", {
+          deviceType,
+          deviceId: device.deviceId,
+        });
+      }
     } else {
-      logger.debug("Device status update", {
+      // Heartbeat (pas de changement d'état)
+      logger.debug("Device status update (heartbeat)", {
         deviceType,
         deviceId: device.deviceId,
         isOnline,
@@ -438,9 +446,9 @@ class DeviceActionService {
         presenceSource: presenceInfo?.presenceSource || "unavailable",
         manualStatus: presenceInfo?.manualStatus
           ? {
-              status: presenceInfo.manualStatus.status,
-              until: presenceInfo.manualStatus.until?.toISOString(),
-            }
+            status: presenceInfo.manualStatus.status,
+            until: presenceInfo.manualStatus.until?.toISOString(),
+          }
           : undefined,
       };
     });
