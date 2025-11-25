@@ -24,7 +24,10 @@ export const getTeacher = asyncHandler(async (req: Request, res: Response) => {
 
 export const updateTeacher = asyncHandler(
   async (req: Request, res: Response) => {
-    const teacher = await teacherService.update(req.params.id, req.body);
+    const teacher = await teacherService.update(req.params.id, {
+      ...req.body,
+      role: req.body.role,
+    });
     res.json({ teacher });
   },
 );

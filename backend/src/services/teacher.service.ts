@@ -1,4 +1,4 @@
-import { Prisma, type Teacher } from "../../prisma/generated/client.js";
+import { Prisma, Role, type Teacher } from "../../prisma/generated/client.js";
 import type { ManualStatus, TeacherPreferences } from "../types";
 import { ConflictError, NotFoundError } from "../utils/errors";
 import logger from "../utils/logger";
@@ -88,6 +88,7 @@ class TeacherService {
       gmailEmail?: string;
       teamsEmail?: string;
       preferences?: TeacherPreferences;
+      role?: Role;
     },
   ): Promise<Teacher> {
     await this.findById(id);
@@ -99,6 +100,7 @@ class TeacherService {
       gmailEmail?: string;
       teamsEmail?: string;
       preferences?: Prisma.InputJsonValue;
+      role?: Role;
     } = {
       username: data.username,
       email: data.email,
@@ -109,6 +111,28 @@ class TeacherService {
     if (data.preferences) {
       updateData.preferences =
         data.preferences as unknown as Prisma.InputJsonValue;
+    }
+    if (data.role) {
+      // Si on essaie de rétrograder un admin
+      if (data.role === Role.USER) {
+        const currentTeacher = await this.findById(id);
+        if (currentTeacher.role === Role.ADMIN) {
+          // Vérifier s'il reste d'autres admins
+          const adminCount = await prismaService.client.teacher.count({
+            where: {
+              role: Role.ADMIN,
+              id: { not: id }, // Exclure l'utilisateur actuel
+            },
+          });
+
+          if (adminCount === 0) {
+            throw new ConflictError(
+              "Cannot remove the last admin role. Promote another user first.",
+            );
+          }
+        }
+      }
+      updateData.role = data.role;
     }
 
     const teacher = await prismaService.client.teacher.update({
@@ -250,7 +274,23 @@ class TeacherService {
   }
 
   async delete(id: string): Promise<void> {
-    await this.findById(id);
+    const teacher = await this.findById(id);
+
+    // Si c'est un admin, vérifier si c'est le dernier
+    if (teacher.role === Role.ADMIN) {
+      const adminCount = await prismaService.client.teacher.count({
+        where: {
+          role: Role.ADMIN,
+          id: { not: id },
+        },
+      });
+
+      if (adminCount === 0) {
+        throw new ConflictError(
+          "Cannot delete the last admin. Promote another user first.",
+        );
+      }
+    }
 
     await prismaService.client.teacher.delete({
       where: { id },
