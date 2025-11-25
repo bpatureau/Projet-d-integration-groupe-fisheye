@@ -294,9 +294,14 @@ class SonnetteApp:
         if arduino:
             self.thread_joystick = threading.Thread(target=self.lire_joystick, daemon=True)
             self.thread_joystick.start()
+        if esp:
+            self.esp_t = threading.Thread(target=self.read_esp, daemon=True)
+            self.esp_t.start()
         
         # Handler fermeture propre
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+        self.teacher_id = ""
     
     def setup_fonts(self):
         """Configure les polices modernes"""
@@ -739,7 +744,7 @@ class SonnetteApp:
         
         # Publier la sélection MQTT
         if nom != "TOUS" and nom in self.professeurs:
-            teacher_id = self.professeurs[nom].get("id")
+            self.teacher_id = self.professeurs[nom].get("id")
         #    if teacher_id:
         #        self.publier_teacher_selected(teacher_id)
     
@@ -853,19 +858,31 @@ class SonnetteApp:
                 self.professeurs = profs
                 self.prof_noms = ["TOUS"] + list(self.professeurs.keys())
                 self.recharger_professeurs()
+
+            elif "cmd/ring" in topic:
+                self.send_esp('turn_on')
+                publish_mqtt(self.mqtt_client, f"fisheye/{self.client_id}/event/ack_ring", {"success" : True}, qos=1)
         
         except json.JSONDecodeError:
             print(f"[MQTT] Message non-JSON reçu: {msg.payload.decode()}")
         except Exception as e:
             print(f"[MQTT] Erreur traitement message: {e}")
     
-    def publier_button_pressed(self, teacher_id=None):
+    def publier_button_pressed(self):
         """Publier un événement de bouton pressé"""
-        topic = f"fisheye/{self.client_id}/button"
-        payload = "pressed"
+        topic = f"fisheye/{self.client_id}/event/button"
+        payload = ( {"targetTeacherId": self.teacher_id} if self.teacher_id else '')
+
+
+        def send_unpressed():
+            time.sleep(3)
+            publish_mqtt(self.mqtt_client, f"fisheye/{self.client_id}/button", "unpressed", qos=0)
         
         #if teacher_id:
         #    payload["targetTeacherId"] = teacher_id
+
+        t = threading.Thread(target=send_unpressed, daemon=True)
+        t.start()
         
         publish_mqtt(self.mqtt_client, topic, payload, qos=1)
     
@@ -933,6 +950,7 @@ class SonnetteApp:
                         
                         # Notification UI
                         self.root.after(0, lambda: self.afficher_notification(f"Ca sonne !", 2000, COLORS['accent']))
+
                         
                         time.sleep(0.5) # Anti-rebond
                         
@@ -972,7 +990,7 @@ class SonnetteApp:
             return
         
         # Préparer le payload MQTT
-        topic = f"fisheye/{self.client_id}/message/send"
+        topic = f"fisheye/{self.client_id}/event/message"
         payload = {"text": message}
         
         if self.prof_selectionne == "TOUS":
@@ -1005,6 +1023,45 @@ class SonnetteApp:
             esp.write(b'TURN_ON(5)')
         elif cmd == "turn_off":
             esp.write(b'TURN_OFF')
+
+    def read_esp(self):
+        while True:
+            try:
+                if esp and esp.in_waiting > 0:
+                    ligne = esp.readline().decode('utf-8').strip()
+                    esp.flushInput()
+
+                    if not ligne:
+                        continue
+
+                    try:
+                        # On s'attend à 4 valeurs (X, Y, Bouton Joystick, Bouton Sonnette)
+                        #print(ligne)
+                        cmd, *arg = ligne.split(' ')
+
+                    except ValueError:
+                        print(
+                            f"[ERREUR ESP]")
+                        time.sleep(0.1)
+                        continue
+
+                    if cmd == "DEBUG":
+                        pass
+
+                    if cmd == 'DOOR':
+                        if arg[0] == 'OPEN':
+                            publish_mqtt(self.mqtt_client, f"fisheye/{self.client_id}/event/door", "OPEN", 0)
+                        #if arg == 'CLOSE':
+                        #    publish_mqtt(self.mqtt_client, f"fisheye/{self.client_id}/event/door", "CLOSE", 0)
+
+                    if cmd == 'ACK':
+                        print(cmd, arg)
+
+                time.sleep(0.01)
+            except Exception as e:
+                print(f"[ERREUR JOYSTICK GRAVE] {e}")
+                time.sleep(1)
+
     
     def mettre_a_jour_disponibilite(self, nom, disponible):
         """Met à jour la disponibilité d'un professeur"""
