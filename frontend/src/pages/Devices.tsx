@@ -23,30 +23,8 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
-import { api } from '../lib/api';
-
-interface Location {
-    id: string;
-    name: string;
-    description: string;
-    calendarId: string;
-    teamsWebhookUrl: string | null;
-    createdAt: string;
-    updatedAt: string;
-}
-
-interface Doorbell {
-    id: string;
-    deviceId: string;
-    mqttClientId: string;
-    locationId: string;
-    hasDoorSensor: boolean;
-    isOnline: boolean;
-    lastSeen: string;
-    createdAt: string;
-    updatedAt: string;
-    location: Location;
-}
+import TabletIcon from '@mui/icons-material/Tablet';
+import { api, type Panel, type Location, type Doorbell } from '../lib/api';
 
 interface NewDoorbellForm {
     deviceId: string;
@@ -99,6 +77,7 @@ export function Devices() {
     useEffect(() => {
         fetchDoorbells();
         fetchLocations();
+        fetchPanels();
     }, []);
 
     // Ouverture du dialogue
@@ -147,21 +126,6 @@ export function Devices() {
                     : d
             )
         );
-
-        /*try {
-            await api.updateDoorbell(doorbell.id, { isOnline: newStatus });
-            setMessage(`Statut mis à jour pour ${doorbell.deviceId}`);
-        } catch (err) {
-            console.error('Erreur toggleDoorbell:', err);
-            setMessage(`Erreur lors du changement de statut`);
-            setDoorbells(prev =>
-                prev.map(d =>
-                    d.id === doorbell.id
-                        ? { ...d, isOnline: doorbell.isOnline }
-                        : d
-                )
-            );
-        }*/
     }; 
 
     // Format de la date de dernière connexion
@@ -195,6 +159,109 @@ export function Devices() {
         }
     };
 
+    const handleRefresh = () => {
+        fetchDoorbells();
+        fetchPanels();
+    };
+
+    // Gestion des panels
+
+    const [panels, setPanels] = useState<Panel[]>([]);
+    const [openPanelDialog, setOpenPanelDialog] = useState(false);
+    const [panelFormData, setPanelFormData] = useState({
+        deviceId: '',
+        mqttClientId: '',
+        locationId: ''
+    });
+    // Récupération des panels
+    const fetchPanels = async () => {
+        try {
+            const data = await api.getPanels();
+            setPanels(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error('Erreur fetchPanels:', err);
+            setMessage('Erreur lors du chargement des panels');
+            setPanels([]);
+        }
+    };
+
+    // Ouverture du dialogue de création de panel
+    const handleOpenPanelDialog = () => {
+        setPanelFormData({
+            deviceId: '',
+            mqttClientId: '',
+            locationId: locations.length > 0 ? locations[0].id : ''
+        });
+        setOpenPanelDialog(true);
+    };
+
+    // Fermeture du dialogue
+    const handleClosePanelDialog = () => {
+        setOpenPanelDialog(false);
+        setMessage('');
+    };
+
+    // Création d'un nouveau panel
+    const handleCreatePanel = async () => {
+        if (!panelFormData.deviceId || !panelFormData.mqttClientId || !panelFormData.locationId) {
+            setMessage('Veuillez remplir tous les champs obligatoires');
+            return;
+        }
+
+        try {
+            await api.createPanel(panelFormData);
+            setMessage('Panel créé avec succès');
+            handleClosePanelDialog();
+            fetchPanels();
+        } catch (err) {
+            console.error('Erreur createPanel:', err);
+            setMessage('Erreur lors de la création du panel');
+        }
+    };
+
+    // Suppression d'un panel
+    const handleDeletePanel = async (panel: Panel) => {
+        if (!window.confirm(`Êtes-vous sûr de vouloir supprimer le panel "${panel.deviceId}" ?`)) {
+            return;
+        }
+
+        try {
+            await api.deletePanel(panel.id);
+            setMessage(`Panel "${panel.deviceId}" supprimé avec succès`);
+            fetchPanels();
+        } catch (err) {
+            console.error('Erreur deletePanel:', err);
+            setMessage('Erreur lors de la suppression du panel');
+        }
+    };
+
+    // Activation/Désactivation d'un panel
+    const togglePanel = async (panel: Panel) => {
+        const newStatus = !panel.isOnline;
+
+        setPanels(prev =>
+            prev.map(p =>
+                p.id === panel.id
+                    ? { ...p, isOnline: newStatus }
+                    : p
+            )
+        );
+
+        /*try {
+            await api.updatePanel(panel.id, { isOnline: newStatus });
+            setMessage(`Statut mis à jour pour ${panel.deviceId}`);
+        } catch (err) {
+            console.error('Erreur togglePanel:', err);
+            setMessage(`Erreur lors du changement de statut`);
+            setPanels(prev =>
+                prev.map(p =>
+                    p.id === panel.id
+                        ? { ...p, isOnline: panel.isOnline }
+                        : p
+                )
+            );
+        }*/
+    };
     return (
         <Container maxWidth="md" sx={{ mt: 4 }}>
             <Paper sx={{ p: 4 }}>
@@ -209,7 +276,7 @@ export function Devices() {
                     <Button
                         variant="outlined"
                         startIcon={<RefreshIcon />}
-                        onClick={fetchDoorbells}
+                        onClick={handleRefresh}
                         disabled={loading}
                     >
                         Actualiser
@@ -380,6 +447,171 @@ export function Devices() {
                         onClick={handleCreateDoorbell} 
                         variant="contained"
                         disabled={!formData.deviceId || !formData.mqttClientId || !formData.locationId}
+                    >
+                        Créer
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Paper sx={{ p: 4, mt: 4 }}>
+                <Box display="flex" alignItems="center" gap={2} mb={3}>
+                    <TabletIcon sx={{ fontSize: 40, color: 'secondary.main' }} />
+                    <Typography variant="h4">
+                        Panels d'Affichage
+                    </Typography>
+                </Box>
+
+                <Stack direction="row" spacing={2} mb={3}>
+                    <Button
+                        variant="outlined"
+                        startIcon={<RefreshIcon />}
+                        onClick={fetchPanels}
+                        disabled={loading}
+                    >
+                        Actualiser
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="secondary"
+                        startIcon={<AddIcon />}
+                        onClick={handleOpenPanelDialog}
+                    >
+                        Ajouter un panel
+                    </Button>
+                </Stack>
+
+                {panels.length === 0 ? (
+                    <Typography color="text.secondary" textAlign="center" py={4}>
+                        Aucun panel configuré
+                    </Typography>
+                ) : (
+                    <Stack spacing={2}>
+                        {panels.map(panel => (
+                            <Box
+                                key={panel.id}
+                                sx={{
+                                    p: 2,
+                                    border: '1px solid',
+                                    borderColor: 'divider',
+                                    borderRadius: 1,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    backgroundColor: panel.isOnline
+                                        ? 'secondary.light'
+                                        : 'grey.100',
+                                }}
+                            >
+                                <Box flex={1}>
+                                    <Typography variant="h6">
+                                        {panel.deviceId}
+                                    </Typography>
+
+                                    <Box display="flex" alignItems="center" gap={0.5} mt={0.5}>
+                                        <LocationOnIcon fontSize="small" color="action" />
+                                        <Typography fontSize={14} color="text.secondary">
+                                            {panel.location?.name ?? '—'}
+                                        </Typography>
+                                    </Box>
+
+                                    {panel.location?.description && (
+                                        <Typography fontSize={12} color="text.secondary" sx={{ mt: 0.5 }}>
+                                            {panel.location.description}
+                                        </Typography>
+                                    )}
+
+                                    {panel.selectedTeacher && (
+                                        <Typography fontSize={12} color="info.main" sx={{ mt: 0.5 }}>
+                                            Prof sélectionné: {panel.selectedTeacher.name}
+                                        </Typography>
+                                    )}
+
+                                    <Stack direction="row" spacing={1} mt={1.5}>
+                                        <Chip
+                                            label={panel.isOnline ? 'En ligne' : 'Hors ligne'}
+                                            color={panel.isOnline ? 'secondary' : 'default'}
+                                            size="small"
+                                        />
+
+                                        <Chip
+                                            label={formatLastSeen(panel.lastSeen)}
+                                            size="small"
+                                            variant="outlined"
+                                        />
+                                    </Stack>
+                                </Box>
+
+                                <Stack direction="row" spacing={1}>
+                                    <Button
+                                        variant="contained"
+                                        color={panel.isOnline ? 'error' : 'secondary'}
+                                        onClick={() => togglePanel(panel)}
+                                    >
+                                        {panel.isOnline ? 'Désactiver' : 'Activer'}
+                                    </Button>
+                                    <Button
+                                        variant="outlined"
+                                        color="error"
+                                        startIcon={<DeleteIcon />}
+                                        onClick={() => handleDeletePanel(panel)}
+                                    >
+                                        Supprimer
+                                    </Button>
+                                </Stack>
+                            </Box>
+                        ))}
+                    </Stack>
+                )}
+            </Paper>
+
+            {/* Dialog pour créer un panel */}
+            <Dialog open={openPanelDialog} onClose={handleClosePanelDialog} maxWidth="sm" fullWidth>
+                <DialogTitle>Ajouter un nouveau panel</DialogTitle>
+                <DialogContent>
+                    <Stack spacing={3} sx={{ mt: 2 }}>
+                        <TextField
+                            label="ID de l'appareil"
+                            value={panelFormData.deviceId}
+                            onChange={e => setPanelFormData({ ...panelFormData, deviceId: e.target.value })}
+                            fullWidth
+                            required
+                            helperText="Identifiant unique du panel"
+                        />
+
+                        <TextField
+                            label="ID du client MQTT"
+                            value={panelFormData.mqttClientId}
+                            onChange={e => setPanelFormData({ ...panelFormData, mqttClientId: e.target.value })}
+                            fullWidth
+                            required
+                            helperText="Identifiant pour la connexion MQTT"
+                        />
+
+                        <TextField
+                            select
+                            label="Emplacement"
+                            value={panelFormData.locationId}
+                            onChange={e => setPanelFormData({ ...panelFormData, locationId: e.target.value })}
+                            fullWidth
+                            required
+                        >
+                            {locations.map(location => (
+                                <MenuItem key={location.id} value={location.id}>
+                                    {location.name}
+                                </MenuItem>
+                            ))}
+                        </TextField>
+                    </Stack>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleClosePanelDialog}>
+                        Annuler
+                    </Button>
+                    <Button 
+                        onClick={handleCreatePanel} 
+                        variant="contained"
+                        color="secondary"
+                        disabled={!panelFormData.deviceId || !panelFormData.mqttClientId || !panelFormData.locationId}
                     >
                         Créer
                     </Button>

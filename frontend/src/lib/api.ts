@@ -44,6 +44,20 @@ export interface Doorbell {
     updatedAt: string;
     location: Location;
 }
+
+export interface Panel {
+    id: string;
+    deviceId: string;
+    mqttClientId: string;
+    locationId: string;
+    selectedTeacherId: string | null;
+    isOnline: boolean;
+    lastSeen: string;
+    createdAt: string;
+    updatedAt: string;
+    location: Location;
+    selectedTeacher: Teacher | null;
+}
 export const api = {
     // ===== AUTH =====
     login: async (username: string, password: string): Promise<LoginResponse> => {
@@ -138,7 +152,7 @@ export const api = {
         if (!response.ok) throw new Error('Erreur création sonnette');
         return response.json();
     },
-    
+
     deleteDoorbell: async (id: string): Promise<void> => {
         const token = localStorage.getItem('auth_token');
         const res = await fetch(`${API_URL}/api/doorbells/${id}`, {
@@ -147,6 +161,65 @@ export const api = {
         });
 
         if (!res.ok) throw new Error('Erreur lors de la suppression de la sonnette');
-    }
+    },
 
+    createLocation: async (data: {
+        name: string;
+        description: string;
+        calendarId: string;
+        teamsWebhookUrl?: string | null;
+    }): Promise<Location> => {
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch(`${API_URL}/api/locations`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) throw new Error('Erreur création emplacement');
+        return response.json();
+    },
+
+    getPanels: async (): Promise<Panel[]> => {
+    const token = localStorage.getItem('auth_token');
+    const res = await fetch(`${API_URL}/api/panels`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+        throw new Error('Erreur lors de la récupération des panels');
+    }
+    const data = await res.json();
+    console.log(data.panels);
+    return data.panels;
+    },
+
+    createPanel: async (data: {
+        deviceId: string;
+        mqttClientId: string;
+        locationId: string;
+    }): Promise<Panel> => {
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch(`${API_URL}/api/panels`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) throw new Error('Erreur création panel');
+        return response.json();
+    },
+
+    deletePanel: async (id: string): Promise<void> => {
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`${API_URL}/api/panels/${id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!res.ok) throw new Error('Erreur lors de la suppression du panel');
+    }
 };
