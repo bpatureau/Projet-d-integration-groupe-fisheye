@@ -105,10 +105,38 @@ export const api = {
     }
 
     const data = await res.json();
-
-    // ⚠️ On renvoie uniquement le tableau contenu dans data.buzzers
     console.log(data.doorbells)
     return data.doorbells;
     },
+
+    getLocations: async (): Promise<Location[]> => {
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch(`${API_URL}/api/locations`, {  // Ajout de /api/
+            headers: { Authorization: `Bearer ${token}` },  // Ajout du token
+        });
+        if (!response.ok) throw new Error('Erreur récupération emplacements');
+        const data = await response.json();
+        console.log('Locations reçues:', data);
+        return data.locations || [];
+    },
+
+    createDoorbell: async (data: {
+        deviceId: string;
+        mqttClientId: string;
+        locationId: string;
+        hasDoorSensor: boolean;
+    }): Promise<Doorbell> => {
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch(`${API_URL}/api/doorbells`, {  // Ajout de /api/
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`  // Ajout du token
+            },
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) throw new Error('Erreur création sonnette');
+        return response.json();
+    }
 
 };

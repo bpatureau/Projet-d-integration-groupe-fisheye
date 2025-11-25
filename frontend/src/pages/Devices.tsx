@@ -7,12 +7,22 @@ import {
     Button,
     CircularProgress,
     Stack,
-    Chip
+    Chip,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    TextField,
+    FormControlLabel,
+    Switch,
+    MenuItem
 } from '@mui/material';
 import DoorFrontIcon from '@mui/icons-material/DoorFront';
 import SensorsIcon from '@mui/icons-material/Sensors';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
 import { api } from '../lib/api';
 
 interface Location {
@@ -38,18 +48,32 @@ interface Doorbell {
     location: Location;
 }
 
+interface NewDoorbellForm {
+    deviceId: string;
+    mqttClientId: string;
+    locationId: string;
+    hasDoorSensor: boolean;
+}
+
 export function Devices() {
     const [doorbells, setDoorbells] = useState<Doorbell[]>([]);
+    const [locations, setLocations] = useState<Location[]>([]);
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
+    const [openDialog, setOpenDialog] = useState(false);
+    const [formData, setFormData] = useState<NewDoorbellForm>({
+        deviceId: '',
+        mqttClientId: '',
+        locationId: '',
+        hasDoorSensor: false
+    });
 
-    // 🔄 Récupération depuis l'API
+    // Récupération depuis l'API
     const fetchDoorbells = async () => {
         setLoading(true);
         setMessage('');
         try {
             const data = await api.getDoorbells();
-            // Extraction du tableau depuis l'objet retourné
             const doorbellsArray = Array.isArray(data) ? data : [];
             setDoorbells(doorbellsArray);
             setMessage('Liste des sonnettes mise à jour');
@@ -62,15 +86,60 @@ export function Devices() {
         }
     };
 
+    // Récupération des emplacements
+    const fetchLocations = async () => {
+        try {
+            const data = await api.getLocations();
+            setLocations(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error('Erreur fetchLocations:', err);
+        }
+    };
+
     useEffect(() => {
         fetchDoorbells();
+        fetchLocations();
     }, []);
+
+    // Ouverture du dialogue
+    const handleOpenDialog = () => {
+        setFormData({
+            deviceId: '',
+            mqttClientId: '',
+            locationId: locations.length > 0 ? locations[0].id : '',
+            hasDoorSensor: false
+        });
+        setOpenDialog(true);
+    };
+
+    // Fermeture du dialogue
+    const handleCloseDialog = () => {
+        setOpenDialog(false);
+        setMessage('');
+    };
+
+    // Création d'une nouvelle sonnette
+    const handleCreateDoorbell = async () => {
+        if (!formData.deviceId || !formData.mqttClientId || !formData.locationId) {
+            setMessage('Veuillez remplir tous les champs obligatoires');
+            return;
+        }
+
+        try {
+            await api.createDoorbell(formData);
+            setMessage('Sonnette créée avec succès');
+            handleCloseDialog();
+            fetchDoorbells();
+        } catch (err) {
+            console.error('Erreur createDoorbell:', err);
+            setMessage('Erreur lors de la création de la sonnette');
+        }
+    };
 
     // Activation/Désactivation d'une sonnette
     const toggleDoorbell = async (doorbell: Doorbell) => {
         const newStatus = !doorbell.isOnline;
 
-        // Mise à jour locale immédiate
         setDoorbells(prev =>
             prev.map(d =>
                 d.id === doorbell.id
@@ -85,7 +154,6 @@ export function Devices() {
         } catch (err) {
             console.error('Erreur toggleDoorbell:', err);
             setMessage(`Erreur lors du changement de statut`);
-            // Rollback en cas d'erreur
             setDoorbells(prev =>
                 prev.map(d =>
                     d.id === doorbell.id
@@ -129,6 +197,13 @@ export function Devices() {
                         disabled={loading}
                     >
                         Actualiser
+                    </Button>
+                    <Button
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        onClick={handleOpenDialog}
+                    >
+                        Ajouter une sonnette
                     </Button>
                 </Stack>
 
@@ -221,6 +296,69 @@ export function Devices() {
                     </Stack>
                 )}
             </Paper>
+
+            {/* Dialog pour créer une sonnette */}
+            <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+                <DialogTitle>Ajouter une nouvelle sonnette</DialogTitle>
+                <DialogContent>
+                    <Stack spacing={3} sx={{ mt: 2 }}>
+                        <TextField
+                            label="ID de l'appareil"
+                            value={formData.deviceId}
+                            onChange={e => setFormData({ ...formData, deviceId: e.target.value })}
+                            fullWidth
+                            required
+                            helperText="Identifiant unique de la sonnette"
+                        />
+
+                        <TextField
+                            label="ID du client MQTT"
+                            value={formData.mqttClientId}
+                            onChange={e => setFormData({ ...formData, mqttClientId: e.target.value })}
+                            fullWidth
+                            required
+                            helperText="Identifiant pour la connexion MQTT"
+                        />
+
+                        <TextField
+                            select
+                            label="Emplacement"
+                            value={formData.locationId}
+                            onChange={e => setFormData({ ...formData, locationId: e.target.value })}
+                            fullWidth
+                            required
+                        >
+                            {locations.map(location => (
+                                <MenuItem key={location.id} value={location.id}>
+                                    {location.name}
+                                </MenuItem>
+                            ))}
+                        </TextField>
+
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={formData.hasDoorSensor}
+                                    onChange={e => setFormData({ ...formData, hasDoorSensor: e.target.checked })}
+                                />
+                            }
+                            label="Capteur de porte intégré"
+                        />
+                    </Stack>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseDialog}>
+                        Annuler
+                    </Button>
+                    <Button 
+                        onClick={handleCreateDoorbell} 
+                        variant="contained"
+                        disabled={!formData.deviceId || !formData.mqttClientId || !formData.locationId}
+                    >
+                        Créer
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Container>
     );
 }

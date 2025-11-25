@@ -12,7 +12,7 @@ import {
     Box,
     Stack
 } from '@mui/material';
-import { useWebSocket, type VisitEvent, type VisitStatus } from '../hooks/useWebSocket';
+import { type VisitEvent, type VisitStatus } from '../hooks/useWebSocket';
 import { api } from '../lib/api';
 
 interface VisitEventWithNames extends VisitEvent {
@@ -20,7 +20,6 @@ interface VisitEventWithNames extends VisitEvent {
 }
 
 export function Dashboard() {
-    const { events: wsEvents } = useWebSocket('/ws');
     const [visits, setVisits] = useState<VisitEventWithNames[]>([]);
     const [filter, setFilter] = useState<'all' | 'missed'>('all');
     const [search, setSearch] = useState('');
@@ -35,13 +34,6 @@ export function Dashboard() {
     }, []);
 
     useEffect(() => computeStats(visits), [visits]);
-
-    useEffect(() => {
-        if (wsEvents.length) {
-            const ev = wsEvents[0];
-            setVisits(prev => [{ ...ev, teacherNames: ev.teacherNames || [] }, ...prev]);
-        }
-    }, [wsEvents]);
 
     const computeStats = (data: VisitEventWithNames[]) => {
         const todayStr = new Date().toLocaleDateString('fr-FR');
