@@ -446,9 +446,9 @@ class DeviceActionService {
         presenceSource: presenceInfo?.presenceSource || "unavailable",
         manualStatus: presenceInfo?.manualStatus
           ? {
-            status: presenceInfo.manualStatus.status,
-            until: presenceInfo.manualStatus.until?.toISOString(),
-          }
+              status: presenceInfo.manualStatus.status,
+              until: presenceInfo.manualStatus.until?.toISOString(),
+            }
           : undefined,
       };
     });

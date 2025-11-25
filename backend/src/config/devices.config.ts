@@ -16,11 +16,6 @@ export const DEVICE_CONFIGS = {
     blockDuration: 2,
     startHour: 8,
     refreshInterval: 60,
-    colors: {
-      present: "#00FF00",
-      absent: "#FF0000",
-      scheduled: "#0000FF",
-    },
     schedule: {
       days: 5, // Nombre de jours à afficher (Lundi -> Vendredi)
       timeBlocks: [

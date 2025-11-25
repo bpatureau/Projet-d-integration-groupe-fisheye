@@ -27,6 +27,7 @@ interface SeedData {
       notifyOnTeams: boolean;
       buzzerEnabled: boolean;
     };
+    role?: "ADMIN" | "USER";
   }>;
   devices: {
     doorbells: Array<{
@@ -73,6 +74,18 @@ const seedData: SeedData = {
         notifyOnTeams: true,
         buzzerEnabled: true,
       },
+      role: "ADMIN",
+    },
+    {
+      username: "user",
+      email: "user@example.com",
+      password: "user",
+      name: "Regular User",
+      preferences: {
+        notifyOnTeams: false,
+        buzzerEnabled: false,
+      },
+      role: "USER",
     },
   ],
   devices: {
@@ -155,6 +168,7 @@ async function main() {
         gmailEmail: teacherData.gmailEmail,
         teamsEmail: teacherData.teamsEmail,
         preferences: teacherData.preferences,
+        role: teacherData.role || "USER",
       },
     });
     teacherMap.set(teacherData.username, teacher.id);

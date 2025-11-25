@@ -11,6 +11,7 @@ import * as scheduleController from "../controllers/schedule.controller";
 import * as teacherController from "../controllers/teacher.controller";
 import * as visitController from "../controllers/visit.controller";
 import { authenticate } from "../middleware/auth.middleware";
+import { authorize } from "../middleware/authorize.middleware";
 import {
   validateBody,
   validateQuery,
@@ -61,6 +62,7 @@ router.delete("/profile/status", profileController.clearManualStatus);
 
 router.post(
   "/locations",
+  authorize(["ADMIN"]),
   validateBody(schemas.createLocationSchema),
   locationController.createLocation,
 );
@@ -68,14 +70,20 @@ router.get("/locations", locationController.getAllLocations);
 router.get("/locations/:id", locationController.getLocation);
 router.put(
   "/locations/:id",
+  authorize(["ADMIN"]),
   validateBody(schemas.updateLocationSchema),
   locationController.updateLocation,
 );
-router.delete("/locations/:id", locationController.deleteLocation);
+router.delete(
+  "/locations/:id",
+  authorize(["ADMIN"]),
+  locationController.deleteLocation,
+);
 router.get("/locations/:id/teachers", locationController.getLocationTeachers);
 
 router.post(
   "/teachers",
+  authorize(["ADMIN"]),
   validateBody(schemas.createTeacherSchema),
   teacherController.createTeacher,
 );
@@ -86,7 +94,11 @@ router.put(
   validateBody(schemas.updateTeacherSchema),
   teacherController.updateTeacher,
 );
-router.delete("/teachers/:id", teacherController.deleteTeacher);
+router.delete(
+  "/teachers/:id",
+  authorize(["ADMIN"]),
+  teacherController.deleteTeacher,
+);
 router.get("/teachers/:id/locations", teacherController.getTeacherLocations);
 router.post(
   "/teachers/:id/locations/:locationId",
@@ -99,6 +111,7 @@ router.delete(
 
 router.post(
   "/doorbells",
+  authorize(["ADMIN"]),
   validateBody(schemas.createDoorbellSchema),
   doorbellController.createDoorbell,
 );
@@ -106,13 +119,19 @@ router.get("/doorbells", doorbellController.getAllDoorbells);
 router.get("/doorbells/:id", doorbellController.getDoorbell);
 router.put(
   "/doorbells/:id",
+  authorize(["ADMIN"]),
   validateBody(schemas.updateDoorbellSchema),
   doorbellController.updateDoorbell,
 );
-router.delete("/doorbells/:id", doorbellController.deleteDoorbell);
+router.delete(
+  "/doorbells/:id",
+  authorize(["ADMIN"]),
+  doorbellController.deleteDoorbell,
+);
 
 router.post(
   "/buzzers",
+  authorize(["ADMIN"]),
   validateBody(schemas.createBuzzerSchema),
   buzzerController.createBuzzer,
 );
@@ -120,13 +139,19 @@ router.get("/buzzers", buzzerController.getAllBuzzers);
 router.get("/buzzers/:id", buzzerController.getBuzzer);
 router.put(
   "/buzzers/:id",
+  authorize(["ADMIN"]),
   validateBody(schemas.updateBuzzerSchema),
   buzzerController.updateBuzzer,
 );
-router.delete("/buzzers/:id", buzzerController.deleteBuzzer);
+router.delete(
+  "/buzzers/:id",
+  authorize(["ADMIN"]),
+  buzzerController.deleteBuzzer,
+);
 
 router.post(
   "/panels",
+  authorize(["ADMIN"]),
   validateBody(schemas.createLEDPanelSchema),
   panelController.createPanel,
 );
@@ -134,10 +159,11 @@ router.get("/panels", panelController.getAllPanels);
 router.get("/panels/:id", panelController.getPanel);
 router.put(
   "/panels/:id",
+  authorize(["ADMIN"]),
   validateBody(schemas.updateLEDPanelSchema),
   panelController.updatePanel,
 );
-router.delete("/panels/:id", panelController.deletePanel);
+router.delete("/panels/:id", authorize(["ADMIN"]), panelController.deletePanel);
 
 router.get(
   "/visits",

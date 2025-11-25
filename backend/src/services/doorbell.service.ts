@@ -8,7 +8,6 @@ class DoorbellService {
     deviceId: string;
     mqttClientId: string;
     locationId: string;
-    hasDoorSensor?: boolean;
   }): Promise<Doorbell> {
     // Vérifie qu'aucune sonnette n'existe déjà avec ces identifiants
     const existing = await prismaService.client.doorbell.findFirst({
@@ -26,7 +25,6 @@ class DoorbellService {
         deviceId: data.deviceId,
         mqttClientId: data.mqttClientId,
         locationId: data.locationId,
-        hasDoorSensor: data.hasDoorSensor ?? true,
       },
     });
 
@@ -86,7 +84,6 @@ class DoorbellService {
       deviceId?: string;
       mqttClientId?: string;
       locationId?: string;
-      hasDoorSensor?: boolean;
     },
   ): Promise<Doorbell> {
     await this.findById(id);

@@ -22,6 +22,11 @@ enum VisitStatus {
   missed
 }
 
+enum Role {
+  USER
+  ADMIN
+}
+
 // ========================================
 // ENTITIES
 // ========================================
@@ -58,6 +63,7 @@ model Teacher {
   gmailEmail   String?  @map("gmail_email") @db.VarChar(255)
   teamsEmail   String?  @map("teams_email") @db.VarChar(255)
   preferences  Json     @default("{\"notifyOnTeams\": true, \"buzzerEnabled\": true}") @db.JsonB
+  role         Role     @default(USER)
   manualStatus Json?    @map("manual_status") @db.JsonB
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -98,7 +104,7 @@ model Doorbell {
   deviceId      String   @unique @map("device_id") @db.VarChar(255)
   mqttClientId  String   @unique @map("mqtt_client_id") @db.VarChar(255)
   locationId    String   @map("location_id") @db.Uuid
-  hasDoorSensor Boolean  @default(true) @map("has_door_sensor")
+
   isOnline      Boolean  @default(false) @map("is_online")
   lastSeen      DateTime @default(now()) @map("last_seen") @db.Timestamptz(6)
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)

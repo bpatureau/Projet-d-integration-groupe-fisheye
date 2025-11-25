@@ -108,12 +108,17 @@ class LocationService {
     logger.info("Teacher added to location", { teacherId, locationId });
 
     // Rafraîchit les appareils du local
-    await deviceActionService.refreshLocationDevices(locationId).catch((error: unknown) => {
-      logger.error("Failed to refresh location devices after adding teacher", {
-        locationId,
-        error,
+    await deviceActionService
+      .refreshLocationDevices(locationId)
+      .catch((error: unknown) => {
+        logger.error(
+          "Failed to refresh location devices after adding teacher",
+          {
+            locationId,
+            error,
+          },
+        );
       });
-    });
   }
 
   /**
@@ -146,12 +151,17 @@ class LocationService {
     logger.info("Teacher removed from location", { teacherId, locationId });
 
     // Rafraîchit les appareils du local
-    await deviceActionService.refreshLocationDevices(locationId).catch((error: unknown) => {
-      logger.error("Failed to refresh location devices after removing teacher", {
-        locationId,
-        error,
+    await deviceActionService
+      .refreshLocationDevices(locationId)
+      .catch((error: unknown) => {
+        logger.error(
+          "Failed to refresh location devices after removing teacher",
+          {
+            locationId,
+            error,
+          },
+        );
       });
-    });
   }
 }
 

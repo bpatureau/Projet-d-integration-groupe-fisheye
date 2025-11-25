@@ -94,14 +94,12 @@ export const createDoorbellSchema = z.object({
   deviceId: z.string().min(1, "Device ID is required"),
   mqttClientId: z.string().min(1, "MQTT Client ID is required"),
   locationId: z.string().uuid("Invalid location ID"),
-  hasDoorSensor: z.boolean().default(true),
 });
 
 export const updateDoorbellSchema = z.object({
   deviceId: z.string().min(1).optional(),
   mqttClientId: z.string().min(1).optional(),
   locationId: z.string().uuid().optional(),
-  hasDoorSensor: z.boolean().optional(),
 });
 
 // ========================================

@@ -73,7 +73,7 @@ class MQTTDispatcher {
     try {
       const data: MQTTPayloads.ButtonPressed = JSON.parse(payload.toString());
       targetTeacherId = data.targetTeacherId;
-    } catch { }
+    } catch {}
 
     const doorbell = await doorbellService.findByMqttClientId(mqttClientId);
     await deviceActionService.handleDoorbellButtonPressed(
@@ -205,21 +205,21 @@ class MQTTDispatcher {
       await deviceActionService.handleStatus("doorbell", doorbell, isOnline);
       this.deviceTypeCache.set(mqttClientId, "doorbell");
       return;
-    } catch { }
+    } catch {}
 
     try {
       const panel = await panelService.findByMqttClientId(mqttClientId);
       await deviceActionService.handleStatus("panel", panel, isOnline);
       this.deviceTypeCache.set(mqttClientId, "panel");
       return;
-    } catch { }
+    } catch {}
 
     try {
       const buzzerDevice = await buzzerService.findByMqttClientId(mqttClientId);
       await deviceActionService.handleStatus("buzzer", buzzerDevice, isOnline);
       this.deviceTypeCache.set(mqttClientId, "buzzer");
       return;
-    } catch { }
+    } catch {}
 
     // Ignorer le statut propre du backend pour éviter les logs d'avertissement
     if (
@@ -254,7 +254,7 @@ class MQTTDispatcher {
             panel.id,
           );
           return;
-        } catch { }
+        } catch {}
       } else if (cachedType === "doorbell") {
         try {
           const doorbell =
@@ -264,7 +264,7 @@ class MQTTDispatcher {
             doorbell.id,
           );
           return;
-        } catch { }
+        } catch {}
       }
     }
 
@@ -277,7 +277,7 @@ class MQTTDispatcher {
       );
       this.deviceTypeCache.set(mqttClientId, "panel");
       return;
-    } catch { }
+    } catch {}
 
     // Essayer de trouver une Doorbell
     try {
@@ -288,7 +288,7 @@ class MQTTDispatcher {
       );
       this.deviceTypeCache.set(mqttClientId, "doorbell");
       return;
-    } catch { }
+    } catch {}
 
     logger.warn("Teachers request from unknown device", { mqttClientId });
   }
