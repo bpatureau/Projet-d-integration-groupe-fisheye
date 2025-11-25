@@ -165,8 +165,8 @@ export const api = {
 
     createLocation: async (data: {
         name: string;
-        description: string;
-        calendarId: string;
+        description?: string | null;
+        calendarId?: string | null;
         teamsWebhookUrl?: string | null;
     }): Promise<Location> => {
         const token = localStorage.getItem('auth_token');
@@ -179,7 +179,8 @@ export const api = {
             body: JSON.stringify(data)
         });
         if (!response.ok) throw new Error('Erreur création emplacement');
-        return response.json();
+        const result = await response.json();
+        return result.location || result;
     },
 
     getPanels: async (): Promise<Panel[]> => {
@@ -221,5 +222,7 @@ export const api = {
         });
 
         if (!res.ok) throw new Error('Erreur lors de la suppression du panel');
-    }
+    }, 
+
+    
 };

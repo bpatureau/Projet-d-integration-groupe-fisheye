@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     Container,
     Paper,
@@ -24,6 +24,7 @@ import LocationOnIcon from '@mui/icons-material/LocationOn';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import TabletIcon from '@mui/icons-material/Tablet';
+import AddLocationIcon from '@mui/icons-material/AddLocation';
 import { api, type Panel, type Location, type Doorbell } from '../lib/api';
 
 interface NewDoorbellForm {
@@ -246,22 +247,65 @@ export function Devices() {
                     : p
             )
         );
-
-        /*try {
-            await api.updatePanel(panel.id, { isOnline: newStatus });
-            setMessage(`Statut mis à jour pour ${panel.deviceId}`);
-        } catch (err) {
-            console.error('Erreur togglePanel:', err);
-            setMessage(`Erreur lors du changement de statut`);
-            setPanels(prev =>
-                prev.map(p =>
-                    p.id === panel.id
-                        ? { ...p, isOnline: panel.isOnline }
-                        : p
-                )
-            );
-        }*/
     };
+
+    //gestion emplacement
+
+    const [openLocationDialog, setOpenLocationDialog] = useState(false);
+    const [locationFormData, setLocationFormData] = useState({
+        name: '',
+        description: '',
+        calendarId: '',
+        teamsWebhookUrl: ''
+    });
+
+    // Ouverture du dialogue de création d'emplacement
+    const handleOpenLocationDialog = () => {
+        setLocationFormData({
+            name: '',
+            description: '',
+            calendarId: '',
+            teamsWebhookUrl: ''
+        });
+        setOpenLocationDialog(true);
+    };
+
+    // Fermeture du dialogue
+    const handleCloseLocationDialog = () => {
+        setOpenLocationDialog(false);
+    };
+
+    // Création d'un nouvel emplacement
+    const handleCreateLocation = async () => {
+        if (!locationFormData.name || !locationFormData.calendarId) {
+            setMessage('Veuillez remplir les champs obligatoires (Nom et ID Calendrier)');
+            return;
+        }
+
+        try {
+            const newLocation = await api.createLocation({
+                name: locationFormData.name,
+                description: locationFormData.description || undefined,
+                calendarId: locationFormData.calendarId || undefined,
+                teamsWebhookUrl: locationFormData.teamsWebhookUrl || undefined
+            });
+            setMessage(`Emplacement "${newLocation.name}" créé avec succès`);
+            handleCloseLocationDialog();
+            await fetchLocations();
+            
+            // Sélectionner automatiquement le nouvel emplacement dans le formulaire actif
+            if (openDialog) {
+                setFormData({ ...formData, locationId: newLocation.id });
+            }
+            if (openPanelDialog) {
+                setPanelFormData({ ...panelFormData, locationId: newLocation.id });
+            }
+        } catch (err) {
+            console.error('Erreur createLocation:', err);
+            setMessage('Erreur lors de la création de l\'emplacement');
+        }
+    };
+
     return (
         <Container maxWidth="md" sx={{ mt: 4 }}>
             <Paper sx={{ p: 4 }}>
@@ -421,6 +465,23 @@ export function Devices() {
                             fullWidth
                             required
                         >
+                            <MenuItem 
+                                value="" 
+                                sx={{ 
+                                    fontWeight: 'bold', 
+                                    backgroundColor: 'action.hover',
+                                    '&:hover': { backgroundColor: 'action.selected' }
+                                }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenLocationDialog();
+                                }}
+                            >
+                                <Box display="flex" alignItems="center" gap={1}>
+                                    <AddLocationIcon />
+                                    <Typography>Créer un nouvel emplacement</Typography>
+                                </Box>
+                            </MenuItem>
                             {locations.map(location => (
                                 <MenuItem key={location.id} value={location.id}>
                                     {location.name}
@@ -595,6 +656,23 @@ export function Devices() {
                             fullWidth
                             required
                         >
+                            <MenuItem 
+                                value="" 
+                                sx={{ 
+                                    fontWeight: 'bold', 
+                                    backgroundColor: 'action.hover',
+                                    '&:hover': { backgroundColor: 'action.selected' }
+                                }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenLocationDialog();
+                                }}
+                            >
+                                <Box display="flex" alignItems="center" gap={1}>
+                                    <AddLocationIcon />
+                                    <Typography>Créer un nouvel emplacement</Typography>
+                                </Box>
+                            </MenuItem>
                             {locations.map(location => (
                                 <MenuItem key={location.id} value={location.id}>
                                     {location.name}
@@ -612,6 +690,61 @@ export function Devices() {
                         variant="contained"
                         color="secondary"
                         disabled={!panelFormData.deviceId || !panelFormData.mqttClientId || !panelFormData.locationId}
+                    >
+                        Créer
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            {/* Dialog pour créer un emplacement */}
+            <Dialog open={openLocationDialog} onClose={handleCloseLocationDialog} maxWidth="sm" fullWidth>
+                <DialogTitle>Créer un nouvel emplacement</DialogTitle>
+                <DialogContent>
+                    <Stack spacing={3} sx={{ mt: 2 }}>
+                        <TextField
+                            label="Nom de l'emplacement"
+                            value={locationFormData.name}
+                            onChange={e => setLocationFormData({ ...locationFormData, name: e.target.value })}
+                            fullWidth
+                            required
+                            helperText="Ex: Bureau des professeurs, Salle 101..."
+                        />
+
+                        <TextField
+                            label="Description"
+                            value={locationFormData.description}
+                            onChange={e => setLocationFormData({ ...locationFormData, description: e.target.value })}
+                            fullWidth
+                            multiline
+                            rows={2}
+                            helperText="Description optionnelle de l'emplacement"
+                        />
+
+                        <TextField
+                            label="ID du calendrier Google"
+                            value={locationFormData.calendarId}
+                            onChange={e => setLocationFormData({ ...locationFormData, calendarId: e.target.value })}
+                            fullWidth
+                            required
+                            helperText="L'identifiant du calendrier Google associé"
+                        />
+
+                        <TextField
+                            label="URL du webhook Teams (optionnel)"
+                            value={locationFormData.teamsWebhookUrl}
+                            onChange={e => setLocationFormData({ ...locationFormData, teamsWebhookUrl: e.target.value })}
+                            fullWidth
+                            helperText="URL du webhook Microsoft Teams pour les notifications"
+                        />
+                    </Stack>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseLocationDialog}>
+                        Annuler
+                    </Button>
+                    <Button 
+                        onClick={handleCreateLocation} 
+                        variant="contained"
+                        disabled={!locationFormData.name || !locationFormData.calendarId}
                     >
                         Créer
                     </Button>
