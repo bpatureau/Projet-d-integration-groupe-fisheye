@@ -178,6 +178,22 @@ export function Devices() {
         const diffDays = Math.floor(diffHours / 24);
         return `Il y a ${diffDays}j`;
     };
+    
+    // Suppression d'une sonnette
+    const handleDeleteDoorbell = async (doorbell: Doorbell) => {
+        if (!window.confirm(`Êtes-vous sûr de vouloir supprimer la sonnette "${doorbell.deviceId}" ?`)) {
+            return;
+        }
+
+        try {
+            await api.deleteDoorbell(doorbell.id);
+            setMessage(`Sonnette "${doorbell.deviceId}" supprimée avec succès`);
+            fetchDoorbells();
+        } catch (err) {
+            console.error('Erreur deleteDoorbell:', err);
+            setMessage('Erreur lors de la suppression de la sonnette');
+        }
+    };
 
     return (
         <Container maxWidth="md" sx={{ mt: 4 }}>
@@ -284,6 +300,7 @@ export function Devices() {
                                     </Stack>
                                 </Box>
 
+                            <Stack direction="row" spacing={1}>
                                 <Button
                                     variant="contained"
                                     color={doorbell.isOnline ? 'error' : 'success'}
@@ -291,6 +308,15 @@ export function Devices() {
                                 >
                                     {doorbell.isOnline ? 'Désactiver' : 'Activer'}
                                 </Button>
+                                <Button
+                                    variant="outlined"
+                                    color="error"
+                                    startIcon={<DeleteIcon />}
+                                    onClick={() => handleDeleteDoorbell(doorbell)}
+                                >
+                                    Supprimer
+                                </Button>
+                            </Stack>
                             </Box>
                         ))}
                     </Stack>

@@ -137,6 +137,16 @@ export const api = {
         });
         if (!response.ok) throw new Error('Erreur création sonnette');
         return response.json();
+    },
+    
+    deleteDoorbell: async (id: string): Promise<void> => {
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`${API_URL}/api/doorbells/${id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!res.ok) throw new Error('Erreur lors de la suppression de la sonnette');
     }
 
 };
