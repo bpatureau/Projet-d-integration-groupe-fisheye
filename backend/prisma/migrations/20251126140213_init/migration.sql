@@ -4,6 +4,9 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- CreateEnum
 CREATE TYPE "VisitStatus" AS ENUM ('pending', 'answered', 'missed');
 
+-- CreateEnum
+CREATE TYPE "Role" AS ENUM ('USER', 'ADMIN');
+
 -- CreateTable
 CREATE TABLE "locations" (
     "id" UUID NOT NULL DEFAULT uuid_generate_v4(),
@@ -27,6 +30,7 @@ CREATE TABLE "teachers" (
     "gmail_email" VARCHAR(255),
     "teams_email" VARCHAR(255),
     "preferences" JSONB NOT NULL DEFAULT '{"notifyOnTeams": true, "buzzerEnabled": true}',
+    "role" "Role" NOT NULL DEFAULT 'USER',
     "manual_status" JSONB,
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -49,7 +53,6 @@ CREATE TABLE "doorbells" (
     "device_id" VARCHAR(255) NOT NULL,
     "mqtt_client_id" VARCHAR(255) NOT NULL,
     "location_id" UUID NOT NULL,
-    "has_door_sensor" BOOLEAN NOT NULL DEFAULT true,
     "is_online" BOOLEAN NOT NULL DEFAULT false,
     "last_seen" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,

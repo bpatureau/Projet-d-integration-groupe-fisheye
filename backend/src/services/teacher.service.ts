@@ -46,12 +46,17 @@ class TeacherService {
     });
 
     logger.info("Teacher created", { teacherId: teacher.id });
-    return teacher;
+    const { passwordHash: _, ...teacherWithoutPassword } = teacher;
+    return teacherWithoutPassword as Teacher;
   }
 
   async findAll(): Promise<Teacher[]> {
-    return prismaService.client.teacher.findMany({
+    const teachers = await prismaService.client.teacher.findMany({
       orderBy: { name: "asc" },
+    });
+    return teachers.map((teacher) => {
+      const { passwordHash: _, ...teacherWithoutPassword } = teacher;
+      return teacherWithoutPassword as Teacher;
     });
   }
 
@@ -68,15 +73,23 @@ class TeacherService {
   }
 
   async findByEmail(email: string): Promise<Teacher | null> {
-    return prismaService.client.teacher.findUnique({
+    const teacher = await prismaService.client.teacher.findUnique({
       where: { email },
     });
+
+    if (!teacher) return null;
+    const { passwordHash: _, ...teacherWithoutPassword } = teacher;
+    return teacherWithoutPassword as Teacher;
   }
 
   async findByGmailEmail(gmailEmail: string): Promise<Teacher | null> {
-    return prismaService.client.teacher.findFirst({
+    const teacher = await prismaService.client.teacher.findFirst({
       where: { gmailEmail },
     });
+
+    if (!teacher) return null;
+    const { passwordHash: _, ...teacherWithoutPassword } = teacher;
+    return teacherWithoutPassword as Teacher;
   }
 
   async update(
@@ -106,8 +119,10 @@ class TeacherService {
       email: data.email,
       name: data.name,
       gmailEmail: data.gmailEmail,
-      teamsEmail: data.teamsEmail,
     };
+    if (data.teamsEmail !== undefined) {
+      updateData.teamsEmail = data.teamsEmail;
+    }
     if (data.preferences) {
       updateData.preferences =
         data.preferences as unknown as Prisma.InputJsonValue;
@@ -160,7 +175,8 @@ class TeacherService {
       }
     }
 
-    return teacher;
+    const { passwordHash: _, ...teacherWithoutPassword } = teacher;
+    return teacherWithoutPassword as Teacher;
   }
 
   async updatePassword(id: string, newPassword: string): Promise<void> {

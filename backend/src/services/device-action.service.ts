@@ -195,9 +195,8 @@ class DeviceActionService {
     const recentVisit = await visitService.getLastPendingVisit(doorbellId);
 
     // Détermine la cible du message
-    // Si aucune cible n'est spécifiée, cible le local de la sonnette
-    const finalTargetLocationId =
-      targetLocationId || (!targetTeacherId ? doorbell.locationId : undefined);
+    // Le message est toujours associé au local de la sonnette par défaut
+    const finalTargetLocationId = targetLocationId || doorbell.locationId;
 
     // Crée le message
     const message = await messageService.create({
@@ -218,6 +217,7 @@ class DeviceActionService {
 
     // Notifie les enseignants concernés
     const messageWithRelations = await messageService.findById(message.id);
+
     await notificationService.notifyTeachersOfMessage(messageWithRelations);
 
     return message;

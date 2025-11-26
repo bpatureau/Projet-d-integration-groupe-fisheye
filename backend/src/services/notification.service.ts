@@ -103,6 +103,17 @@ class NotificationService {
       }
     });
 
+    // Si aucun prof n'est notifié (aucun présent ou aucun ciblé), envoyer une notif générique au channel
+    if (teachers.length === 0 && visit.location.teamsWebhookUrl) {
+      this.sendTeamsNotification(
+        visit.location.teamsWebhookUrl,
+        visit.location,
+        [],
+      ).catch((err) => {
+        logger.error("Failed to send generic teams notification", { err });
+      });
+    }
+
     logger.info(`Notifications dispatched for ${teachers.length} teachers`, {
       visitId: visit.id,
     });
@@ -127,7 +138,16 @@ class NotificationService {
       teachersToNotify.push(message.targetTeacher);
     }
 
+    // Si aucun prof spécifique, on vérifie si on peut envoyer au channel du local
     if (teachersToNotify.length === 0) {
+      if (message.targetLocation?.teamsWebhookUrl) {
+        await this.sendTeamsMessageNotification(
+          message.targetLocation.teamsWebhookUrl,
+          message.targetLocation,
+          undefined,
+          message.text,
+        );
+      }
       return;
     }
 
@@ -160,34 +180,103 @@ class NotificationService {
   private async sendTeamsMessageNotification(
     webhookUrl: string,
     location: Location,
-    teacher: Teacher,
+    teacher: Teacher | undefined,
     text: string,
   ): Promise<boolean> {
-    const message = {
-      "@type": "MessageCard",
-      "@context": "http://schema.org/extensions",
-      summary: "Nouveau message reçu",
-      sections: [
+    const targetName = teacher
+      ? `Pour : ${teacher.name}`
+      : "Pour : Tout le monde";
+
+    const adaptiveCard = {
+      type: "message",
+      attachments: [
         {
-          activityTitle: `📨 Message - ${location.name}`,
-          activitySubtitle: `Pour: ${teacher.name}`,
-          facts: [
-            { name: "Message", value: text },
-            { name: "Heure", value: new Date().toLocaleTimeString("fr-FR") },
-          ],
+          contentType: "application/vnd.microsoft.card.adaptive",
+          contentUrl: null,
+          content: {
+            $schema: "http://adaptivecards.io/schemas/adaptive-card.json",
+            type: "AdaptiveCard",
+            version: "1.4",
+            body: [
+              {
+                type: "Container",
+                style: "accent",
+                items: [
+                  {
+                    type: "TextBlock",
+                    text: "📨 Nouveau Message",
+                    weight: "Bolder",
+                    size: "Medium",
+                    color: "Light",
+                  },
+                ],
+              },
+              {
+                type: "Container",
+                items: [
+                  {
+                    type: "TextBlock",
+                    text: location.name,
+                    weight: "Bolder",
+                    size: "Large",
+                    spacing: "Small",
+                  },
+                  {
+                    type: "TextBlock",
+                    text: targetName,
+                    isSubtle: true,
+                    spacing: "None",
+                  },
+                ],
+              },
+              {
+                type: "Container",
+                style: "emphasis",
+                items: [
+                  {
+                    type: "TextBlock",
+                    text: text,
+                    wrap: true,
+                    fontType: "Monospace",
+                  },
+                ],
+              },
+              {
+                type: "TextBlock",
+                text: `Reçu à ${new Date().toLocaleTimeString("fr-FR")}`,
+                size: "Small",
+                isSubtle: true,
+                horizontalAlignment: "Right",
+                spacing: "Medium",
+              },
+            ],
+          },
         },
       ],
     };
 
     try {
-      await axios.post(webhookUrl, message, { timeout: 5000 });
+      await axios.post(webhookUrl, adaptiveCard, { timeout: 5000 });
       logger.info("Teams message notification sent", {
         location: location.name,
-        teacher: teacher.name,
+        teacher: teacher?.name || "Everyone",
       });
       return true;
-    } catch (error) {
-      logger.error("Failed to send Teams message notification", { error });
+    } catch (error: unknown) {
+      let errorMessage = "Unknown error";
+      let responseData: unknown;
+
+      if (axios.isAxiosError(error)) {
+        errorMessage = error.message;
+        responseData = error.response?.data;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      logger.error("Failed to send Teams message notification", {
+        error: errorMessage,
+        responseData,
+      });
       return false;
     }
   }
@@ -266,34 +355,103 @@ class NotificationService {
     location: Location,
     teachers: Teacher[],
   ): Promise<boolean> {
-    const mentions = teachers.map((t) => t.name).join(", ");
+    const teacherNames =
+      teachers.length > 0
+        ? teachers.map((t) => t.name).join(", ")
+        : "Tout le monde";
 
-    const message = {
-      "@type": "MessageCard",
-      "@context": "http://schema.org/extensions",
-      summary: "Quelqu'un sonne à l'entrée",
-      sections: [
+    const adaptiveCard = {
+      type: "message",
+      attachments: [
         {
-          activityTitle: `🔔 Sonnette - ${location.name}`,
-          activitySubtitle: "Quelqu'un demande à entrer",
-          facts: [
-            { name: "Lieu", value: location.name },
-            { name: "Professeurs notifiés", value: mentions },
-            { name: "Heure", value: new Date().toLocaleTimeString("fr-FR") },
-          ],
+          contentType: "application/vnd.microsoft.card.adaptive",
+          content: {
+            $schema: "http://adaptivecards.io/schemas/adaptive-card.json",
+            type: "AdaptiveCard",
+            version: "1.4",
+            body: [
+              {
+                type: "Container",
+                style: "attention",
+                items: [
+                  {
+                    type: "TextBlock",
+                    text: "🔔 Sonnette Activée",
+                    weight: "Bolder",
+                    size: "Medium",
+                    color: "Light",
+                  },
+                ],
+              },
+              {
+                type: "Container",
+                items: [
+                  {
+                    type: "TextBlock",
+                    text: location.name,
+                    weight: "Bolder",
+                    size: "Large",
+                    spacing: "Small",
+                  },
+                  {
+                    type: "TextBlock",
+                    text: "Quelqu'un demande à entrer",
+                    isSubtle: true,
+                    spacing: "None",
+                  },
+                ],
+              },
+              {
+                type: "Container",
+                style: "emphasis",
+                items: [
+                  {
+                    type: "FactSet",
+                    facts: [
+                      {
+                        title: "Professeurs notifiés",
+                        value: teacherNames,
+                      },
+                    ],
+                  },
+                ],
+              },
+              {
+                type: "TextBlock",
+                text: `Reçu à ${new Date().toLocaleTimeString("fr-FR")}`,
+                size: "Small",
+                isSubtle: true,
+                horizontalAlignment: "Right",
+                spacing: "Medium",
+              },
+            ],
+          },
         },
       ],
     };
 
     try {
-      await axios.post(webhookUrl, message, { timeout: 5000 }); // Timeout 5s
+      await axios.post(webhookUrl, adaptiveCard, { timeout: 5000 });
       logger.info("Teams notification sent", {
         location: location.name,
-        teachers: teachers.length,
+        teachers: teachers.length > 0 ? teachers.length : "Generic",
       });
       return true;
-    } catch (error) {
-      logger.error("Failed to send Teams notification", { error });
+    } catch (error: unknown) {
+      let errorMessage = "Unknown error";
+      let responseData: unknown;
+
+      if (axios.isAxiosError(error)) {
+        errorMessage = error.message;
+        responseData = error.response?.data;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      logger.error("Failed to send Teams notification", {
+        error: errorMessage,
+        responseData,
+      });
       return false;
     }
   }
