@@ -25,6 +25,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import TabletIcon from '@mui/icons-material/Tablet';
 import AddLocationIcon from '@mui/icons-material/AddLocation';
+import PlaceIcon from '@mui/icons-material/Place';
 import { api, type Panel, type Location, type Doorbell } from '../lib/api';
 
 interface NewDoorbellForm {
@@ -277,16 +278,16 @@ export function Devices() {
 
     // Création d'un nouvel emplacement
     const handleCreateLocation = async () => {
-        if (!locationFormData.name || !locationFormData.calendarId) {
-            setMessage('Veuillez remplir les champs obligatoires (Nom et ID Calendrier)');
+        if (!locationFormData.name) {  // Retirer la vérification de calendarId
+            setMessage('Veuillez remplir le nom de l\'emplacement');
             return;
         }
 
         try {
             const newLocation = await api.createLocation({
                 name: locationFormData.name,
-                description: locationFormData.description || undefined,
-                calendarId: locationFormData.calendarId || undefined,
+                description: locationFormData.description,
+                calendarId: locationFormData.calendarId || undefined,  // Envoyer null si vide
                 teamsWebhookUrl: locationFormData.teamsWebhookUrl || undefined
             });
             setMessage(`Emplacement "${newLocation.name}" créé avec succès`);
@@ -304,6 +305,41 @@ export function Devices() {
             console.error('Erreur createLocation:', err);
             setMessage('Erreur lors de la création de l\'emplacement');
         }
+    };
+
+    // Suppression d'un emplacement
+    const handleDeleteLocation = async (location: Location) => {
+        // Vérifier si l'emplacement est utilisé par des sonnettes ou panels
+        const usedByDoorbells = doorbells.some(d => d.locationId === location.id);
+        const usedByPanels = panels.some(p => p.locationId === location.id);
+        
+        if (usedByDoorbells || usedByPanels) {
+            setMessage('Impossible de supprimer : cet emplacement est utilisé par des sonnettes ou des panels');
+            return;
+        }
+
+        if (!window.confirm(`Êtes-vous sûr de vouloir supprimer l'emplacement "${location.name}" ?`)) {
+            return;
+        }
+
+        try {
+            await api.deleteLocation(location.id);
+            setMessage(`Emplacement "${location.name}" supprimé avec succès`);
+            fetchLocations();
+        } catch (err) {
+            console.error('Erreur deleteLocation:', err);
+            setMessage('Erreur lors de la suppression de l\'emplacement');
+        }
+    };
+    // Ouverture du dialogue de création d'emplacement (standalone)
+    const handleOpenLocationDialogStandalone = () => {
+        setLocationFormData({
+            name: '',
+            description: '',
+            calendarId: '',
+            teamsWebhookUrl: ''
+        });
+        setOpenLocationDialog(true);
     };
 
     return (
@@ -718,14 +754,12 @@ export function Devices() {
                             rows={2}
                             helperText="Description optionnelle de l'emplacement"
                         />
-
                         <TextField
-                            label="ID du calendrier Google"
+                            label="ID du calendrier Google (optionnel)"
                             value={locationFormData.calendarId}
                             onChange={e => setLocationFormData({ ...locationFormData, calendarId: e.target.value })}
                             fullWidth
-                            required
-                            helperText="L'identifiant du calendrier Google associé"
+                            helperText="L'identifiant du calendrier Google associé (facultatif)"
                         />
 
                         <TextField
@@ -744,12 +778,131 @@ export function Devices() {
                     <Button 
                         onClick={handleCreateLocation} 
                         variant="contained"
-                        disabled={!locationFormData.name || !locationFormData.calendarId}
+                        disabled={!locationFormData.name}  // Seul le nom est requis maintenant
                     >
                         Créer
                     </Button>
                 </DialogActions>
             </Dialog>
+            {/* Section Emplacements */}
+            <Paper sx={{ p: 4, mt: 4 }}>
+                <Box display="flex" alignItems="center" gap={2} mb={3}>
+                    <PlaceIcon sx={{ fontSize: 40, color: 'info.main' }} />
+                    <Typography variant="h4">
+                        Emplacements
+                    </Typography>
+                </Box>
+
+                <Stack direction="row" spacing={2} mb={3}>
+                    <Button
+                        variant="outlined"
+                        startIcon={<RefreshIcon />}
+                        onClick={fetchLocations}
+                        disabled={loading}
+                    >
+                        Actualiser
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="info"
+                        startIcon={<AddIcon />}
+                        onClick={handleOpenLocationDialogStandalone}
+                    >
+                        Ajouter un emplacement
+                    </Button>
+                </Stack>
+
+                {locations.length === 0 ? (
+                    <Typography color="text.secondary" textAlign="center" py={4}>
+                        Aucun emplacement configuré
+                    </Typography>
+                ) : (
+                    <Stack spacing={2}>
+                        {locations.map(location => {
+                            // Compter l'utilisation
+                            const doorbellCount = doorbells.filter(d => d.locationId === location.id).length;
+                            const panelCount = panels.filter(p => p.locationId === location.id).length;
+                            const isInUse = doorbellCount > 0 || panelCount > 0;
+
+                            return (
+                                <Box
+                                    key={location.id}
+                                    sx={{
+                                        p: 2,
+                                        border: '1px solid',
+                                        borderColor: 'divider',
+                                        borderRadius: 1,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        backgroundColor: 'grey.50',
+                                    }}
+                                >
+                                    <Box flex={1}>
+                                        <Typography variant="h6">
+                                            {location.name}
+                                        </Typography>
+
+                                        {location.description && (
+                                            <Typography fontSize={14} color="text.secondary" sx={{ mt: 0.5 }}>
+                                                {location.description}
+                                            </Typography>
+                                        )}
+
+                                        <Typography fontSize={12} color="text.secondary" sx={{ mt: 1 }}>
+                                            ID Calendrier: {location.calendarId || 'Non configuré'}
+                                        </Typography>
+
+                                        {location.teamsWebhookUrl && (
+                                            <Typography fontSize={12} color="text.secondary" sx={{ mt: 0.5 }}>
+                                                Webhook Teams configuré ✓
+                                            </Typography>
+                                        )}
+
+                                        <Stack direction="row" spacing={1} mt={1.5}>
+                                            {doorbellCount > 0 && (
+                                                <Chip
+                                                    icon={<DoorFrontIcon />}
+                                                    label={`${doorbellCount} sonnette${doorbellCount > 1 ? 's' : ''}`}
+                                                    color="primary"
+                                                    size="small"
+                                                    variant="outlined"
+                                                />
+                                            )}
+                                            {panelCount > 0 && (
+                                                <Chip
+                                                    icon={<TabletIcon />}
+                                                    label={`${panelCount} panel${panelCount > 1 ? 's' : ''}`}
+                                                    color="secondary"
+                                                    size="small"
+                                                    variant="outlined"
+                                                />
+                                            )}
+                                            {!isInUse && (
+                                                <Chip
+                                                    label="Non utilisé"
+                                                    size="small"
+                                                    variant="outlined"
+                                                />
+                                            )}
+                                        </Stack>
+                                    </Box>
+
+                                    <Button
+                                        variant="outlined"
+                                        color="error"
+                                        startIcon={<DeleteIcon />}
+                                        onClick={() => handleDeleteLocation(location)}
+                                        disabled={isInUse}
+                                    >
+                                        Supprimer
+                                    </Button>
+                                </Box>
+                            );
+                        })}
+                    </Stack>
+                )}
+            </Paper>
         </Container>
     );
 }

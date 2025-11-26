@@ -26,8 +26,8 @@ export interface Location {
     id: string;
     name: string;
     description: string;
-    calendarId: string;
-    teamsWebhookUrl: string | null;
+    calendarId: string | undefined;
+    teamsWebhookUrl: string | undefined;
     createdAt: string;
     updatedAt: string;
 }
@@ -165,9 +165,9 @@ export const api = {
 
     createLocation: async (data: {
         name: string;
-        description?: string | null;
-        calendarId?: string | null;
-        teamsWebhookUrl?: string | null;
+        description: string;
+        calendarId?: string | undefined;
+        teamsWebhookUrl?: string | undefined;
     }): Promise<Location> => {
         const token = localStorage.getItem('auth_token');
         const response = await fetch(`${API_URL}/api/locations`, {
@@ -223,6 +223,16 @@ export const api = {
 
         if (!res.ok) throw new Error('Erreur lors de la suppression du panel');
     }, 
+
+    deleteLocation: async (id: string): Promise<void> => {
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`${API_URL}/api/locations/${id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!res.ok) throw new Error('Erreur lors de la suppression de l\'emplacement');
+    }
 
     
 };
