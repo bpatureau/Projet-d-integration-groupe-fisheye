@@ -29,6 +29,7 @@ COLORS = {
     'offline': '#DC3545',
 }
 
+
 # ===================== GESTION CONFIGURATION =====================
 def charger_config():
     """Charge la configuration depuis config.json"""
@@ -65,6 +66,7 @@ def charger_config():
         print(f"[ERREUR] Impossible de charger la config : {e}")
         return config_defaut
 
+
 def charger_professeurs(payload):
     """Charge la liste des professeurs depuis professeurs.json"""
     profs_defaut = {
@@ -78,7 +80,7 @@ def charger_professeurs(payload):
 
     return profs_defaut
 
-    #try:
+    # try:
     #   if os.path.exists("professeurs.json"):
     #       with open("professeurs.json", "r", encoding="utf-8") as f:
     #           profs = json.load(f)
@@ -92,9 +94,10 @@ def charger_professeurs(payload):
     #           json.dump(profs_defaut, f, indent=4, ensure_ascii=False)
     #       print("[INFO] Fichier professeurs.json créé avec les valeurs par défaut")
     #       return profs_defaut
-    #except Exception as e:
+    # except Exception as e:
     #   print(f"[ERREUR] Impossible de charger les professeurs : {e}")
     #   return profs_defaut
+
 
 def sauvegarder_professeurs(professeurs):
     """Sauvegarde les professeurs dans professeurs.json"""
@@ -107,6 +110,7 @@ def sauvegarder_professeurs(professeurs):
         print(f"[ERREUR] Impossible de sauvegarder les professeurs : {e}")
         return False
 
+
 # ===================== COMMUNICATION ARDUINO =====================
 config = charger_config()
 
@@ -117,11 +121,13 @@ esp = None
 
 # ===================== MQTT CLIENT =====================
 unacked_publish = set()
-mqttc = None # Sera initialisé dans create_mqtt_client
+mqttc = None  # Sera initialisé dans create_mqtt_client
+
 
 def on_publish(client, userdata, mid):
     """Callback quand un message est publié avec succès"""
     userdata.discard(mid)
+
 
 def create_mqtt_client(broker, port, user, passwd, client_id):
     """Crée et démarre le client MQTT avec MQTTv5"""
@@ -160,15 +166,16 @@ def create_mqtt_client(broker, port, user, passwd, client_id):
 
     return client
 
+
 def publish_mqtt(client, topic, payload, qos=1, retain=False, wait=False):
     """Publie un message MQTT et attend la confirmation si demandé"""
     if client is None:
         print("[MQTT] ✗ Client MQTT non initialisé. Impossible de publier.")
         return False
-        
+
     try:
         payload_str = json.dumps(payload, ensure_ascii=False) if isinstance(payload, dict) else str(payload)
-        
+
         # Vérification supplémentaire de la connexion avant de publier
         if not client.is_connected():
             print(f"[MQTT] ✗ Impossible de publier. Déconnecté de: {topic}")
@@ -189,11 +196,13 @@ def publish_mqtt(client, topic, payload, qos=1, retain=False, wait=False):
         print(f"[MQTT] ✗ Erreur de publication: {e}")
         return False
 
+
 # La création du client est déplacée dans SonnetteApp.__init__
 
 # ===================== WIDGETS MODERNES =====================
 class ModernButton(tk.Frame):
     """Bouton moderne avec effet hover"""
+
     def __init__(self, parent, text, command=None, bg_color=None, fg_color=None, **kwargs):
         super().__init__(parent, bg=parent.cget('bg'))
 
@@ -228,12 +237,15 @@ class ModernButton(tk.Frame):
         if self.command:
             self.command()
 
+
 class ModernCard(tk.Frame):
     """Carte moderne avec bordure subtile"""
+
     def __init__(self, parent, **kwargs):
         super().__init__(parent, bg=COLORS['white'], relief="flat", bd=0, **kwargs)
         # Bordure subtile en bleu clair pour l'esthétique "dégradé abstrait"
         self.configure(highlightbackground=COLORS['border_light'], highlightthickness=1)
+
 
 # ===================== APPLICATION TKINTER =====================
 class SonnetteApp:
@@ -257,7 +269,7 @@ class SonnetteApp:
 
         self.door_status = 0
         self.teacher_id = ""
-        
+
         # --- NOUVEAUX STATUTS DE CONNEXION ---
         self.arduino_connecte = False
         self.esp_connecte = False
@@ -266,12 +278,12 @@ class SonnetteApp:
         self.alerte_mqtt_affiche = False
         self.alerte_arduino_affiche = False
         self.alerte_esp_affiche = False
-        
+
         # Tentative d'ouverture des ports série AVANT l'interface
         self.connecter_serial()
 
         # Création du client MQTT après l'initialisation des ports série (si possible)
-        global mqttc # Utilise la variable globale
+        global mqttc  # Utilise la variable globale
         mqttc = create_mqtt_client(
             config.get("mqtt_broker", "localhost"),
             config.get("mqtt_port", 1883),
@@ -281,7 +293,7 @@ class SonnetteApp:
         )
         self.mqtt_client = mqttc
         self.client_id = config.get("mqtt_client_id")
-        
+
         # Charger les professeurs
         self.professeurs = {}
         self.prof_noms = []
@@ -311,7 +323,7 @@ class SonnetteApp:
             self.thread_joystick.start()
         else:
             self.afficher_alerte_integrée("⚠️ Arduino non connecté. Vérifiez le port série.", COLORS['warning'])
-            
+
         # Thread pour l'ESP
         global esp
         if esp and self.esp_connecte:
@@ -320,20 +332,20 @@ class SonnetteApp:
         else:
             self.afficher_alerte_integrée("⚠️ ESP non connecté. Vérifiez le port série.", COLORS['warning'])
 
-
         # Vérification de l'état des connexions périodique
-        self.verifier_mqtt() # Inclut la vérification des connexions série
+        self.verifier_mqtt()  # Inclut la vérification des connexions série
 
         # Handler fermeture propre
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
-        
+
     def connecter_serial(self):
         """Tente d'ouvrir les ports série pour Arduino et ESP"""
         global arduino, esp
-        
+
         # --- Connexion Arduino (Joystick) ---
         try:
-            arduino = serial.Serial(config['serial_port_arduino'], config['baudrate_arduino'], timeout=config['timeout'])
+            arduino = serial.Serial(config['serial_port_arduino'], config['baudrate_arduino'],
+                                    timeout=config['timeout'])
             arduino.flushInput()
             self.arduino_connecte = True
             print(f"[INFO] Arduino connecté sur {config['serial_port_arduino']}")
@@ -395,7 +407,7 @@ class SonnetteApp:
         # --- NOUVEAU: Zone d'Alertes/Status à droite ---
         status_container = tk.Frame(header_content, bg=COLORS['white'])
         status_container.pack(side="right", fill="y")
-        
+
         # Espace pour les alertes (au-dessus des indicateurs)
         self.alert_label = tk.Label(
             status_container,
@@ -405,20 +417,19 @@ class SonnetteApp:
             fg=COLORS['danger'],
         )
         self.alert_label.pack(side="top", anchor="e", pady=(0, 5))
-        
+
         # Frame pour les indicateurs
         indicator_frame = tk.Frame(status_container, bg=COLORS['white'])
         indicator_frame.pack(side="bottom", anchor="e")
 
         # Status Arduino
         self.create_status_indicator(indicator_frame, "Arduino", self.arduino_connecte)
-        
+
         # Status ESP
         self.create_status_indicator(indicator_frame, "ESP", self.esp_connecte, is_esp=True)
 
         # Status MQTT
         self.create_status_indicator(indicator_frame, "MQTT", self.mqtt_connecte, is_mqtt=True)
-
 
         # Ligne de séparation
         separator = tk.Frame(self.root, bg=COLORS['medium_gray'], height=1)
@@ -463,7 +474,7 @@ class SonnetteApp:
             fg=COLORS['text_dark']
         )
         status_label.pack(anchor="w")
-        
+
         if is_mqtt:
             self.mqtt_status_indicator = indicator
             self.mqtt_status_label = status_label
@@ -474,7 +485,6 @@ class SonnetteApp:
             self.arduino_status_indicator = indicator
             self.arduino_status_label = status_label
 
-
     def create_main_content(self, *args, **kwargs):
         """Crée le contenu principal"""
         # ... (Le reste de la méthode create_main_content reste inchangé) ...
@@ -483,7 +493,6 @@ class SonnetteApp:
 
         self.create_message_section(main_container)
         self.create_professors_section(main_container)
-
 
     def create_message_section(self, parent):
         """Section d'écriture de message"""
@@ -521,7 +530,8 @@ class SonnetteApp:
         ).pack(anchor="w", pady=(0, 8))
 
         # Frame pour la zone de texte avec bordure (ajusté pour le nouveau thème)
-        text_frame = tk.Frame(text_container, bg=COLORS['white'], highlightbackground=COLORS['medium_gray'], highlightthickness=1)
+        text_frame = tk.Frame(text_container, bg=COLORS['white'], highlightbackground=COLORS['medium_gray'],
+                              highlightthickness=1)
         text_frame.pack(fill="both", expand=True)
 
         self.message_text = tk.Text(
@@ -534,14 +544,15 @@ class SonnetteApp:
             pady=15,
             bg=COLORS['white'],
             fg=COLORS['text_dark'],
-            insertbackground=COLORS['secondary'] # Curseur bleu vif
+            insertbackground=COLORS['secondary']  # Curseur bleu vif
         )
         self.message_text.pack(fill="both", expand=True)
         self.message_text.insert("1.0", "")
         self.message_text.bind("<FocusIn>", self.clear_placeholder)
 
         # Instructions
-        instruction_card = tk.Frame(body, bg=COLORS['primary_light'], bd=0, highlightbackground=COLORS['border_light'], highlightthickness=1)
+        instruction_card = tk.Frame(body, bg=COLORS['primary_light'], bd=0, highlightbackground=COLORS['border_light'],
+                                    highlightthickness=1)
         instruction_card.pack(fill="x", pady=15)
 
         instruction_content = tk.Frame(instruction_card, bg=COLORS['primary_light'])
@@ -644,7 +655,6 @@ class SonnetteApp:
         self.canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-
     def create_prof_item_tous(self):
         """Crée l'item 'TOUS' avec un fond principal bleu"""
         item_frame = tk.Frame(
@@ -653,7 +663,7 @@ class SonnetteApp:
             cursor="hand2",
             bd=0,
             highlightbackground=COLORS['primary_dark'],
-            highlightthickness=2 # Bordure foncée pour l'effet spécial
+            highlightthickness=2  # Bordure foncée pour l'effet spécial
         )
         item_frame.pack(fill="x", padx=10, pady=8)
 
@@ -768,7 +778,8 @@ class SonnetteApp:
             old_widgets = self.prof_widgets[self.prof_selectionne]
             if old_widgets.get('is_tous'):
                 # Ramener à la couleur primaire normale
-                old_widgets['item_frame'].config(bg=COLORS['primary'], highlightbackground=COLORS['primary_dark'], highlightthickness=2)
+                old_widgets['item_frame'].config(bg=COLORS['primary'], highlightbackground=COLORS['primary_dark'],
+                                                 highlightthickness=2)
                 for widget in old_widgets['item_frame'].winfo_children():
                     if isinstance(widget, tk.Frame):
                         widget.config(bg=COLORS['primary'])
@@ -799,7 +810,7 @@ class SonnetteApp:
         if nom == "TOUS":
             self.selection_label.config(
                 text=f"📢 Envoi à tous les professeurs ({len(self.professeurs)})",
-                fg=COLORS['primary'] # Couleur modifiée
+                fg=COLORS['primary']  # Couleur modifiée
             )
         else:
             self.selection_label.config(
@@ -809,7 +820,8 @@ class SonnetteApp:
 
         widgets = self.prof_widgets[nom]
         if widgets.get('is_tous'):
-            widgets['item_frame'].config(bg=COLORS['primary_dark'], highlightbackground=COLORS['primary'], highlightthickness=2)
+            widgets['item_frame'].config(bg=COLORS['primary_dark'], highlightbackground=COLORS['primary'],
+                                         highlightthickness=2)
             for widget in widgets['item_frame'].winfo_children():
                 if isinstance(widget, tk.Frame):
                     widget.config(bg=COLORS['primary_dark'])
@@ -834,7 +846,6 @@ class SonnetteApp:
                         if child.winfo_class() == 'Label':
                             child.config(bg=COLORS['primary_light'])
 
-
         self.scroll_vers_selection(nom)
         print(f"[SÉLECTION] {nom}")
 
@@ -858,7 +869,7 @@ class SonnetteApp:
             scroll_region = self.canvas.bbox("all")
             if scroll_region:
                 total_height = scroll_region[3]
-                position = (item_y + item_height/2 - canvas_height/2) / total_height
+                position = (item_y + item_height / 2 - canvas_height / 2) / total_height
                 position = max(0.0, min(1.0, position))
                 self.canvas.yview_moveto(position)
         except Exception as e:
@@ -870,12 +881,11 @@ class SonnetteApp:
             couleur = COLORS['text_dark']
         self.notif_label.config(text=message, fg=couleur)
         self.root.after(duree, lambda: self.notif_label.config(text=""))
-        
+
     def afficher_alerte_integrée(self, message, couleur=COLORS['danger'], duree=5000):
         """Affiche une alerte intégrée dans le header"""
         self.alert_label.config(text=f"🚨 {message}", fg=couleur)
         self.root.after(duree, lambda: self.alert_label.config(text=""))
-
 
     def clear_placeholder(self, event):
         """Efface le placeholder au focus"""
@@ -892,19 +902,19 @@ class SonnetteApp:
     def verifier_connexions_serial(self):
         """Vérifie l'état de l'Arduino et de l'ESP"""
         global arduino, esp
-        
+
         # --- Vérification Arduino ---
         arduino_etat_precedent = self.arduino_connecte
         try:
             # Tente d'écrire/lire une petite commande si le port est ouvert, sinon tente de se reconnecter
             if arduino and arduino.is_open:
-                 self.arduino_connecte = True
+                self.arduino_connecte = True
             else:
-                self.connecter_serial() # Tente de rétablir la connexion
-                
+                self.connecter_serial()  # Tente de rétablir la connexion
+
         except Exception as e:
             self.arduino_connecte = False
-            
+
         # Mise à jour de l'UI Arduino
         if self.arduino_connecte:
             self.arduino_status_indicator.config(fg=COLORS['online'])
@@ -916,14 +926,14 @@ class SonnetteApp:
             if arduino_etat_precedent and not self.alerte_arduino_affiche:
                 self.afficher_alerte_integrée("Connexion Arduino PERDUE. Redémarrage requis.", COLORS['danger'], 10000)
                 self.alerte_arduino_affiche = True
-                
+
         # --- Vérification ESP ---
         esp_etat_precedent = self.esp_connecte
         try:
             if esp and esp.is_open:
                 self.esp_connecte = True
             else:
-                self.connecter_serial() # Tente de rétablir la connexion
+                self.connecter_serial()  # Tente de rétablir la connexion
         except Exception as e:
             self.esp_connecte = False
 
@@ -936,14 +946,15 @@ class SonnetteApp:
             self.esp_status_indicator.config(fg=COLORS['offline'])
             self.esp_status_label.config(text="Déconnecté")
             if esp_etat_precedent and not self.alerte_esp_affiche:
-                self.afficher_alerte_integrée("Connexion ESP PERDUE. Redémarrage ou vérification du port.", COLORS['danger'], 10000)
+                self.afficher_alerte_integrée("Connexion ESP PERDUE. Redémarrage ou vérification du port.",
+                                              COLORS['danger'], 10000)
                 self.alerte_esp_affiche = True
 
     def verifier_mqtt(self):
         """Vérifie et met à jour le status MQTT et appelle la vérification série"""
-        
+
         self.verifier_connexions_serial()
-        
+
         # --- Vérification MQTT ---
         mqtt_etat_precedent = self.mqtt_connecte
         try:
@@ -958,7 +969,8 @@ class SonnetteApp:
                 self.mqtt_status_label.config(text="Déconnecté")
                 # Afficher une alerte seulement si l'état vient de changer
                 if mqtt_etat_precedent and not self.alerte_mqtt_affiche:
-                    self.afficher_alerte_integrée("Connexion MQTT PERDUE. Tentative de reconnexion...", COLORS['danger'], 10000)
+                    self.afficher_alerte_integrée("Connexion MQTT PERDUE. Tentative de reconnexion...",
+                                                  COLORS['danger'], 10000)
                     self.alerte_mqtt_affiche = True
 
         except Exception as e:
@@ -966,9 +978,9 @@ class SonnetteApp:
             self.mqtt_status_indicator.config(fg=COLORS['danger'])
             self.mqtt_status_label.config(text="Erreur")
             if mqtt_etat_precedent and not self.alerte_mqtt_affiche:
-                self.afficher_alerte_integrée("Erreur critique MQTT. Vérifiez la configuration.", COLORS['danger'], 10000)
+                self.afficher_alerte_integrée("Erreur critique MQTT. Vérifiez la configuration.", COLORS['danger'],
+                                              10000)
                 self.alerte_mqtt_affiche = True
-
 
         self.root.after(2000, self.verifier_mqtt)
 
@@ -976,14 +988,14 @@ class SonnetteApp:
         """S'abonner aux topics MQTT"""
         if not self.mqtt_connecte:
             print("[MQTT] Abonnement reporté: Client non connecté.")
-            self.root.after(5000, self.subscribe_topics) # Réessayer plus tard
+            self.root.after(5000, self.subscribe_topics)  # Réessayer plus tard
             return
-            
+
         topics = [
             (f"fisheye/{self.client_id}/bell/activate", 1),
             (f"fisheye/{self.client_id}/buzz/activate", 1),
             (f"fisheye/{self.client_id}/display/update", 1),
-            #("fisheye/broadcast/#", 0),
+            # ("fisheye/broadcast/#", 0),
             (f"fisheye/{self.client_id}/data/teachers", 1),
             (f"fisheye/{self.client_id}/cmd/ring", 1)
         ]
@@ -1029,14 +1041,14 @@ class SonnetteApp:
             elif "data/teachers" in topic:
                 profs = {}
                 for teacher in payload["teachers"]:
-                    profs[teacher["name"]] = {"disponible" : teacher["isPresent"], "id" : teacher["id"]}
+                    profs[teacher["name"]] = {"disponible": teacher["isPresent"], "id": teacher["id"]}
                 self.professeurs = profs
                 self.prof_noms = ["TOUS"] + list(self.professeurs.keys())
                 self.recharger_professeurs()
 
             elif "cmd/ring" in topic:
                 self.send_esp('turn_on')
-                publish_mqtt(self.mqtt_client, f"fisheye/{self.client_id}/event/ack_ring", {"success" : True}, qos=1)
+                publish_mqtt(self.mqtt_client, f"fisheye/{self.client_id}/event/ack_ring", {"success": True}, qos=1)
 
         except json.JSONDecodeError:
             print(f"[MQTT] Message non-JSON reçu: {msg.payload.decode()}")
@@ -1048,10 +1060,9 @@ class SonnetteApp:
         if not self.mqtt_connecte:
             self.afficher_alerte_integrée("❌ Impossible d'envoyer: MQTT déconnecté.", COLORS['danger'], 3000)
             return
-            
-        topic = f"fisheye/{self.client_id}/event/button"
-        payload = ( {"targetTeacherId": self.teacher_id} if self.teacher_id else {})
 
+        topic = f"fisheye/{self.client_id}/event/button"
+        payload = ({"targetTeacherId": self.teacher_id} if self.teacher_id else {})
 
         def send_unpressed():
             time.sleep(3)
@@ -1105,7 +1116,8 @@ class SonnetteApp:
                     try:
                         # On s'attend à 4 valeurs (X, Y, Bouton Joystick, Bouton Sonnette)
                         x, y, bouton_joystick, bouton_sonnette = ligne.split(',')
-                        x, y, bouton_joystick, bouton_sonnette = int(x), int(y), int(bouton_joystick), int(bouton_sonnette)
+                        x, y, bouton_joystick, bouton_sonnette = int(x), int(y), int(bouton_joystick), int(
+                            bouton_sonnette)
                     except ValueError:
                         # print(f"[ERREUR JOYSTICK] Format de données incorrect: {ligne}. Assurez-vous d'envoyer 'X,Y,BoutonJoystick,BoutonSonnette'.")
                         time.sleep(0.1)
@@ -1123,19 +1135,17 @@ class SonnetteApp:
                     # bouton joystick
                     if bouton_joystick:
                         self.root.after(0, self.envoyer_au_prof)
-                        time.sleep(0.5) # Anti-rebond
+                        time.sleep(0.5)  # Anti-rebond
 
                     # bouton sonette
                     if bouton_sonnette:
-
                         self.root.after(0, self.publier_button_pressed)
-                        self.root.after(0, lambda : self.send_esp('turn_on'))
+                        self.root.after(0, lambda: self.send_esp('turn_on'))
 
                         # Notification UI
                         self.root.after(0, lambda: self.afficher_notification(f"Ca sonne !", 2000, COLORS['accent']))
 
-
-                        time.sleep(0.5) # Anti-rebond
+                        time.sleep(0.5)  # Anti-rebond
 
                 time.sleep(0.01)
             except serial.SerialException as e:
@@ -1143,7 +1153,7 @@ class SonnetteApp:
                 print(f"[ERREUR JOYSTICK SÉRIE] Connexion perdue: {e}")
                 self.arduino_connecte = False
                 self.root.after(0, lambda: self.verifier_connexions_serial())
-                time.sleep(5) # Attendre avant de réessayer
+                time.sleep(5)  # Attendre avant de réessayer
                 # Si on n'arrive pas à se reconnecter, le thread va juste tourner et le statut sera mis à jour par verifier_connexions_serial
             except Exception as e:
                 print(f"[ERREUR JOYSTICK GRAVE] {e}")
@@ -1161,9 +1171,9 @@ class SonnetteApp:
 
     def envoyer_au_prof(self):
         """Envoie le message au professeur sélectionné via MQTT"""
-        
+
         message = self.message_text.get("1.0", "end-1c").strip()
-        
+
         if not self.mqtt_connecte:
             self.afficher_alerte_integrée("❌ Envoi impossible: MQTT déconnecté.", COLORS['danger'], 3000)
             return
@@ -1189,15 +1199,15 @@ class SonnetteApp:
         payload = {"text": message}
 
         if self.prof_selectionne == "TOUS":
-            #payload["to"] = "all"
-            #payload["recipients"] = list(self.professeurs.keys())
+            # payload["to"] = "all"
+            # payload["recipients"] = list(self.professeurs.keys())
             notif_text = f"✓ Message envoyé à TOUS les professeurs"
         else:
             payload["targetTeacherId"] = self.professeurs[self.prof_selectionne].get("id")
             notif_text = f"✓ Message envoyé à {self.prof_selectionne}"
 
             teacher_id = self.professeurs[self.prof_selectionne].get("id")
-            #if teacher_id:
+            # if teacher_id:
             #   self.publier_button_pressed(teacher_id)
 
         # Publier le message
@@ -1249,7 +1259,7 @@ class SonnetteApp:
                         cmd, *arg = ligne.split(' ')
 
                     except ValueError:
-                        #print(f"[ERREUR ESP] Format de données incorrect: {ligne}")
+                        # print(f"[ERREUR ESP] Format de données incorrect: {ligne}")
                         time.sleep(0.1)
                         continue
 
@@ -1259,7 +1269,7 @@ class SonnetteApp:
                     if cmd == 'DOOR':
                         if arg[0] == 'OPEN':
                             publish_mqtt(self.mqtt_client, f"fisheye/{self.client_id}/event/door", "OPEN", 0)
-                        #if arg == 'CLOSE':
+                        # if arg == 'CLOSE':
                         #   publish_mqtt(self.mqtt_client, f"fisheye/{self.client_id}/event/door", "CLOSE", 0)
 
                     if cmd == 'ACK':
@@ -1274,7 +1284,6 @@ class SonnetteApp:
             except Exception as e:
                 print(f"[ERREUR ESP GRAVE] {e}")
                 time.sleep(1)
-
 
     def mettre_a_jour_disponibilite(self, nom, disponible):
         """Met à jour la disponibilité d'un professeur"""
