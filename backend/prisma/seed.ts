@@ -74,8 +74,8 @@ async function main() {
   const usersData = [
     // Admins
     {
-      username: "admin",
-      email: "admin@ephec.be",
+      username: "simon_fontaine",
+      email: "simon.fontaine@ephec.be",
       name: "Simon Fontaine",
       role: "ADMIN" as const,
       passwordHash: adminPasswordHash,
@@ -84,7 +84,7 @@ async function main() {
     },
     {
       username: "casey_morgan",
-      email: "casey_morgan@ephec.be",
+      email: "casey.morgan@ephec.be",
       name: "Casey Morgan",
       role: "ADMIN" as const,
       passwordHash: defaultPasswordHash,
@@ -92,21 +92,21 @@ async function main() {
     // Normal Users
     {
       username: "john_doe",
-      email: "john_doe@ephec.be",
+      email: "john.doe@ephec.be",
       name: "John Doe",
       role: "USER" as const,
       passwordHash: defaultPasswordHash,
     },
     {
       username: "jane_doe",
-      email: "jane_doe@ephec.be",
+      email: "jane.doe@ephec.be",
       name: "Jane Doe",
       role: "USER" as const,
       passwordHash: defaultPasswordHash,
     },
     {
       username: "alex_smith",
-      email: "alex_smith@ephec.be",
+      email: "alex.smith@ephec.be",
       name: "Alex Smith",
       role: "USER" as const,
       passwordHash: defaultPasswordHash,
