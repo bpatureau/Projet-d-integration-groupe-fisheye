@@ -31,7 +31,7 @@ CREATE TABLE "teachers" (
     "teams_email" VARCHAR(255),
     "preferences" JSONB NOT NULL DEFAULT '{"notifyOnTeams": true, "buzzerEnabled": true}',
     "role" "Role" NOT NULL DEFAULT 'USER',
-    "manual_status" JSONB,
+    "manual_schedule" JSONB,
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 

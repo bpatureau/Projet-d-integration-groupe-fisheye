@@ -30,11 +30,6 @@ export const updatePreferencesSchema = z.object({
   buzzerEnabled: z.boolean().optional(),
 });
 
-export const setManualStatusSchema = z.object({
-  status: z.enum(["present", "absent", "dnd"]),
-  until: z.string().datetime().optional(),
-});
-
 // ========================================
 // SCHÉMAS DE LIEU
 // ========================================

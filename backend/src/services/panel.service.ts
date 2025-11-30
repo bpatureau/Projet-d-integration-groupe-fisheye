@@ -150,10 +150,6 @@ class PanelService {
       Array(config.timeBlocks.length).fill(false),
     );
 
-    if (!teacher.gmailEmail) {
-      return grid;
-    }
-
     const now = new Date();
 
     // Calcul du Lundi de la semaine courante
@@ -162,6 +158,41 @@ class PanelService {
     const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1); // Ajuste au Lundi
     startOfWeek.setDate(diff);
     startOfWeek.setHours(0, 0, 0, 0);
+
+    // Si un emploi du temps manuel est défini, on l'utilise s'il est valide pour cette semaine
+    if (teacher.manualSchedule) {
+      const scheduleData = teacher.manualSchedule as {
+        weekStart?: string;
+        data?: boolean[][];
+      };
+
+      if (scheduleData.weekStart && Array.isArray(scheduleData.data)) {
+        const manualWeekStart = new Date(scheduleData.weekStart);
+        // On compare les dates (ignorer l'heure si besoin, mais setHours(0,0,0,0) aide)
+        if (manualWeekStart.toDateString() === startOfWeek.toDateString()) {
+          const manualSchedule = scheduleData.data;
+          // Validation basique des dimensions
+          if (
+            manualSchedule.length === config.days &&
+            manualSchedule[0].length === config.timeBlocks.length
+          ) {
+            return manualSchedule;
+          }
+          logger.warn(
+            "Invalid manual schedule dimensions, falling back to calendar",
+            {
+              teacherId: teacher.id,
+            },
+          );
+        }
+      }
+    }
+
+    if (!teacher.gmailEmail) {
+      return grid;
+    }
+
+    // (Variables now, startOfWeek, day, diff déjà calculées plus haut)
 
     const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(startOfWeek.getDate() + 5); // Vendredi soir inclus

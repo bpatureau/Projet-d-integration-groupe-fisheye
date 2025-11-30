@@ -42,26 +42,3 @@ export const updatePreferences = asyncHandler(
     res.json({ teacher });
   },
 );
-
-export const setManualStatus = asyncHandler(
-  async (req: AuthRequest, res: Response) => {
-    if (!req.teacher?.id) {
-      throw new Error("Teacher ID is required");
-    }
-    const teacher = await teacherService.setManualStatus(
-      req.teacher.id,
-      req.body,
-    );
-    res.json({ teacher });
-  },
-);
-
-export const clearManualStatus = asyncHandler(
-  async (req: AuthRequest, res: Response) => {
-    if (!req.teacher?.id) {
-      throw new Error("Teacher ID is required");
-    }
-    const teacher = await teacherService.clearManualStatus(req.teacher.id);
-    res.json({ teacher });
-  },
-);

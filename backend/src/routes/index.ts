@@ -53,12 +53,6 @@ router.put(
   validateBody(schemas.updatePreferencesSchema),
   profileController.updatePreferences,
 );
-router.put(
-  "/profile/status",
-  validateBody(schemas.setManualStatusSchema),
-  profileController.setManualStatus,
-);
-router.delete("/profile/status", profileController.clearManualStatus);
 
 router.post(
   "/locations",

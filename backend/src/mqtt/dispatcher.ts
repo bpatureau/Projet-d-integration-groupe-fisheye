@@ -34,22 +34,22 @@ class MQTTDispatcher {
         await this.handleDoorOpened(topic, payload);
       } else if (matchesTopic(topic, MQTT_TOPICS_INBOUND.EVENT_MESSAGE)) {
         await this.handleMessageSend(topic, payload);
-      } else if (matchesTopic(topic, MQTT_TOPICS_INBOUND.EVENT_SELECT)) {
-        await this.handleTeacherSelected(topic, payload);
       } else if (matchesTopic(topic, MQTT_TOPICS_INBOUND.STATE_STATUS)) {
         await this.handleStatus(topic, payload);
       } else if (
         matchesTopic(topic, MQTT_TOPICS_INBOUND.EVENT_REQUEST_TEACHERS)
       ) {
         await this.handleTeachersRequest(topic, payload);
-      } else if (matchesTopic(topic, MQTT_TOPICS_INBOUND.EVENT_PRESENCE)) {
-        await this.handlePresenceUpdate(topic, payload);
       } else if (matchesTopic(topic, MQTT_TOPICS_INBOUND.ACK_RING)) {
         await this.handleBellActivateAck(topic, payload);
       } else if (matchesTopic(topic, MQTT_TOPICS_INBOUND.ACK_BUZZ)) {
         await this.handleBuzzActivateAck(topic, payload);
       } else if (matchesTopic(topic, MQTT_TOPICS_INBOUND.ACK_DISPLAY)) {
         await this.handleDisplayUpdateAck(topic, payload);
+      } else if (
+        matchesTopic(topic, MQTT_TOPICS_INBOUND.EVENT_SCHEDULE_UPDATE)
+      ) {
+        await this.handleScheduleUpdate(topic, payload);
       }
     } catch (error) {
       logger.error("Error routing MQTT message", { topic, error });
@@ -137,35 +137,6 @@ class MQTTDispatcher {
   }
 
   /**
-   * Gère la sélection d'enseignant sur le panneau LED
-   */
-  private async handleTeacherSelected(
-    topic: string,
-    payload: Buffer,
-  ): Promise<void> {
-    const mqttClientId = extractClientIdFromTopic(topic);
-    if (!mqttClientId) {
-      logger.warn("Invalid topic format for teacher selected", { topic });
-      return;
-    }
-
-    let teacherId: string;
-    try {
-      const data: MQTTPayloads.TeacherSelected = JSON.parse(payload.toString());
-      teacherId = data.teacherId;
-    } catch {
-      logger.warn("Invalid teacher selected payload", {
-        mqttClientId,
-        payload: payload.toString(),
-      });
-      return;
-    }
-
-    const panel = await panelService.findByMqttClientId(mqttClientId);
-    await deviceActionService.handleTeacherSelected(panel.id, teacherId);
-  }
-
-  /**
    * Gère le status d'un appareil (Heartbeat ou LWT)
    * Topic: fisheye/{clientId}/status
    * Payload: { online: boolean, ... }
@@ -204,6 +175,9 @@ class MQTTDispatcher {
       const doorbell = await doorbellService.findByMqttClientId(mqttClientId);
       await deviceActionService.handleStatus("doorbell", doorbell, isOnline);
       this.deviceTypeCache.set(mqttClientId, "doorbell");
+      if (isOnline) {
+        await deviceActionService.refreshLocationDevices(doorbell.locationId);
+      }
       return;
     } catch {}
 
@@ -211,6 +185,9 @@ class MQTTDispatcher {
       const panel = await panelService.findByMqttClientId(mqttClientId);
       await deviceActionService.handleStatus("panel", panel, isOnline);
       this.deviceTypeCache.set(mqttClientId, "panel");
+      if (isOnline) {
+        await deviceActionService.refreshLocationDevices(panel.locationId);
+      }
       return;
     } catch {}
 
@@ -294,45 +271,6 @@ class MQTTDispatcher {
   }
 
   /**
-   * Gère la mise à jour de présence d'un enseignant par un panel
-   */
-  private async handlePresenceUpdate(
-    topic: string,
-    payload: Buffer,
-  ): Promise<void> {
-    const mqttClientId = extractClientIdFromTopic(topic);
-    if (!mqttClientId) {
-      logger.warn("Invalid topic format for presence update", { topic });
-      return;
-    }
-
-    let teacherId: string;
-    let status: "present" | "absent" | "dnd";
-    let until: string | undefined;
-
-    try {
-      const data: MQTTPayloads.PresenceUpdate = JSON.parse(payload.toString());
-      teacherId = data.teacherId;
-      status = data.status;
-      until = data.until;
-    } catch {
-      logger.warn("Invalid presence update payload", {
-        mqttClientId,
-        payload: payload.toString(),
-      });
-      return;
-    }
-
-    const panel = await panelService.findByMqttClientId(mqttClientId);
-    await deviceActionService.handlePresenceUpdate(
-      panel.id,
-      teacherId,
-      status,
-      until,
-    );
-  }
-
-  /**
    * Gère la confirmation d'activation de la sonnette
    */
   private async handleBellActivateAck(
@@ -386,6 +324,42 @@ class MQTTDispatcher {
         payload: payload.toString(),
       });
     }
+  }
+
+  /**
+   * Gère la mise à jour de l'emploi du temps d'un enseignant par un panel
+   */
+  private async handleScheduleUpdate(
+    topic: string,
+    payload: Buffer,
+  ): Promise<void> {
+    const mqttClientId = extractClientIdFromTopic(topic);
+    if (!mqttClientId) {
+      logger.warn("Invalid topic format for schedule update", { topic });
+      return;
+    }
+
+    let teacherId: string;
+    let schedule: boolean[][];
+
+    try {
+      const data: MQTTPayloads.ScheduleUpdate = JSON.parse(payload.toString());
+      teacherId = data.teacherId;
+      schedule = data.schedule;
+    } catch {
+      logger.warn("Invalid schedule update payload", {
+        mqttClientId,
+        payload: payload.toString(),
+      });
+      return;
+    }
+
+    const panel = await panelService.findByMqttClientId(mqttClientId);
+    await deviceActionService.handleScheduleUpdate(
+      panel.id,
+      teacherId,
+      schedule,
+    );
   }
 
   /**

@@ -131,48 +131,6 @@ class DeviceActionService {
   }
 
   /**
-   * Gère la sélection d'un enseignant sur le panneau LED (affiche son emploi du temps)
-   * Flux 3: Affichage LED Panel
-   */
-  async handleTeacherSelected(
-    panelId: string,
-    teacherId: string,
-  ): Promise<void> {
-    const panel = await prismaService.client.ledPanel.findUnique({
-      where: { id: panelId },
-      include: { location: true },
-    });
-
-    if (!panel) {
-      throw new NotFoundError("LED Panel not found");
-    }
-
-    const teacher = await prismaService.client.teacher.findUnique({
-      where: { id: teacherId },
-    });
-
-    if (!teacher) {
-      throw new NotFoundError("Teacher not found");
-    }
-
-    await panelService.updateSelectedTeacher(panel.id, teacher.id);
-
-    const weekSchedule = await panelService.generateWeekScheduleGrid(teacher);
-
-    await notificationService.publishPanelDisplay(panel.mqttClientId, {
-      teacherName: teacher.name,
-      teacherId: teacher.id,
-      weekSchedule,
-    });
-
-    logger.info("Teacher selected on LED panel", {
-      panelId: panel.id,
-      teacherId: teacher.id,
-      teacherName: teacher.name,
-    });
-  }
-
-  /**
    * Gère la création d'un message depuis la sonnette
    * Le message peut être lié à une visite récente ou être autonome
    */
@@ -252,49 +210,32 @@ class DeviceActionService {
     }
 
     // Pour chaque enseignant, trouve les panneaux qui l'affichent et les met à jour
+    // Maintenant, on doit rafraîchir tous les appareils du local où se trouve l'enseignant
+    // car la liste des profs contient l'emploi du temps.
+    // Mais attention, un prof peut être dans plusieurs locaux.
+    // Simplification: on rafraîchit les locaux associés à ces profs.
+
+    const locationIdsToRefresh = new Set<string>();
+
     for (const teacher of teachers) {
-      const panels = await prismaService.client.ledPanel.findMany({
-        where: {
-          selectedTeacherId: teacher.id,
-          isOnline: true, // Only update online panels
-        },
+      const teacherLocations =
+        await prismaService.client.teacherLocation.findMany({
+          where: { teacherId: teacher.id },
+          select: { locationId: true },
+        });
+
+      teacherLocations.forEach((tl) => {
+        locationIdsToRefresh.add(tl.locationId);
       });
+    }
 
-      if (panels.length === 0) {
-        continue;
-      }
+    logger.info("Refreshing locations for schedule updates", {
+      locationCount: locationIdsToRefresh.size,
+      locations: Array.from(locationIdsToRefresh),
+    });
 
-      logger.info("Updating panels for teacher", {
-        teacherId: teacher.id,
-        teacherName: teacher.name,
-        panelCount: panels.length,
-      });
-
-      // Génère la grille d'emploi du temps
-      const weekSchedule = await panelService.generateWeekScheduleGrid(teacher);
-
-      // Envoie la mise à jour à chaque panneau
-      for (const panel of panels) {
-        try {
-          await notificationService.publishPanelDisplay(panel.mqttClientId, {
-            teacherName: teacher.name,
-            teacherId: teacher.id,
-            weekSchedule,
-          });
-
-          logger.info("Panel updated with new schedule", {
-            panelId: panel.id,
-            teacherId: teacher.id,
-            teacherName: teacher.name,
-          });
-        } catch (error) {
-          logger.error("Failed to update panel", {
-            panelId: panel.id,
-            teacherId: teacher.id,
-            error,
-          });
-        }
-      }
+    for (const locationId of locationIdsToRefresh) {
+      await this.refreshLocationDevices(locationId);
     }
   }
 
@@ -363,14 +304,12 @@ class DeviceActionService {
   }
 
   /**
-   * Gère la mise à jour de présence d'un enseignant depuis un panel
-   * Met à jour le statut manuel de présence et diffuse le changement
+   * Gère la mise à jour de l'emploi du temps d'un enseignant depuis un panel
    */
-  async handlePresenceUpdate(
+  async handleScheduleUpdate(
     panelId: string,
     teacherId: string,
-    status: "present" | "absent" | "dnd",
-    until?: string,
+    schedule: boolean[][],
   ): Promise<void> {
     const panel = await prismaService.client.ledPanel.findUnique({
       where: { id: panelId },
@@ -388,28 +327,29 @@ class DeviceActionService {
       throw new NotFoundError("Teacher not found");
     }
 
-    // Met à jour le statut manuel de l'enseignant
-    const manualStatus: {
-      status: "present" | "absent" | "dnd";
-      until?: string;
-    } = {
-      status,
-      ...(until && { until }),
-    };
+    // Calcule le début de la semaine courante
+    const now = new Date();
+    const day = now.getDay(); // 0 = Dimanche, 1 = Lundi...
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Ajuste au Lundi
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(diff);
+    startOfWeek.setHours(0, 0, 0, 0);
 
+    // Met à jour l'emploi du temps manuel de l'enseignant avec le timestamp de la semaine
     await prismaService.client.teacher.update({
       where: { id: teacherId },
       data: {
-        manualStatus: manualStatus as Prisma.InputJsonValue,
+        manualSchedule: {
+          weekStart: startOfWeek.toISOString(),
+          data: schedule,
+        } as Prisma.InputJsonValue,
       },
     });
 
-    logger.info("Teacher presence updated from panel", {
+    logger.info("Teacher schedule updated from panel", {
       panelId,
       teacherId,
       teacherName: teacher.name,
-      status,
-      until,
     });
 
     // Rafraîchit tous les appareils du local avec la nouvelle liste
@@ -435,23 +375,22 @@ class DeviceActionService {
     const presentTeachers =
       await presenceService.getPresentTeachersInLocation(locationId);
 
-    // Crée la liste des enseignants avec leur statut de présence
-    return teachers.map((teacher) => {
-      const presenceInfo = presentTeachers.find((pt) => pt.id === teacher.id);
-      return {
-        id: teacher.id,
-        name: teacher.name,
-        email: teacher.email,
-        isPresent: presenceInfo?.isPresent || false,
-        presenceSource: presenceInfo?.presenceSource || "unavailable",
-        manualStatus: presenceInfo?.manualStatus
-          ? {
-              status: presenceInfo.manualStatus.status,
-              until: presenceInfo.manualStatus.until?.toISOString(),
-            }
-          : undefined,
-      };
-    });
+    // Crée la liste des enseignants avec leur statut de présence et emploi du temps
+    return Promise.all(
+      teachers.map(async (teacher) => {
+        const presenceInfo = presentTeachers.find((pt) => pt.id === teacher.id);
+        const schedule = await panelService.generateWeekScheduleGrid(teacher);
+
+        return {
+          id: teacher.id,
+          name: teacher.name,
+          email: teacher.email,
+          isPresent: presenceInfo?.isPresent || false,
+          presenceSource: presenceInfo?.presenceSource || "unavailable",
+          schedule,
+        };
+      }),
+    );
   }
 
   /**

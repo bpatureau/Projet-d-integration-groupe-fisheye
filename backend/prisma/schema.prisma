@@ -64,7 +64,7 @@ model Teacher {
   teamsEmail   String?  @map("teams_email") @db.VarChar(255)
   preferences  Json     @default("{\"notifyOnTeams\": true, \"buzzerEnabled\": true}") @db.JsonB
   role         Role     @default(USER)
-  manualStatus Json?    @map("manual_status") @db.JsonB
+  manualSchedule Json?    @map("manual_schedule") @db.JsonB
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 

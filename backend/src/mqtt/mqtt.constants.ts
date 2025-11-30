@@ -16,9 +16,8 @@ export const MQTT_TOPICS_INBOUND = {
   EVENT_BUTTON: "event/button",
   EVENT_DOOR: "event/door",
   EVENT_MESSAGE: "event/message",
-  EVENT_SELECT: "event/select",
-  EVENT_PRESENCE: "event/presence",
   EVENT_REQUEST_TEACHERS: "event/request_teachers",
+  EVENT_SCHEDULE_UPDATE: "event/schedule_update",
 
   // State
   STATE_STATUS: "status",
@@ -39,8 +38,8 @@ export const MQTT_TOPICS_OUTBOUND = {
   CMD_MISSED: "cmd/missed",
 
   // Data
+  // Data
   DATA_TEACHERS: "data/teachers",
-  DATA_SCHEDULE: "data/schedule",
 } as const;
 
 /**
@@ -63,9 +62,7 @@ export function getInboundTopics(clientId: string) {
     buttonPressed: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.EVENT_BUTTON}`,
     doorOpened: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.EVENT_DOOR}`,
     messageSend: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.EVENT_MESSAGE}`,
-    teacherSelected: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.EVENT_SELECT}`,
     teachersRequest: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.EVENT_REQUEST_TEACHERS}`,
-    presenceUpdate: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.EVENT_PRESENCE}`,
     status: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.STATE_STATUS}`,
     bellActivateAck: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.ACK_RING}`,
     buzzActivateAck: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_INBOUND.ACK_BUZZ}`,
@@ -81,7 +78,6 @@ export function getOutboundTopics(clientId: string) {
     bellActivate: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_OUTBOUND.CMD_RING}`,
     visitMissed: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_OUTBOUND.CMD_MISSED}`,
     buzzActivate: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_OUTBOUND.CMD_BUZZ}`,
-    displayUpdate: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_OUTBOUND.DATA_SCHEDULE}`,
     teachersList: `${MQTT_NAMESPACE}/${clientId}/${MQTT_TOPICS_OUTBOUND.DATA_TEACHERS}`,
   };
 }
@@ -137,17 +133,7 @@ export namespace MQTTPayloads {
     targetTeacherId?: string;
   }
 
-  export interface TeacherSelected {
-    teacherId: string;
-  }
-
   export type TeachersRequest = Record<string, never>;
-
-  export interface PresenceUpdate {
-    teacherId: string;
-    status: "present" | "absent" | "dnd";
-    until?: string;
-  }
 
   export interface DeviceStatus {
     online?: boolean;
@@ -176,22 +162,13 @@ export namespace MQTTPayloads {
     duration: number;
   }
 
-  export interface DisplayUpdate {
-    teacherName: string;
-    teacherId: string;
-    weekSchedule: boolean[][];
-  }
-
   export interface TeacherInfo {
     id: string;
     name: string;
     email: string;
     isPresent: boolean;
     presenceSource: string;
-    manualStatus?: {
-      status: "present" | "absent" | "dnd";
-      until?: string;
-    };
+    schedule: boolean[][];
   }
 
   export interface TeachersList {
@@ -204,5 +181,10 @@ export namespace MQTTPayloads {
     status: "present" | "absent" | "dnd";
     until?: string;
     source: "panel" | "api" | "calendar";
+  }
+
+  export interface ScheduleUpdate {
+    teacherId: string;
+    schedule: boolean[][];
   }
 }

@@ -1,4 +1,3 @@
-import { Prisma } from "../../prisma/generated/client";
 import deviceActionService from "../services/device-action.service";
 import logger from "../utils/logger";
 import prismaService from "../utils/prisma";
@@ -40,45 +39,8 @@ class PresenceUpdateScheduler {
       // Détecte les changements d'état (statuts expirés ou événements calendrier)
       const locationsToRefresh = new Set<string>();
 
-      // 1. Vérifie les statuts manuels expirés dans la dernière minute
+      // 1. Vérifie les événements calendrier (début ou fin dans la dernière minute)
       const oneMinuteAgo = new Date(now.getTime() - this.CHECK_INTERVAL_MS);
-
-      // Récupère les profs avec statut manuel (filtrage JSON fait en code)
-      const teachersWithStatus = await prismaService.client.teacher.findMany({
-        where: {
-          manualStatus: {
-            not: Prisma.DbNull,
-          },
-        },
-        include: {
-          locations: true,
-        },
-      });
-
-      for (const teacher of teachersWithStatus) {
-        const status = teacher.manualStatus as { until?: string | Date } | null;
-        if (status?.until) {
-          const until = new Date(status.until);
-          if (until >= oneMinuteAgo && until <= now) {
-            // Expiré récemment
-            logger.info("Teacher manual status expired", {
-              teacherId: teacher.id,
-              until,
-            });
-
-            // Ajoute les lieux à rafraîchir
-            const teacherLocations =
-              await prismaService.client.teacherLocation.findMany({
-                where: { teacherId: teacher.id },
-              });
-            for (const tl of teacherLocations) {
-              locationsToRefresh.add(tl.locationId);
-            }
-          }
-        }
-      }
-
-      // 2. Vérifie les événements calendrier (début ou fin dans la dernière minute)
       const changingSchedules = await prismaService.client.schedule.findMany({
         where: {
           OR: [

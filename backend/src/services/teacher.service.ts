@@ -1,5 +1,5 @@
 import { Prisma, Role, type Teacher } from "../../prisma/generated/client.js";
-import type { ManualStatus, TeacherPreferences } from "../types";
+import type { TeacherPreferences } from "../types";
 import { ConflictError, NotFoundError } from "../utils/errors";
 import logger from "../utils/logger";
 import { hashPassword } from "../utils/password";
@@ -102,6 +102,7 @@ class TeacherService {
       teamsEmail?: string;
       preferences?: TeacherPreferences;
       role?: Role;
+      manualSchedule?: boolean[][] | null;
     },
   ): Promise<Teacher> {
     await this.findById(id);
@@ -114,6 +115,9 @@ class TeacherService {
       teamsEmail?: string;
       preferences?: Prisma.InputJsonValue;
       role?: Role;
+      manualSchedule?:
+        | Prisma.InputJsonValue
+        | Prisma.NullableJsonNullValueInput;
     } = {
       username: data.username,
       email: data.email,
@@ -148,6 +152,25 @@ class TeacherService {
         }
       }
       updateData.role = data.role;
+    }
+
+    if (data.manualSchedule !== undefined) {
+      if (data.manualSchedule === null) {
+        updateData.manualSchedule = Prisma.DbNull;
+      } else {
+        // On associe l'emploi du temps à la semaine courante
+        const now = new Date();
+        const day = now.getDay(); // 0 = Dimanche, 1 = Lundi...
+        const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Ajuste au Lundi
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(diff);
+        startOfWeek.setHours(0, 0, 0, 0);
+
+        updateData.manualSchedule = {
+          weekStart: startOfWeek.toISOString(),
+          data: data.manualSchedule,
+        } as Prisma.InputJsonValue;
+      }
     }
 
     const teacher = await prismaService.client.teacher.update({
@@ -216,77 +239,6 @@ class TeacherService {
 
     logger.info("Teacher preferences updated", { teacherId: id });
     return updated;
-  }
-
-  /**
-   * Définit un statut de présence manuel pour un enseignant
-   */
-  async setManualStatus(id: string, status: ManualStatus): Promise<Teacher> {
-    await this.findById(id);
-
-    const teacher = await prismaService.client.teacher.update({
-      where: { id },
-      data: { manualStatus: status as unknown as Prisma.InputJsonValue },
-    });
-
-    logger.info("Teacher manual status set", {
-      teacherId: id,
-      status: status.status,
-    });
-
-    // Récupère les lieux associés à l'enseignant
-    const locations = await this.getLocations(id);
-
-    // Rafraîchit les appareils de chaque lieu
-    for (const location of locations) {
-      await deviceActionService
-        .refreshLocationDevices(location.id)
-        .catch((error) => {
-          logger.error(
-            "Failed to refresh location devices after status change",
-            {
-              locationId: location.id,
-              error,
-            },
-          );
-        });
-    }
-
-    return teacher;
-  }
-
-  /**
-   * Supprime le statut de présence manuel d'un enseignant
-   */
-  async clearManualStatus(id: string): Promise<Teacher> {
-    await this.findById(id);
-
-    const teacher = await prismaService.client.teacher.update({
-      where: { id },
-      data: { manualStatus: Prisma.DbNull },
-    });
-
-    logger.info("Teacher manual status cleared", { teacherId: id });
-
-    // Récupère les lieux associés à l'enseignant
-    const locations = await this.getLocations(id);
-
-    // Rafraîchit les appareils de chaque lieu
-    for (const location of locations) {
-      await deviceActionService
-        .refreshLocationDevices(location.id)
-        .catch((error) => {
-          logger.error(
-            "Failed to refresh location devices after status clear",
-            {
-              locationId: location.id,
-              error,
-            },
-          );
-        });
-    }
-
-    return teacher;
   }
 
   async delete(id: string): Promise<void> {

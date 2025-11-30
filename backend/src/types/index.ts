@@ -27,12 +27,6 @@ export interface TeacherPreferences {
   buzzerEnabled: boolean;
 }
 
-// Statut manuel du professeur
-export interface ManualStatus {
-  status: "present" | "absent" | "dnd";
-  until?: Date; // Optionnel: jusque quand le statut est valide
-}
-
 // Notification d'un professeur
 export interface NotifiedTeacher {
   teacherId: string;
@@ -93,7 +87,6 @@ export interface PresentTeacher {
   email: string;
   isPresent: boolean;
   presenceSource: "calendar" | "manual" | "unavailable";
-  manualStatus?: ManualStatus;
 }
 
 // Grille d'horaires pour LED Panel

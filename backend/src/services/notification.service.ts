@@ -457,20 +457,6 @@ class NotificationService {
   }
 
   /**
-   * Publie une mise à jour d'affichage vers un panneau LED via MQTT
-   * Utilise RETAINED pour que le panneau affiche l'info même après reconnexion
-   */
-  async publishPanelDisplay(
-    mqttClientId: string,
-    data: MQTTPayloads.DisplayUpdate,
-  ): Promise<void> {
-    const topic = getOutboundTopics(mqttClientId).displayUpdate;
-    // QoS 1 + Retained = true assure la dispo à la reconnexion et la fiabilité
-    await mqttService.publish(topic, data, { qos: 1, retained: true });
-    logger.info("Panel display published (retained)", { mqttClientId });
-  }
-
-  /**
    * Publie la liste des enseignants vers un panneau LED via MQTT
    * Utilise RETAINED pour que le panneau reçoive la liste à la connexion
    */

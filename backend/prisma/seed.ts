@@ -88,6 +88,8 @@ async function main() {
       name: "Casey Morgan",
       role: "ADMIN" as const,
       passwordHash: defaultPasswordHash,
+      gmailEmail: process.env.ADMIN_2_GMAIL,
+      teamsEmail: process.env.ADMIN_2_TEAMS_EMAIL,
     },
     // Normal Users
     {
@@ -167,6 +169,9 @@ async function main() {
   if (users.length > 0 && locations.length > 0) {
     await prisma.teacherLocation.create({
       data: { teacherId: users[0].id, locationId: locations[0].id },
+    });
+    await prisma.teacherLocation.create({
+      data: { teacherId: users[1].id, locationId: locations[0].id },
     });
     await prisma.teacherLocation.create({
       data: { teacherId: users[2].id, locationId: locations[1].id },
