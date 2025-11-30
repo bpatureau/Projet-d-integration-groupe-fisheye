@@ -5,7 +5,12 @@ import ssd1306
 import time
 from random import randint
 import neopixel
+import ujson
+
+from lib.umqtt import robust2
 import network
+import ntptime
+from secret import *
 
 # Connect to Wi-Fi (Replace with your SSID & password)
 wifi = network.WLAN(network.STA_IF)
@@ -14,23 +19,69 @@ wifi.connect(wifi_SSID, wifi_password)
 while not wifi.isconnected():
     time.sleep(1)
 
+print('Connection successful')
+print('Network Config:', wifi.ifconfig())
+
+time.sleep(2)
+
 # --- 1. Sync RTC to UTC via NTP ---
-ntptime.host = "pool.ntp.org"
-ntptime.settime()  # sets RTC to UTC
-time.sleep(1)  # give RTC a moment to update
+#ntptime.host = "pool.ntp.org"
+#ntptime.settime()  # sets RTC to UTC
+#time.sleep(1)  # give RTC a moment to update
+#
+#print('ntp success')
 
+FLAG_UPDATE = 0
 
-def fetch_data():
-    return [{"name": "xav", "data": []},
-            {"name": "de smet", "data": []},
-            {"name": "vds", "data": []},
-            {"name": "scalpel", "data": []}]
+CLIENT_ID = "panel_client_001"
 
+TOPIC_AVAILABILITY = f'fisheye/{CLIENT_ID}/status'
 
-def fill_random_data():
-    for i in prof_array:
-        i['data'] = [randint(0, 1) for x in range(20)]
+def update_schedule(msg):
+    global FLAG_UPDATE
+    if FLAG_UPDATE == 0:
+        print(f"Received: {msg}")
+        FLAG_UPDATE = 1
+        global index
+        data = ujson.loads(msg)["teachers"]
 
+        prof_array.clear()
+
+        for teacher in data:
+
+            schedule = [
+                x
+                for xs in teacher["schedule"]
+                for x in xs
+            ]
+
+            prof_array.append({"name": teacher["name"], "id": teacher["id"], "schedule": schedule})
+        # print(prof_array)
+
+        display.fill_rect(0, 10, 128, 10, 0)
+        display.text(prof_array[index]['name'], 0, 10)
+        display.show()
+
+        update_strip()
+
+    else:
+        FLAG_UPDATE -= 1
+
+def mqtt_callback(topic, msg, retained, duplicate):
+    topic = topic.decode('utf-8')
+    msg = msg.decode('utf-8')
+    # print(f"Received: {topic} → {msg}")
+
+    if "/data/teachers" in topic:
+        update_schedule(msg)
+
+client = robust2.MQTTClient(CLIENT_ID, mqtt_server, port=mqtt_port, user=mqtt_user, password=mqtt_password)
+client.set_callback(mqtt_callback)
+client.connect()
+
+client.publish(TOPIC_AVAILABILITY, "online", retain=True)
+
+client.subscribe(f"fisheye/{CLIENT_ID}/data/teachers")
 
 def scroll_prof(direction='up'):
     global prof_array, index
@@ -48,6 +99,7 @@ def scroll_prof(direction='up'):
     display.text(prof_array[index]['name'], 0, 10)
     display.show()
 
+
     update_strip()
 
 
@@ -57,31 +109,40 @@ def update_strip():
     for x in range(20):
         y = x * 2
 
-        convert = {0: (255, 0, 0), 1: (0, 255, 0)}
-        # print(convert[data[i_index]['data'][x]])
-        np[y] = convert[prof_array[index]['data'][x]]
-        np[y + 1] = convert[prof_array[index]['data'][x]]
+        convert = {False: (255, 0, 0), True: (0, 255, 0)}
+        # print(convert[prof_array[index]['schedule'][x]])
+        np[y] = convert[prof_array[index]['schedule'][x]]
+        np[y + 1] = convert[prof_array[index]['schedule'][x]]
 
     np.write()
 
 
 def button_press(b_index):
+    global prof_array, index, FLAG_UPDATE
+
     if b_index is not None:
-        print('button press')
-        print(prof_array[index]['data'][b_index])
+        #print('button press')
+        # print(prof_array[index]['schedule'][b_index])
 
-        prof_array[index]['data'][b_index] = 1 if prof_array[index]['data'][b_index] == 0 else 0
+        prof_array[index]['schedule'][b_index] = True if not prof_array[index]['schedule'][b_index] else False
 
-        print(prof_array[index]['data'][b_index])
+        # print(prof_array[index]['schedule'][b_index])
+
+        temp = []
+
+        for x in range(5):
+            temp.append([prof_array[index]['schedule'][x], prof_array[index]['schedule'][x+5], prof_array[index]['schedule'][x+10], prof_array[index]['schedule'][x+15]])
+
+        FLAG_UPDATE += 1
+
+        client.publish(f"fisheye/{CLIENT_ID}/event/schedule_update", ujson.dumps({"schedule": temp, "teacherId": prof_array[index]['id']}))
+        # print("published: " + str(temp))
 
         update_strip()
 
 
-prof_array = fetch_data()
-fill_random_data()
+prof_array = []
 index = 0
-
-print(prof_array)
 
 i2c = I2C(sda=Pin(0), scl=Pin(1))
 display = ssd1306.SSD1306_I2C(128, 32, i2c)
@@ -107,6 +168,9 @@ while True:
 
     if pot.read_u16() > 20_000:
         scroll_prof()
-        time.sleep(0.5)
+        time.sleep(0.4)
     matrice.scan()
 
+    client.check_msg()
+
+    time.sleep(0.1)
