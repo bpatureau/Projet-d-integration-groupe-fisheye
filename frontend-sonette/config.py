@@ -64,18 +64,15 @@ def charger_config():
 
 
 def charger_professeurs(payload=None):
-    """Charge la liste des professeurs depuis professeurs.json"""
-    profs_defaut = {
-        "Mme Vroman": {"disponible": True, "id": str(uuid.uuid4())},
-        "M. Dubruille": {"disponible": False, "id": str(uuid.uuid4())},
-        "M. De Smet": {"disponible": True, "id": str(uuid.uuid4())},
-        "M. Van Dormael": {"disponible": True, "id": str(uuid.uuid4())}
-    }
-
+    """Charge la liste des professeurs depuis professeurs.json ou payload MQTT"""
+    # Ne jamais retourner de professeurs par défaut
+    # La liste sera remplie uniquement via MQTT
     if payload:
         print(payload)
-
-    return profs_defaut
+        # Traiter le payload si fourni
+        return payload
+    
+    return {}
 
 
 def sauvegarder_professeurs(professeurs):

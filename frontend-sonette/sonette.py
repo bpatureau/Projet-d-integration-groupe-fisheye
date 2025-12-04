@@ -36,7 +36,7 @@ def charger_config():
     config_defaut = {
         "serial_port_arduino": "COM4",
         "baudrate_arduino": 9600,
-        "serial_port_esp": "COM3", 
+        "serial_port_esp": "COM4", 
         "baudrate_esp": 115200,
         "timeout": 1,
         "joystick_threshold": 300,
