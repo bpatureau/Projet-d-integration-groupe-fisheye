@@ -1,3 +1,4 @@
+// frontend/src/lib/api.ts
 const API_URL = import.meta.env.VITE_API_URL || 'https://fisheye-doorbell.up.railway.app';
 
 interface Teacher {
@@ -20,6 +21,7 @@ export interface VisitEvent {
     status: VisitStatus;
     message?: string;
     teacherNames: string[];
+    targetTeacherName?: string;
 }
 
 export interface Location {
@@ -58,6 +60,35 @@ export interface Panel {
     location: Location;
     selectedTeacher: Teacher | null;
 }
+
+export interface Message {
+    id: string;
+    text: string;
+    senderInfo: string;
+    visitId: string | null;
+    targetTeacherId: string | null;
+    targetLocationId: string | null;
+    isRead: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface Schedule {
+    id: string;
+    calendarId: string;
+    eventId: string;
+    locationId: string;
+    teacherEmail: string;
+    summary: string;
+    description: string;
+    startTime: string;
+    endTime: string;
+    allDay: boolean;
+    lastSync: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
 export const api = {
     // ===== AUTH =====
     login: async (username: string, password: string): Promise<LoginResponse> => {
@@ -80,7 +111,7 @@ export const api = {
         const token = localStorage.getItem('auth_token');
         const res = await fetch(`${API_URL}/api/visits`, {
             headers: {
-                'Authorization': `Bearer ${token}`,
+                Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
             },
         });
@@ -92,8 +123,7 @@ export const api = {
 
         const response = await res.json();
 
-        // Gérer différents formats de réponse backend
-        let visits = [];
+        let visits: any[] = [];
         if (Array.isArray(response)) {
             visits = response;
         } else if (response.data && Array.isArray(response.data)) {
@@ -105,14 +135,46 @@ export const api = {
             throw new Error('Format de réponse invalide');
         }
 
-        return visits.map((v: any) => ({
-            id: v.id,
-            date: new Date(v.createdAt).toLocaleString('fr-FR'),
-            status: v.status as VisitStatus,
-            message: v.message || undefined,
-            teacherNames: v.location ? [v.location.name] : [],
-        }));
+        return visits.map((v: any) => {
+            const textMessage =
+                Array.isArray(v.messages) && v.messages.length > 0
+                    ? v.messages[0].text
+                    : undefined;
 
+            return {
+                id: v.id,
+                date: new Date(v.createdAt).toLocaleString('fr-FR'),
+                status: v.status as VisitStatus,
+                message: textMessage,
+                teacherNames: v.location ? [v.location.name] : [],
+                targetTeacherName: v.targetTeacher ? v.targetTeacher.name : undefined,
+            } as VisitEvent;
+        });
+    },
+
+    getMessages: async (): Promise<Message[]> => {
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`${API_URL}/api/messages`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(`HTTP ${res.status}: ${errorText}`);
+        }
+
+        const response = await res.json();
+        if (Array.isArray(response.messages)) {
+            return response.messages;
+        }
+        if (Array.isArray(response)) {
+            return response;
+        }
+        console.error('Format messages inattendu:', response);
+        return [];
     },
 
     deleteVisit: async (id: string): Promise<void> => {
@@ -138,24 +200,24 @@ export const api = {
 
     // ===== Devices ======
     getDoorbells: async (): Promise<Doorbell[]> => {
-    const token = localStorage.getItem('auth_token');
+        const token = localStorage.getItem('auth_token');
 
-    const res = await fetch(`${API_URL}/api/doorbells`, {
-        headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) {
-        throw new Error('Erreur lors de la récupération des sonnettes');
-    }
+        const res = await fetch(`${API_URL}/api/doorbells`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+            throw new Error('Erreur lors de la récupération des sonnettes');
+        }
 
-    const data = await res.json();
-    console.log(data.doorbells)
-    return data.doorbells;
+        const data = await res.json();
+        console.log(data.doorbells);
+        return data.doorbells;
     },
 
     getLocations: async (): Promise<Location[]> => {
         const token = localStorage.getItem('auth_token');
-        const response = await fetch(`${API_URL}/api/locations`, {  // Ajout de /api/
-            headers: { Authorization: `Bearer ${token}` },  // Ajout du token
+        const response = await fetch(`${API_URL}/api/locations`, {
+            headers: { Authorization: `Bearer ${token}` },
         });
         if (!response.ok) throw new Error('Erreur récupération emplacements');
         const data = await response.json();
@@ -170,13 +232,13 @@ export const api = {
         hasDoorSensor: boolean;
     }): Promise<Doorbell> => {
         const token = localStorage.getItem('auth_token');
-        const response = await fetch(`${API_URL}/api/doorbells`, {  // Ajout de /api/
+        const response = await fetch(`${API_URL}/api/doorbells`, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`  // Ajout du token
+                Authorization: `Bearer ${token}`,
             },
-            body: JSON.stringify(data)
+            body: JSON.stringify(data),
         });
         if (!response.ok) throw new Error('Erreur création sonnette');
         return response.json();
@@ -201,11 +263,11 @@ export const api = {
         const token = localStorage.getItem('auth_token');
         const response = await fetch(`${API_URL}/api/locations`, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`
+                Authorization: `Bearer ${token}`,
             },
-            body: JSON.stringify(data)
+            body: JSON.stringify(data),
         });
         if (!response.ok) throw new Error('Erreur création emplacement');
         const result = await response.json();
@@ -213,16 +275,16 @@ export const api = {
     },
 
     getPanels: async (): Promise<Panel[]> => {
-    const token = localStorage.getItem('auth_token');
-    const res = await fetch(`${API_URL}/api/panels`, {
-        headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) {
-        throw new Error('Erreur lors de la récupération des panels');
-    }
-    const data = await res.json();
-    console.log(data.panels);
-    return data.panels;
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`${API_URL}/api/panels`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+            throw new Error('Erreur lors de la récupération des panels');
+        }
+        const data = await res.json();
+        console.log(data.panels);
+        return data.panels;
     },
 
     createPanel: async (data: {
@@ -233,11 +295,11 @@ export const api = {
         const token = localStorage.getItem('auth_token');
         const response = await fetch(`${API_URL}/api/panels`, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`
+                Authorization: `Bearer ${token}`,
             },
-            body: JSON.stringify(data)
+            body: JSON.stringify(data),
         });
         if (!response.ok) throw new Error('Erreur création panel');
         return response.json();
@@ -251,7 +313,7 @@ export const api = {
         });
 
         if (!res.ok) throw new Error('Erreur lors de la suppression du panel');
-    }, 
+    },
 
     deleteLocation: async (id: string): Promise<void> => {
         const token = localStorage.getItem('auth_token');
@@ -260,8 +322,27 @@ export const api = {
             headers: { Authorization: `Bearer ${token}` },
         });
 
-        if (!res.ok) throw new Error('Erreur lors de la suppression de l\'emplacement');
-    }
+        if (!res.ok) throw new Error("Erreur lors de la suppression de l'emplacement");
+    },
+    getLocationSchedules: async (locationId: string): Promise<Schedule[]> => {
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`${API_URL}/api/schedules/location/${locationId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
 
-    
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(`HTTP ${res.status}: ${errorText}`);
+        }
+
+        const data = await res.json();
+        if (Array.isArray(data.schedules)) {
+            return data.schedules;
+        }
+        if (Array.isArray(data)) {
+            return data;
+        }
+        console.error('Format schedules inattendu:', data);
+        return [];
+    }
 };

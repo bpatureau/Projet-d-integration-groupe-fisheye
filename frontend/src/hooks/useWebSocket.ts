@@ -1,13 +1,12 @@
+// frontend/src/hooks/useWebSocket.ts
 import { useEffect, useState } from 'react';
-import type { VisitEvent } from '../lib/api';
+import type { VisitEvent, VisitStatus } from '../lib/api';
 
 export function useWebSocket(path: string) {
     const [events, setEvents] = useState<VisitEvent[]>([]);
 
     useEffect(() => {
         const API_URL = import.meta.env.VITE_API_URL || 'https://fisheye-doorbell.up.railway.app';
-
-        // Forcer wss:// pour HTTPS backend
         const wsUrl = API_URL.replace('https://', 'wss://') + path;
 
         const socket = new WebSocket(wsUrl);
@@ -19,12 +18,19 @@ export function useWebSocket(path: string) {
         socket.onmessage = (message) => {
             try {
                 const raw = JSON.parse(message.data);
+
+                const textMessage =
+                    Array.isArray(raw.messages) && raw.messages.length > 0
+                        ? raw.messages[0].text
+                        : undefined;
+
                 const event: VisitEvent = {
                     id: raw.id,
                     date: new Date(raw.createdAt).toLocaleString('fr-FR'),
-                    status: raw.status,
-                    message: raw.message,
+                    status: raw.status as VisitStatus,
+                    message: textMessage,
                     teacherNames: raw.location ? [raw.location.name] : [],
+                    targetTeacherName: raw.targetTeacher ? raw.targetTeacher.name : undefined,
                 };
                 setEvents(prev => [event, ...prev]);
             } catch (error) {

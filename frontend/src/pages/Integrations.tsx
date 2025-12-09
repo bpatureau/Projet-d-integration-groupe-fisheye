@@ -1,25 +1,15 @@
-import React, { useState } from 'react';
+// frontend/src/pages/Integrations.tsx
+import React, { useState, useEffect } from 'react';
 import {
     Container,
     Paper,
     Typography,
     Button,
     Box,
-    TextField,
     CircularProgress,
     Stack
 } from '@mui/material';
-import { api } from '../lib/api';
-
-interface CalendarEvent {
-    id: string;
-    title: string;
-    start: string;
-    end: string;
-    provider: string;
-}
-
-type EventsByDay = Record<string, CalendarEvent[]>;
+import { api, type Schedule } from '../lib/api';
 
 function getMondayOfWeek(date: Date): Date {
     const d = new Date(date);
@@ -43,57 +33,36 @@ function getWorkWeekDates(monday: Date): string[] {
     return dates;
 }
 
-function groupEventsByDay(events: CalendarEvent[]): EventsByDay {
-    return events.reduce((acc, ev) => {
-        const day = ev.start.split(' ')[0];
-        (acc[day] = acc[day] || []).push(ev);
-        return acc;
-    }, {} as EventsByDay);
-}
-
-function timeToDecimal(timeStr: string): number {
-    const [h, m] = timeStr.split(':').map(Number);
-    return h + m / 60;
-}
-
 export function Integrations() {
-    const [googleEmail, setGoogleEmail] = useState('');
-    const [outlookEmail, setOutlookEmail] = useState('');
-    const [events, setEvents] = useState<CalendarEvent[]>([]);
+    const [schedules, setSchedules] = useState<Schedule[]>([]);
     const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState('');
     const [mondayDate, setMondayDate] = useState<Date>(() => getMondayOfWeek(new Date()));
+    const [error, setError] = useState<string | null>(null);
 
-    const syncGoogle = async () => {
+    const hourStart = 8;
+    const hourEnd = 18;
+    const cellHeightPx = 60;
+    const locationId = '1f358c01-e709-4b3d-bf6f-49b7de464859'; // statique
+
+    const loadSchedules = async () => {
         setLoading(true);
-        setMessage('');
+        setError(null);
         try {
-            const data = await api.getCalendarEvents(googleEmail);
-            setEvents(data);
-            setMessage('Synchronisation Google réussie');
-        } catch {
-            setMessage('Erreur lors de la synchronisation Google');
+            const data = await api.getLocationSchedules(locationId);
+            setSchedules(data);
+        } catch (e: any) {
+            console.error('Erreur chargement schedules:', e);
+            setError(e.message || 'Erreur de chargement des cours');
         } finally {
             setLoading(false);
         }
     };
 
-    const syncOutlook = async () => {
-        setLoading(true);
-        setMessage('');
-        try {
-            const data = await api.getCalendarEvents(outlookEmail);
-            setEvents(data);
-            setMessage('Synchronisation Outlook réussie');
-        } catch {
-            setMessage('Erreur lors de la synchronisation Outlook');
-        } finally {
-            setLoading(false);
-        }
-    };
+    useEffect(() => {
+        loadSchedules();
+    }, []);
 
     const workWeekDates = getWorkWeekDates(mondayDate);
-    const eventsByDay = groupEventsByDay(events);
 
     const previousWeek = () => {
         const prev = new Date(mondayDate);
@@ -107,58 +76,42 @@ export function Integrations() {
         setMondayDate(next);
     };
 
-    const hourStart = 8;
-    const hourEnd = 18;
-    const cellHeightPx = 100;
+    const getEventsForDay = (dateStr: string) => {
+        const dayStart = new Date(dateStr + 'T00:00:00');
+        const dayEnd = new Date(dayStart);
+        dayEnd.setDate(dayEnd.getDate() + 1);
+
+        return schedules.filter(s => {
+            const start = new Date(s.startTime);
+            const end = new Date(s.endTime);
+            return start < dayEnd && end > dayStart;
+        });
+    };
 
     return (
         <Container maxWidth="lg" sx={{ mt: 4 }}>
             <Paper sx={{ p: 4 }}>
                 <Typography variant="h4" gutterBottom>
-                    Intégration Calendriers - Vue Agenda Hebdomadaire
+                    Intégration Calendrier – Vue hebdomadaire
                 </Typography>
 
-                <Stack spacing={3} mb={3}>
-                    <Box>
-                        <TextField
-                            fullWidth
-                            label="Adresse email Google"
-                            value={googleEmail}
-                            onChange={e => setGoogleEmail(e.target.value)}
-                            sx={{ mb: 1 }}
-                        />
-                        <Button variant="contained" onClick={syncGoogle} disabled={loading || !googleEmail}>
-                            Synchroniser Google
-                        </Button>
-                    </Box>
-                    <Box>
-                        <TextField
-                            fullWidth
-                            label="Adresse email Outlook (Teams)"
-                            value={outlookEmail}
-                            onChange={e => setOutlookEmail(e.target.value)}
-                            sx={{ mb: 1 }}
-                        />
-                        <Button variant="contained" onClick={syncOutlook} disabled={loading || !outlookEmail}>
-                            Synchroniser Outlook
-                        </Button>
-                    </Box>
-                </Stack>
-
-                {message && (
-                    <Typography color={message.includes('Erreur') ? 'error.main' : 'success.main'} sx={{ mb: 2 }}>
-                        {message}
-                    </Typography>
-                )}
-
-                <Stack direction="row" spacing={2} justifyContent="center" mb={2}>
+                <Stack direction="row" spacing={2} mb={2} justifyContent="center">
                     <Button variant="outlined" onClick={previousWeek}>
                         Semaine précédente
                     </Button>
                     <Button variant="outlined" onClick={nextWeek}>
                         Semaine suivante
                     </Button>
+                    <Button variant="contained" onClick={loadSchedules} disabled={loading}>
+                        Recharger
+                    </Button>
                 </Stack>
+
+                {error && (
+                    <Typography color="error" sx={{ mb: 2 }}>
+                        {error}
+                    </Typography>
+                )}
 
                 {loading && <CircularProgress sx={{ mb: 2 }} />}
 
@@ -173,7 +126,7 @@ export function Integrations() {
                             minWidth: 800
                         }}
                     >
-                        {/* En-tête : heure vide + 5 jours */}
+                        {/* En-têtes jours */}
                         <Box sx={{ borderRight: '1px solid', borderColor: 'divider' }}></Box>
                         {workWeekDates.map((dateStr) => {
                             const d = new Date(dateStr + 'T00:00:00');
@@ -197,12 +150,12 @@ export function Integrations() {
                             );
                         })}
 
-                        {/* Lignes par heure (8h à 18h) */}
+                        {/* Lignes horaires */}
                         {Array.from({ length: hourEnd - hourStart + 1 }).map((_, i) => {
                             const hour = hourStart + i;
                             return (
                                 <React.Fragment key={hour}>
-                                    {/* Heure */}
+                                    {/* Colonne heure */}
                                     <Box
                                         sx={{
                                             borderTop: '1px solid',
@@ -221,9 +174,9 @@ export function Integrations() {
                                         {String(hour).padStart(2, '0')}h00
                                     </Box>
 
-                                    {/* Cases pour chaque jour */}
+                                    {/* Colonnes jours */}
                                     {workWeekDates.map(dateStr => {
-                                        const dayEvents = eventsByDay[dateStr] || [];
+                                        const dayEvents = getEventsForDay(dateStr);
 
                                         return (
                                             <Box
@@ -235,33 +188,20 @@ export function Integrations() {
                                                     height: `${cellHeightPx}px`,
                                                     p: 0.25,
                                                     position: 'relative',
-                                                    overflow: 'visible'
+                                                    overflow: 'hidden'
                                                 }}
                                             >
-                                                {dayEvents.map(ev => {
-                                                    const startH = timeToDecimal(ev.start.split(' ')[1]);
-                                                    const endH = timeToDecimal(ev.end.split(' ')[1]);
-
-                                                    // Affiche l'événement SEULEMENT si la première heure se chevauche
-                                                    if (!(endH > hour && startH < hour + 1)) {
-                                                        return null; // Pas de chevauchement
-                                                    }
-
-                                                    const topOffset = (startH - hour) * 100;
-                                                    const heightInCells = endH - startH;
-                                                    const totalHeight = heightInCells * cellHeightPx;
-
-                                                    return (
+                                                {i === 0 &&
+                                                    dayEvents.map(ev => (
                                                         <Box
                                                             key={ev.id}
                                                             sx={{
                                                                 position: 'absolute',
-                                                                top: `${topOffset}%`,
+                                                                top: 0,
                                                                 left: 0,
                                                                 right: 0,
-                                                                height: `${totalHeight}px`,
-                                                                minHeight: '24px',
-                                                                p: 0.5,
+                                                                bottom: 0,
+                                                                m: 0.5,
                                                                 borderRadius: 0.5,
                                                                 backgroundColor: 'primary.light',
                                                                 color: 'primary.contrastText',
@@ -270,19 +210,22 @@ export function Integrations() {
                                                                 '&:hover': { backgroundColor: 'primary.main' },
                                                                 overflow: 'hidden',
                                                                 textOverflow: 'ellipsis',
-                                                                zIndex: 10
                                                             }}
-                                                            title={`${ev.title}\n${ev.start} - ${ev.end}\n${ev.provider}`}
+                                                            title={`${ev.summary}\n${new Date(ev.startTime).toLocaleDateString('fr-FR')} - ${new Date(ev.endTime).toLocaleDateString('fr-FR')}\n${ev.teacherEmail}`}
                                                         >
                                                             <Typography fontWeight="bold" lineHeight={1} fontSize={10}>
-                                                                {ev.title}
+                                                                {ev.summary || '(Sans titre)'}
                                                             </Typography>
-                                                            <Typography fontSize={8} lineHeight={1}>
-                                                                {ev.start.split(' ')[1]} - {ev.end.split(' ')[1]}
+                                                            <Typography fontSize={9} lineHeight={1}>
+                                                                {ev.teacherEmail}
                                                             </Typography>
+                                                            {ev.allDay && (
+                                                                <Typography fontSize={9} lineHeight={1}>
+                                                                    Toute la journée
+                                                                </Typography>
+                                                            )}
                                                         </Box>
-                                                    );
-                                                })}
+                                                    ))}
                                             </Box>
                                         );
                                     })}
