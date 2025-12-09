@@ -1,0 +1,252 @@
+// Fisheye Backend - Refactored Prisma Schema
+// Architecture: Location-centric avec entités séparées
+
+generator client {
+  provider        = "prisma-client"
+  output          = "./generated"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [uuidOssp(map: "uuid-ossp")]
+}
+
+// ========================================
+// ENUMS
+// ========================================
+
+enum VisitStatus {
+  pending
+  answered
+  missed
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+// ========================================
+// ENTITIES
+// ========================================
+
+// Local (emplacement physique)
+model Location {
+  id              String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name            String   @db.VarChar(255)
+  description     String?  @db.Text
+  calendarId      String?  @map("calendar_id") @db.VarChar(255)
+  teamsWebhookUrl String?  @map("teams_webhook_url") @db.VarChar(500)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  teachers         TeacherLocation[]
+  doorbells        Doorbell[]
+  LedPanels        LedPanel[]
+  visits           Visit[]
+  schedules        Schedule[]
+  receivedMessages Message[]         @relation("ReceivedMessages")
+
+  @@index([calendarId], name: "idx_locations_calendar_id")
+  @@map("locations")
+}
+
+// Professeur
+model Teacher {
+  id           String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  username     String   @unique @db.VarChar(255)
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  name         String   @db.VarChar(255)
+  gmailEmail   String?  @map("gmail_email") @db.VarChar(255)
+  teamsEmail   String?  @map("teams_email") @db.VarChar(255)
+  preferences  Json     @default("{\"notifyOnTeams\": true, \"buzzerEnabled\": true}") @db.JsonB
+  role         Role     @default(USER)
+  manualSchedule Json?    @map("manual_schedule") @db.JsonB
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  locations        TeacherLocation[]
+  buzzer           Buzzer?
+  targetedVisits   Visit[]           @relation("TargetedVisits")
+  answeredVisits   Visit[]           @relation("AnsweredVisits")
+  selectedInPanels LedPanel[]
+  receivedMessages Message[]         @relation("ReceivedMessages")
+
+  @@index([username], name: "idx_teachers_username")
+  @@index([email], name: "idx_teachers_email")
+  @@index([gmailEmail], name: "idx_teachers_gmail_email")
+  @@map("teachers")
+}
+
+// Table de liaison Teacher ↔ Location (many-to-many)
+model TeacherLocation {
+  teacherId  String   @map("teacher_id") @db.Uuid
+  locationId String   @map("location_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  teacher  Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@id([teacherId, locationId])
+  @@index([teacherId], name: "idx_teacher_location_teacher")
+  @@index([locationId], name: "idx_teacher_location_location")
+  @@map("teacher_locations")
+}
+
+// Sonnette (installée dans un local)
+model Doorbell {
+  id            String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  deviceId      String   @unique @map("device_id") @db.VarChar(255)
+  mqttClientId  String   @unique @map("mqtt_client_id") @db.VarChar(255)
+  locationId    String   @map("location_id") @db.Uuid
+
+  isOnline      Boolean  @default(false) @map("is_online")
+  lastSeen      DateTime @default(now()) @map("last_seen") @db.Timestamptz(6)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  visits   Visit[]
+
+  @@index([deviceId], name: "idx_doorbells_device_id")
+  @@index([mqttClientId], name: "idx_doorbells_mqtt_client_id")
+  @@index([locationId], name: "idx_doorbells_location_id")
+  @@index([isOnline], name: "idx_doorbells_is_online")
+  @@map("doorbells")
+}
+
+// Buzzer personnel (appartient à un professeur)
+model Buzzer {
+  id           String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  deviceId     String   @unique @map("device_id") @db.VarChar(255)
+  mqttClientId String   @unique @map("mqtt_client_id") @db.VarChar(255)
+  teacherId    String   @unique @map("teacher_id") @db.Uuid
+  isOnline     Boolean  @default(false) @map("is_online")
+  lastSeen     DateTime @default(now()) @map("last_seen") @db.Timestamptz(6)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId], name: "idx_buzzers_device_id")
+  @@index([mqttClientId], name: "idx_buzzers_mqtt_client_id")
+  @@index([teacherId], name: "idx_buzzers_teacher_id")
+  @@index([isOnline], name: "idx_buzzers_is_online")
+  @@map("buzzers")
+}
+
+// Panneau LED 5×4 (installé dans un local)
+model LedPanel {
+  id                String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  deviceId          String   @unique @map("device_id") @db.VarChar(255)
+  mqttClientId      String   @unique @map("mqtt_client_id") @db.VarChar(255)
+  locationId        String   @map("location_id") @db.Uuid
+  selectedTeacherId String?  @map("selected_teacher_id") @db.Uuid
+  isOnline          Boolean  @default(false) @map("is_online")
+  lastSeen          DateTime @default(now()) @map("last_seen") @db.Timestamptz(6)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  location        Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  selectedTeacher Teacher? @relation(fields: [selectedTeacherId], references: [id], onDelete: SetNull)
+
+  @@index([deviceId], name: "idx_led_panels_device_id")
+  @@index([mqttClientId], name: "idx_led_panels_mqtt_client_id")
+  @@index([locationId], name: "idx_led_panels_location_id")
+  @@index([selectedTeacherId], name: "idx_led_panels_selected_teacher_id")
+  @@index([isOnline], name: "idx_led_panels_is_online")
+  @@map("led_panels")
+}
+
+// Visite/Sonnerie
+model Visit {
+  id              String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  doorbellId      String      @map("doorbell_id") @db.Uuid
+  locationId      String      @map("location_id") @db.Uuid
+  targetTeacherId String?     @map("target_teacher_id") @db.Uuid
+  status          VisitStatus @default(pending)
+  answeredById    String?     @map("answered_by_id") @db.Uuid
+  answeredAt      DateTime?   @map("answered_at") @db.Timestamptz(6)
+  doorOpened      Boolean     @default(false) @map("door_opened")
+  doorOpenedAt    DateTime?   @map("door_opened_at") @db.Timestamptz(6)
+  autoMissAt      DateTime    @map("auto_miss_at") @db.Timestamptz(6)
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  doorbell      Doorbell  @relation(fields: [doorbellId], references: [id], onDelete: Cascade)
+  location      Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  targetTeacher Teacher?  @relation("TargetedVisits", fields: [targetTeacherId], references: [id], onDelete: SetNull)
+  answeredBy    Teacher?  @relation("AnsweredVisits", fields: [answeredById], references: [id], onDelete: SetNull)
+  messages      Message[]
+
+  @@index([doorbellId], name: "idx_visits_doorbell_id")
+  @@index([locationId], name: "idx_visits_location_id")
+  @@index([targetTeacherId], name: "idx_visits_target_teacher_id")
+  @@index([answeredById], name: "idx_visits_answered_by_id")
+  @@index([status], name: "idx_visits_status")
+  @@index([createdAt(sort: Desc)], name: "idx_visits_created_at")
+  @@index([status, autoMissAt], name: "idx_visits_status_auto_miss")
+  @@map("visits")
+}
+
+// Événements calendrier
+model Schedule {
+  id           String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  calendarId   String   @map("calendar_id") @db.VarChar(255)
+  eventId      String   @unique @map("event_id") @db.VarChar(255)
+  locationId   String   @map("location_id") @db.Uuid
+  teacherEmail String   @map("teacher_email") @db.VarChar(255)
+  summary      String   @db.Text
+  description  String?  @db.Text
+  startTime    DateTime @map("start_time") @db.Timestamptz(6)
+  endTime      DateTime @map("end_time") @db.Timestamptz(6)
+  allDay       Boolean  @default(false) @map("all_day")
+  lastSync     DateTime @default(now()) @map("last_sync") @db.Timestamptz(6)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@index([eventId], name: "idx_schedules_event_id")
+  @@index([calendarId], name: "idx_schedules_calendar_id")
+  @@index([locationId], name: "idx_schedules_location_id")
+  @@index([teacherEmail], name: "idx_schedules_teacher_email")
+  @@index([startTime], name: "idx_schedules_start_time")
+  @@map("schedules")
+}
+
+// Messages textuels depuis la sonnette
+model Message {
+  id               String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  text             String    @db.Text
+  senderInfo       String?   @map("sender_info") @db.VarChar(255)
+  visitId          String?   @map("visit_id") @db.Uuid
+  targetTeacherId  String?   @map("target_teacher_id") @db.Uuid
+  targetLocationId String?   @map("target_location_id") @db.Uuid
+  isRead           Boolean   @default(false) @map("is_read")
+  readAt           DateTime? @map("read_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  visit          Visit?    @relation(fields: [visitId], references: [id], onDelete: SetNull)
+  targetTeacher  Teacher?  @relation("ReceivedMessages", fields: [targetTeacherId], references: [id], onDelete: Cascade)
+  targetLocation Location? @relation("ReceivedMessages", fields: [targetLocationId], references: [id], onDelete: Cascade)
+
+  @@index([visitId], name: "idx_messages_visit_id")
+  @@index([targetTeacherId], name: "idx_messages_target_teacher_id")
+  @@index([targetLocationId], name: "idx_messages_target_location_id")
+  @@index([isRead], name: "idx_messages_is_read")
+  @@index([createdAt(sort: Desc)], name: "idx_messages_created_at")
+  @@map("messages")
+}

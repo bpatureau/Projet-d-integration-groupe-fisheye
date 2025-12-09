@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fisheye-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: fisheye
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d fisheye"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fisheye-network
+
+  mqtt:
+    build: ./mosquitto
+    container_name: fisheye-mqtt
+    restart: unless-stopped
+    environment:
+      MQTT_USERNAME: ${MQTT_USERNAME:-admin}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-password}
+    ports:
+      - "8883:8883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/certs:/mosquitto/certs
+      - mqtt_data:/mosquitto/data
+      - mqtt_logs:/mosquitto/log
+    networks:
+      - fisheye-network
+
+volumes:
+  postgres_data:
+    driver: local
+  mqtt_data:
+    driver: local
+  mqtt_logs:
+    driver: local
+
+networks:
+  fisheye-network:
+    driver: bridge
