@@ -78,10 +78,6 @@ export function Login() {
                         {loading ? <CircularProgress size={24} /> : 'Se connecter'}
                     </Button>
                 </Box>
-
-                <Typography variant="caption" display="block" textAlign="center" sx={{ mt: 3, color: 'text.secondary' }}>
-                    Credentials de démo : admin / admin
-                </Typography>
             </Paper>
         </Container>
     );

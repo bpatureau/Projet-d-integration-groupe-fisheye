@@ -12,26 +12,26 @@ import {
     Box,
     Stack
 } from '@mui/material';
-import { useWebSocket, type VisitEvent, type VisitStatus } from '../hooks/useWebSocket';
-import { api } from '../lib/api';
-
-interface VisitEventWithNames extends VisitEvent {
-    teacherNames: string[];
-}
+import { useWebSocket } from '../hooks/useWebSocket';
+import { api, type VisitEvent, type VisitStatus } from '../lib/api';
 
 export function Dashboard() {
     const { events: wsEvents } = useWebSocket('/ws');
-    const [visits, setVisits] = useState<VisitEventWithNames[]>([]);
+    const [visits, setVisits] = useState<VisitEvent[]>([]);
     const [filter, setFilter] = useState<'all' | 'missed'>('all');
     const [search, setSearch] = useState('');
     const [stats, setStats] = useState({ total: 0, missed: 0, today: 0 });
 
     useEffect(() => {
-        api.getEvents().then(data => {
-            const enriched = data.map(v => ({ ...v, teacherNames: v.teacherNames || [] }));
-            setVisits(enriched);
-            computeStats(enriched);
-        });
+        api.getEvents()
+            .then(data => {
+                setVisits(data);
+                computeStats(data);
+            })
+            .catch(error => {
+                console.error('Erreur chargement visites:', error);
+                // Optionnel : afficher un toast d'erreur
+            });
     }, []);
 
     useEffect(() => computeStats(visits), [visits]);
@@ -39,24 +39,21 @@ export function Dashboard() {
     useEffect(() => {
         if (wsEvents.length) {
             const ev = wsEvents[0];
-            setVisits(prev => [{ ...ev, teacherNames: ev.teacherNames || [] }, ...prev]);
+            setVisits(prev => [ev, ...prev]);
         }
     }, [wsEvents]);
 
-    const computeStats = (data: VisitEventWithNames[]) => {
+    const computeStats = (data: VisitEvent[]) => {
         const todayStr = new Date().toLocaleDateString('fr-FR');
         setStats({
             total: data.length,
             missed: data.filter(v => v.status === 'missed').length,
-            today: data.filter(v => v.date.startsWith(todayStr)).length
+            today: data.filter(v => v.date.startsWith(todayStr)).length,
         });
     };
 
     const refresh = () => {
-        api.getEvents().then(data => {
-            const enriched = data.map(v => ({ ...v, teacherNames: v.teacherNames || [] }));
-            setVisits(enriched);
-        });
+        api.getEvents().then(data => setVisits(data));
     };
 
     const handleDelete = (id: string) => api.deleteVisit(id).then(refresh);
@@ -85,12 +82,11 @@ export function Dashboard() {
                 Tableau de bord
             </Typography>
 
-            {/* Statistiques */}
             <Stack direction="row" spacing={2} mb={3}>
                 {[
                     { label: 'Total visites', value: stats.total },
                     { label: 'Manquées', value: stats.missed },
-                    { label: "Aujourd'hui", value: stats.today }
+                    { label: "Aujourd'hui", value: stats.today },
                 ].map((s, i) => (
                     <Box key={i} sx={{ flex: 1 }}>
                         <Card>
@@ -100,7 +96,6 @@ export function Dashboard() {
                 ))}
             </Stack>
 
-            {/* Filtres */}
             <Stack direction="row" spacing={2} mb={3} alignItems="center">
                 <TextField
                     label="Rechercher par ID"
@@ -119,7 +114,6 @@ export function Dashboard() {
                 </Button>
             </Stack>
 
-            {/* Liste des visites */}
             <Stack spacing={2}>
                 {displayed.map(v => (
                     <Card variant="outlined" key={v.id}>

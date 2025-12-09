@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_URL = import.meta.env.VITE_API_URL || 'https://fisheye-doorbell.up.railway.app';
 
 interface Teacher {
     id: string;
@@ -43,11 +43,40 @@ export const api = {
     getEvents: async (): Promise<VisitEvent[]> => {
         const token = localStorage.getItem('auth_token');
         const res = await fetch(`${API_URL}/api/visits`, {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
         });
 
-        if (!res.ok) throw new Error('Erreur lors de la récupération des visites');
-        return res.json();
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(`HTTP ${res.status}: ${errorText}`);
+        }
+
+        const response = await res.json();
+
+        // Gérer différents formats de réponse backend
+        let visits = [];
+        if (Array.isArray(response)) {
+            visits = response;
+        } else if (response.data && Array.isArray(response.data)) {
+            visits = response.data;
+        } else if (response.visits && Array.isArray(response.visits)) {
+            visits = response.visits;
+        } else {
+            console.error('Format réponse inattendu:', response);
+            throw new Error('Format de réponse invalide');
+        }
+
+        return visits.map((v: any) => ({
+            id: v.id,
+            date: new Date(v.createdAt).toLocaleString('fr-FR'),
+            status: v.status as VisitStatus,
+            message: v.message || undefined,
+            teacherNames: v.location ? [v.location.name] : [],
+        }));
+
     },
 
     deleteVisit: async (id: string): Promise<void> => {
