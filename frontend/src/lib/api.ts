@@ -69,8 +69,12 @@ export interface Message {
     targetTeacherId: string | null;
     targetLocationId: string | null;
     isRead: boolean;
+    readAt: string | null;
     createdAt: string;
     updatedAt: string;
+    visit?: any | null;
+    targetTeacher?: Teacher | null;
+    targetLocation?: Location | null;
 }
 
 export interface Schedule {
@@ -167,14 +171,64 @@ export const api = {
         }
 
         const response = await res.json();
-        if (Array.isArray(response.messages)) {
-            return response.messages;
+
+        let messages: Message[] = [];
+        if (response.messages && Array.isArray(response.messages)) {
+            messages = response.messages;
+        } else if (Array.isArray(response)) {
+            messages = response;
+        } else {
+            console.error('Format messages inattendu:', response);
+            return [];
         }
-        if (Array.isArray(response)) {
-            return response;
+
+        return messages.map((m: any) => ({
+            id: m.id,
+            text: m.text,
+            senderInfo: m.senderInfo,
+            visitId: m.visitId,
+            targetTeacherId: m.targetTeacherId,
+            targetLocationId: m.targetLocationId,
+            isRead: m.isRead ?? false,
+            readAt: m.readAt,
+            createdAt: m.createdAt,
+            updatedAt: m.updatedAt,
+            visit: m.visit,
+            targetTeacher: m.targetTeacher,
+            targetLocation: m.targetLocation,
+        }));
+    },
+
+    markMessageAsRead: async (messageId: string): Promise<void> => {
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`${API_URL}/api/messages/${messageId}/read`, {
+            method: 'PUT',
+            headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(`HTTP ${res.status}: ${errorText}`);
         }
-        console.error('Format messages inattendu:', response);
-        return [];
+    },
+
+    markAllAsRead: async (): Promise<void> => {
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`${API_URL}/api/messages/mark-all-read`, {
+            method: 'PUT',
+            headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(`HTTP ${res.status}: ${errorText}`);
+        }
     },
 
     deleteVisit: async (id: string): Promise<void> => {
@@ -201,17 +255,14 @@ export const api = {
     // ===== Devices ======
     getDoorbells: async (): Promise<Doorbell[]> => {
         const token = localStorage.getItem('auth_token');
-
         const res = await fetch(`${API_URL}/api/doorbells`, {
             headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) {
             throw new Error('Erreur lors de la récupération des sonnettes');
         }
-
         const data = await res.json();
-        console.log(data.doorbells);
-        return data.doorbells;
+        return data.doorbells || [];
     },
 
     getLocations: async (): Promise<Location[]> => {
@@ -221,7 +272,6 @@ export const api = {
         });
         if (!response.ok) throw new Error('Erreur récupération emplacements');
         const data = await response.json();
-        console.log('Locations reçues:', data);
         return data.locations || [];
     },
 
@@ -250,7 +300,6 @@ export const api = {
             method: 'DELETE',
             headers: { Authorization: `Bearer ${token}` },
         });
-
         if (!res.ok) throw new Error('Erreur lors de la suppression de la sonnette');
     },
 
@@ -283,8 +332,7 @@ export const api = {
             throw new Error('Erreur lors de la récupération des panels');
         }
         const data = await res.json();
-        console.log(data.panels);
-        return data.panels;
+        return data.panels || [];
     },
 
     createPanel: async (data: {
@@ -311,7 +359,6 @@ export const api = {
             method: 'DELETE',
             headers: { Authorization: `Bearer ${token}` },
         });
-
         if (!res.ok) throw new Error('Erreur lors de la suppression du panel');
     },
 
@@ -321,9 +368,9 @@ export const api = {
             method: 'DELETE',
             headers: { Authorization: `Bearer ${token}` },
         });
-
         if (!res.ok) throw new Error("Erreur lors de la suppression de l'emplacement");
     },
+
     getLocationSchedules: async (locationId: string): Promise<Schedule[]> => {
         const token = localStorage.getItem('auth_token');
         const res = await fetch(`${API_URL}/api/schedules/location/${locationId}`, {
@@ -342,7 +389,6 @@ export const api = {
         if (Array.isArray(data)) {
             return data;
         }
-        console.error('Format schedules inattendu:', data);
         return [];
     }
 };
