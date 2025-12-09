@@ -50,3 +50,5 @@ client.publish(TOPIC_AVAILABILITY, "online", retain=True)
 client.subscribe(f"fisheye/{CLIENT_ID}/data/teachers")
 client.subscribe(f"fisheye/{CLIENT_ID}/data/schedule")
 
+print('connected')
+
