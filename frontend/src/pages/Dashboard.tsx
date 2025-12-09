@@ -1,3 +1,4 @@
+// frontend/src/pages/Dashboard.tsx
 import { useState, useEffect } from 'react';
 import {
     Container,
@@ -12,28 +13,17 @@ import {
     Box,
     Stack
 } from '@mui/material';
-<<<<<<< HEAD
 import { useWebSocket } from '../hooks/useWebSocket';
 import { api, type VisitEvent, type VisitStatus } from '../lib/api';
 
 export function Dashboard() {
     const { events: wsEvents } = useWebSocket('/ws');
     const [visits, setVisits] = useState<VisitEvent[]>([]);
-=======
-import { type VisitEvent, type VisitStatus } from '../hooks/useWebSocket';
-import { api } from '../lib/api';
-
-interface VisitEventWithNames extends VisitEvent {
-    teacherNames: string[];
-}
-
-export function Dashboard() {
-    const [visits, setVisits] = useState<VisitEventWithNames[]>([]);
->>>>>>> e343fd3933b450a7c811d175f4686dc7c03a4f8b
     const [filter, setFilter] = useState<'all' | 'missed'>('all');
     const [search, setSearch] = useState('');
     const [stats, setStats] = useState({ total: 0, missed: 0, today: 0 });
 
+    // Chargement initial depuis l’API
     useEffect(() => {
         api.getEvents()
             .then(data => {
@@ -42,13 +32,13 @@ export function Dashboard() {
             })
             .catch(error => {
                 console.error('Erreur chargement visites:', error);
-                // Optionnel : afficher un toast d'erreur
             });
     }, []);
 
+    // Recalcul des stats si visites changent
     useEffect(() => computeStats(visits), [visits]);
 
-<<<<<<< HEAD
+    // Nouveau visite via WebSocket
     useEffect(() => {
         if (wsEvents.length) {
             const ev = wsEvents[0];
@@ -57,9 +47,6 @@ export function Dashboard() {
     }, [wsEvents]);
 
     const computeStats = (data: VisitEvent[]) => {
-=======
-    const computeStats = (data: VisitEventWithNames[]) => {
->>>>>>> e343fd3933b450a7c811d175f4686dc7c03a4f8b
         const todayStr = new Date().toLocaleDateString('fr-FR');
         setStats({
             total: data.length,
@@ -69,10 +56,13 @@ export function Dashboard() {
     };
 
     const refresh = () => {
-        api.getEvents().then(data => setVisits(data));
+        api.getEvents()
+            .then(data => setVisits(data))
+            .catch(err => console.error('Erreur refresh visites:', err));
     };
 
-    const handleDelete = (id: string) => api.deleteVisit(id).then(refresh);
+    const handleDelete = (id: string) =>
+        api.deleteVisit(id).then(refresh).catch(err => console.error('Erreur suppression:', err));
 
     const displayed = visits.filter(v =>
         (filter === 'all' || v.status === 'missed') &&
@@ -98,6 +88,7 @@ export function Dashboard() {
                 Tableau de bord
             </Typography>
 
+            {/* Statistiques */}
             <Stack direction="row" spacing={2} mb={3}>
                 {[
                     { label: 'Total visites', value: stats.total },
@@ -112,6 +103,7 @@ export function Dashboard() {
                 ))}
             </Stack>
 
+            {/* Filtres */}
             <Stack direction="row" spacing={2} mb={3} alignItems="center">
                 <TextField
                     label="Rechercher par ID"
@@ -130,6 +122,7 @@ export function Dashboard() {
                 </Button>
             </Stack>
 
+            {/* Liste des visites */}
             <Stack spacing={2}>
                 {displayed.map(v => (
                     <Card variant="outlined" key={v.id}>
