@@ -12,12 +12,24 @@ import {
     Box,
     Stack
 } from '@mui/material';
+<<<<<<< HEAD
 import { useWebSocket } from '../hooks/useWebSocket';
 import { api, type VisitEvent, type VisitStatus } from '../lib/api';
 
 export function Dashboard() {
     const { events: wsEvents } = useWebSocket('/ws');
     const [visits, setVisits] = useState<VisitEvent[]>([]);
+=======
+import { type VisitEvent, type VisitStatus } from '../hooks/useWebSocket';
+import { api } from '../lib/api';
+
+interface VisitEventWithNames extends VisitEvent {
+    teacherNames: string[];
+}
+
+export function Dashboard() {
+    const [visits, setVisits] = useState<VisitEventWithNames[]>([]);
+>>>>>>> e343fd3933b450a7c811d175f4686dc7c03a4f8b
     const [filter, setFilter] = useState<'all' | 'missed'>('all');
     const [search, setSearch] = useState('');
     const [stats, setStats] = useState({ total: 0, missed: 0, today: 0 });
@@ -36,6 +48,7 @@ export function Dashboard() {
 
     useEffect(() => computeStats(visits), [visits]);
 
+<<<<<<< HEAD
     useEffect(() => {
         if (wsEvents.length) {
             const ev = wsEvents[0];
@@ -44,6 +57,9 @@ export function Dashboard() {
     }, [wsEvents]);
 
     const computeStats = (data: VisitEvent[]) => {
+=======
+    const computeStats = (data: VisitEventWithNames[]) => {
+>>>>>>> e343fd3933b450a7c811d175f4686dc7c03a4f8b
         const todayStr = new Date().toLocaleDateString('fr-FR');
         setStats({
             total: data.length,

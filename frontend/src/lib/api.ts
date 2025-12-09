@@ -22,6 +22,42 @@ export interface VisitEvent {
     teacherNames: string[];
 }
 
+export interface Location {
+    id: string;
+    name: string;
+    description: string;
+    calendarId: string | undefined;
+    teamsWebhookUrl: string | undefined;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface Doorbell {
+    id: string;
+    deviceId: string;
+    mqttClientId: string;
+    locationId: string;
+    hasDoorSensor: boolean;
+    isOnline: boolean;
+    lastSeen: string;
+    createdAt: string;
+    updatedAt: string;
+    location: Location;
+}
+
+export interface Panel {
+    id: string;
+    deviceId: string;
+    mqttClientId: string;
+    locationId: string;
+    selectedTeacherId: string | null;
+    isOnline: boolean;
+    lastSeen: string;
+    createdAt: string;
+    updatedAt: string;
+    location: Location;
+    selectedTeacher: Teacher | null;
+}
 export const api = {
     // ===== AUTH =====
     login: async (username: string, password: string): Promise<LoginResponse> => {
@@ -99,4 +135,133 @@ export const api = {
         if (!res.ok) throw new Error('Erreur lors de la récupération du calendrier');
         return res.json();
     },
+
+    // ===== Devices ======
+    getDoorbells: async (): Promise<Doorbell[]> => {
+    const token = localStorage.getItem('auth_token');
+
+    const res = await fetch(`${API_URL}/api/doorbells`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+        throw new Error('Erreur lors de la récupération des sonnettes');
+    }
+
+    const data = await res.json();
+    console.log(data.doorbells)
+    return data.doorbells;
+    },
+
+    getLocations: async (): Promise<Location[]> => {
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch(`${API_URL}/api/locations`, {  // Ajout de /api/
+            headers: { Authorization: `Bearer ${token}` },  // Ajout du token
+        });
+        if (!response.ok) throw new Error('Erreur récupération emplacements');
+        const data = await response.json();
+        console.log('Locations reçues:', data);
+        return data.locations || [];
+    },
+
+    createDoorbell: async (data: {
+        deviceId: string;
+        mqttClientId: string;
+        locationId: string;
+        hasDoorSensor: boolean;
+    }): Promise<Doorbell> => {
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch(`${API_URL}/api/doorbells`, {  // Ajout de /api/
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`  // Ajout du token
+            },
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) throw new Error('Erreur création sonnette');
+        return response.json();
+    },
+
+    deleteDoorbell: async (id: string): Promise<void> => {
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`${API_URL}/api/doorbells/${id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!res.ok) throw new Error('Erreur lors de la suppression de la sonnette');
+    },
+
+    createLocation: async (data: {
+        name: string;
+        description: string;
+        calendarId?: string | undefined;
+        teamsWebhookUrl?: string | undefined;
+    }): Promise<Location> => {
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch(`${API_URL}/api/locations`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) throw new Error('Erreur création emplacement');
+        const result = await response.json();
+        return result.location || result;
+    },
+
+    getPanels: async (): Promise<Panel[]> => {
+    const token = localStorage.getItem('auth_token');
+    const res = await fetch(`${API_URL}/api/panels`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+        throw new Error('Erreur lors de la récupération des panels');
+    }
+    const data = await res.json();
+    console.log(data.panels);
+    return data.panels;
+    },
+
+    createPanel: async (data: {
+        deviceId: string;
+        mqttClientId: string;
+        locationId: string;
+    }): Promise<Panel> => {
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch(`${API_URL}/api/panels`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) throw new Error('Erreur création panel');
+        return response.json();
+    },
+
+    deletePanel: async (id: string): Promise<void> => {
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`${API_URL}/api/panels/${id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!res.ok) throw new Error('Erreur lors de la suppression du panel');
+    }, 
+
+    deleteLocation: async (id: string): Promise<void> => {
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`${API_URL}/api/locations/${id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!res.ok) throw new Error('Erreur lors de la suppression de l\'emplacement');
+    }
+
+    
 };
